@@ -1,0 +1,325 @@
+html,
+body {
+    margin: 0;
+    background-color: var(--theme-background, #1a1a1a);
+    color: var(--theme-text, #f6f6f6);
+}
+
+#svelte {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--theme-background, #1a1a1a);
+}
+
+/* ─── Root typography ────────────────────────────────────────── */
+:root {
+    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* ─── Nerd Font Asset Configuration ────────────────────────── */
+@font-face {
+    font-family: "Symbols Nerd Font";
+    src: url("/fonts/SymbolsNerdFont-Regular.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* Utility: Icon Rendering Class Engine */
+.nf {
+    font-family: "Symbols Nerd Font", monospace;
+    font-weight: normal; /* Prevents bold parent elements from breaking icons on Android */
+    font-style: normal;
+    display: inline-block;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.home {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
+    gap: 1rem;
+
+    /* Explicitly sets the layout width to prevent transform-collapsing */
+    width: 100%; 
+
+    transform: scale(var(--page-scale, 1));
+    transform-origin: top center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ─── Shared layout helpers ──────────────────────────────────── */
+.page {
+    min-height: 100vh;
+    background-color: var(--theme-background, #1a1a1a);
+    transition: background-color 0.3s ease;
+}
+
+.logo {
+    position: fixed;
+    top: 3rem;
+    left: 1rem;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.3s ease;
+}
+
+.side-nav {
+    position: fixed;
+    top: 7rem;
+    left: 1rem;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.3s ease;
+}
+
+/* keep logo always at top */
+.logo {
+    display: flex;
+}
+
+.nav-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.bottom-nav {
+    position: fixed;
+    bottom: 4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+}
+
+@media (max-width: 325px), (max-height: 372px) {
+    .side-nav {
+        opacity: 0;
+        pointer-events: none;
+    }
+    .logo {
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+/* Shared: page header action row */
+.profile-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+/* ── Shared modal styles ── */
+
+@keyframes modal-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes modal-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: modal-fade-in 0.15s ease-out;
+}
+
+.modal {
+    background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 75%, #000);
+    border: 1px solid var(--theme-border, #404040);
+    border-radius: 20px;
+    padding: 1.75rem 2rem 1.5rem;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    min-width: 240px;
+    max-width: min(400px, 90vw);
+    box-sizing: border-box;
+    animation: modal-scale-in 0.2s ease-out;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--theme-text, #f6f6f6);
+    letter-spacing: -0.01em;
+}
+
+.modal-input {
+    background: var(--theme-background, #1a1a1a);
+    border: 2px solid var(--theme-border, #404040);
+    border-radius: 12px;
+    color: var(--theme-text, #f6f6f6);
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    text-align: center;
+    padding: 0.6rem 0.9rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.modal-input:focus {
+    border-color: var(--theme-primary, #36b7bd);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-primary, #36b7bd) 20%, transparent);
+}
+
+.modal-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.modal-input[type="number"]::-webkit-inner-spin-button,
+.modal-input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    width: 100%;
+}
+
+.modal-btn {
+    border: 1px solid var(--theme-border, #404040);
+    border-radius: 8px;
+    padding: 0.6em 1.4em;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--theme-background, #1a1a1a);
+    color: var(--theme-text, #f6f6f6);
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.3;
+}
+
+.modal-btn:hover {
+    border-color: var(--theme-textSecondary, #b3b3b3);
+    background: color-mix(in srgb, var(--theme-textSecondary, #b3b3b3) 8%, var(--theme-background, #1a1a1a));
+}
+
+.modal-btn.primary {
+    background: var(--theme-primary, #36b7bd);
+    border-color: var(--theme-primary, #36b7bd);
+    color: #fff;
+    font-weight: 700;
+}
+
+.modal-btn.primary:hover {
+    background: var(--theme-primaryHover, #17a4ab);
+    border-color: var(--theme-primaryHover, #17a4ab);
+}
+
+/* ─── Android Layout Extensions ─────────────────────────────── */
+
+/* Arrange mobile side-nav into a horizontal toolbar */
+.android .side-nav {
+    top: auto;
+    bottom: 16vh;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+    gap: 1.25rem;
+}
+
+/* Establishes the absolute anchor alignment row for all navigation items */
+.android .nav-actions {
+    position: relative; 
+    flex-direction: row;
+    gap: 1.25rem;
+    align-items: center;
+}
+
+/* Breaks out of component scope boundaries so alignment centers perfectly to the whole row */
+.android .theme-selector {
+    position: static;
+}
+
+/* Forces the theme panel into a horizontal 2-row grid layered ABOVE or BELOW all buttons */
+.android .swatch-grid {
+    position: absolute;
+    z-index: 1000;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+
+    /* ──── Toggle Alignment Positioning Context ──── */
+    bottom: 100%;          /* Forces the menu to render ABOVE all buttons */
+    margin-bottom: 1rem;   /* Safe margin tracking spacing above buttons */
+    
+    /* Note: If you want it UNDERNEATH instead, comment out the two lines above and use: */
+    /* top: 100%; */
+    /* margin-top: 1rem; */
+    /* ────────────────────────────────────────────── */
+
+    /* 2-Row Horizontal Auto-Flow Distribution */
+    display: grid;
+    grid-template-rows: repeat(2, max-content);
+    grid-auto-flow: column;
+    gap: 0.5rem;
+
+    /* Floating Panel Cosmetics */
+    background: var(--theme-surface, #2d2d2d);
+    padding: 0.65rem;
+    border-radius: 12px;
+    border: 1px solid var(--theme-border, #404040);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Give the swatches fixed horizontal dimensions so they don't collapse in auto-flow rows */
+.android .swatch {
+    width: 30px !important;
+    height: 22px !important;
+}
+
+.android .credit {
+    bottom: 4rem !important; /* different position */
+    -webkit-tap-highlight-color: transparent; /* remove blue tap flash */
+}

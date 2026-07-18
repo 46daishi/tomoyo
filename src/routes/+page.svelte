@@ -1,156 +1,245 @@
 <script>
-  import { invoke } from "@tauri-apps/api/core";
+  import ActionButton from "$lib/components/ActionButton.svelte";
+  import { ICONS } from "$lib/icons.js";
 
-  let name = $state("");
-  let greetMsg = $state("");
-
-  async function greet(event) {
-    event.preventDefault();
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsg = await invoke("greet", { name });
-  }
 </script>
 
-<main class="container">
-  <h1>Welcome to Tauri + Svelte</h1>
-
-  <div class="row">
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo vite" alt="Vite Logo" />
-    </a>
-    <a href="https://tauri.app" target="_blank">
-      <img src="/tauri.svg" class="logo tauri" alt="Tauri Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank">
-      <img src="/svelte.svg" class="logo svelte-kit" alt="SvelteKit Logo" />
-    </a>
-  </div>
-  <p>Click on the Tauri, Vite, and SvelteKit logos to learn more.</p>
-
-  <form class="row" onsubmit={greet}>
-    <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
-    <button type="submit">Greet</button>
-  </form>
-  <p>{greetMsg}</p>
+<main class="page home">
 </main>
 
+<div class="logo">
+    <a href="https://x.com/46daishi" target="_blank" rel="noopener noreferrer"><img src="tomoyo_full.png" alt="tomoyo" /></a>
+</div>
+<nav class="side-nav" aria-label="App navigation">
+  <div class="nav-actions">
+      <ActionButton
+          icon={ICONS.settings}
+          variant="secondary"
+          size="small"
+      />
+      <ActionButton
+          icon={ICONS.stats}
+          variant="secondary"
+          size="small"
+      />
+      <ActionButton
+          icon={ICONS.unmute}
+          variant="secondary"
+          size="small"
+      />
+      <ActionButton
+          icon={ICONS.plus}
+          variant="secondary"
+          size="small"
+      />
+  </div>
+</nav>
+
 <style>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
+    .home {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        text-align: center;
+        gap: 1rem;
 
-.logo.svelte-kit:hover {
-  filter: drop-shadow(0 0 2em #ff3e00);
-}
+        transform: scale(var(--page-scale, 1));
+        transform-origin: top center;
+        height: 100vh;
+        overflow: hidden;
+    }
 
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
+    h1 {
+        font-size: 1.7em;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 15vh;
+        margin-bottom: 0;
+    }
 
-  color: #0f0f0f;
-  background-color: #f6f6f6;
+    .session-label {
+        font-size: 1.2em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
+    .timer-controls {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
 
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
+    .profile-picker {
+        margin-top: 1.5rem;
+        transition: opacity 0.2s ease;
+    }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
+    .logo img {
+        width: 50px;
+        height: 50px;
+        object-fit: contain;
+    }
 
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
+    /* Shared pill button style (edit + extend) */
+    .edit-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--theme-surface, #2d2d2d);
+        color: var(--theme-text, #ffffff);
+        border: 1px solid transparent;
+        border-radius: 100px;
+        padding: 0.3em 0.4em;
+        font-size: 0.45em;
+        cursor: pointer;
+        box-shadow: 0 4px 8px var(--theme-shadow, rgba(0, 0, 0, 0.3));
+        transition: all 0.3s ease;
+        transform: translateY(1px);
+    }
 
-.row {
-  display: flex;
-  justify-content: center;
-}
+    .edit-btn:hover:not(:disabled) {
+        border-color: var(--theme-primary, #36b7bd);
+        background-color: var(--theme-button, #1a1a1a);
+        transform: translateY(0px);
+    }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
+    .edit-btn:active {
+        transform: translateY(1px);
+    }
 
-a:hover {
-  color: #535bf2;
-}
+    .edit-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
 
-h1 {
-  text-align: center;
-}
+    .extend-btn {
+        font-size: 0.55em;
+    }
 
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
+    .name-input {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid var(--theme-primary, #36b7bd);
+        color: var(--theme-text, #ffffff);
+        font-size: 1.7em;
+        font-weight: bold;
+        font-family: inherit;
+        text-align: center;
+        width: 16ch;
+        outline: none;
+        margin-top: 15vh;
+    }
 
-button {
-  cursor: pointer;
-}
+    .add-modal {
+        width: 400px;
+    }
 
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
+    .ext-input {
+        font-size: 2rem;
+        font-weight: 700;
+        width: 5ch;
+    }
 
-input,
-button {
-  outline: none;
-}
+    .add-tabs {
+        display: flex;
+        background: var(--theme-background, #1a1a1a);
+        border-radius: 12px;
+        padding: 4px;
+        width: 100%;
+        gap: 4px;
+    }
 
-#greet-input {
-  margin-right: 5px;
-}
+    .add-tab {
+        flex: 1;
+        border: none;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.85rem;
+        font-weight: 600;
+        font-family: inherit;
+        padding: 0.45rem 0;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+    }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
+    .add-tab.active {
+        background: var(--theme-surface, #2d2d2d);
+        color: var(--theme-text, #f6f6f6);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
 
-  a:hover {
-    color: #24c8db;
-  }
+    .add-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+    }
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
+    .add-minutes {
+        width: 4.5rem;
+    }
 
+    .add-name {
+        flex: 1;
+    }
+
+    .modal-unit {
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-right: 0.25rem;
+    }
+
+    @media (max-height: 372px) {
+        .profile-picker {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        
+    }
+
+    @media (max-height: 450px) {
+        .credit {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+    }
+
+    /* ── Credit footer ───────────────────────────────────────────────────── */
+    .credit {
+        position: fixed;
+        bottom: 1.2rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(0);
+        display: flex;
+        align-items: center;
+        gap: 0.35em;
+        font-size: 0.8rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        text-decoration: none;
+        opacity: 0.30;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        white-space: nowrap;
+        pointer-events: auto;
+    }
+
+    .credit:hover {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-3px);
+    }
+
+    .credit-icon {
+        width: 14px;
+        height: 14px;
+        object-fit: contain;
+        opacity: 0.8;
+        border-radius: 3px;
+    }
 </style>
