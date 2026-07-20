@@ -1,10 +1,86 @@
 <script>
   import ActionButton from "$lib/components/ActionButton.svelte";
   import { ICONS } from "$lib/icons.js";
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { getDb } from '$lib/db';
 
+  let mediaList = $state([]);
+  let statusFilter = $state('all');
+  let showAddModal = $state(false);
+
+  let newTitle = $state('');
+  let newTag = $state('');
+  let newColor = $state('#89b4fa');
+
+  async function loadMedia() {
+      const db = await getDb();
+      mediaList = await db.select('SELECT * FROM media ORDER BY updated_at DESC');
+  }
+
+  let filtered = $derived(
+      statusFilter === 'all'
+          ? mediaList
+          : mediaList.filter((m) => m.status === statusFilter)
+  );
+
+  async function addMedia() {
+      if (!newTitle.trim()) return;
+      const db = await getDb();
+      await db.execute(
+          'INSERT INTO media (title, tag, color) VALUES ($1, $2, $3)',
+          [newTitle, newTag || null, newColor]
+      );
+      newTitle = '';
+      newTag = '';
+      showAddModal = false;
+      await loadMedia();
+  }
+
+  function openMedia(id) {
+      goto(`/media/${id}`);
+  }
+
+  onMount(loadMedia);
 </script>
 
 <main class="page home">
+    <div class="toolbar">
+            <select bind:value={statusFilter}>
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+                <option value="dropped">Dropped</option>
+            </select>
+            <button onclick={() => (showAddModal = true)}>+ Add media</button>
+        </div>
+    
+        <div class="grid">
+            {#each filtered as media (media.id)}
+                <button class="card" style="--accent: {media.color}" onclick={() => openMedia(media.id)}>
+                    {#if media.cover_path}
+                        <img src={media.cover_path} alt={media.title} />
+                    {:else}
+                        <div class="placeholder"></div>
+                    {/if}
+                    <div class="title">{media.title}</div>
+                    <div class="status">{media.status}</div>
+                </button>
+            {/each}
+        </div>
+    
+    {#if showAddModal}
+        <div class="modal-backdrop" onclick={() => (showAddModal = false)}>
+            <div class="modal" onclick={(e) => e.stopPropagation()}>
+                <h3>Add media</h3>
+                <input placeholder="Title" bind:value={newTitle} />
+                <input placeholder="Tag" bind:value={newTag} />
+                <input type="color" bind:value={newColor} />
+                <button onclick={addMedia}>Add</button>
+            </div>
+        </div>
+    {/if}
 </main>
 
 <div class="logo">
