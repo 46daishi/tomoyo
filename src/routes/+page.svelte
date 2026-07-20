@@ -1,9 +1,10 @@
 <script>
   import ActionButton from "$lib/components/ActionButton.svelte";
+  import SelectInput from "$lib/components/SelectInput.svelte";
   import { ICONS } from "$lib/icons.js";
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { getDb } from '$lib/db';
+  import { getDb, pickCoverImage, coverSrc } from '$lib/db';
 
   let mediaList = $state([]);
   let statusFilter = $state('all');
@@ -12,6 +13,15 @@
   let newTitle = $state('');
   let newTag = $state('');
   let newColor = $state('#89b4fa');
+  let newCoverPath = $state(null);
+
+  const statusOptions = [
+          { value: 'all', label: 'All' },
+          { value: 'active', label: 'Active' },
+          { value: 'paused', label: 'Paused' },
+          { value: 'completed', label: 'Completed' },
+          { value: 'dropped', label: 'Dropped' }
+  ];
 
   async function loadMedia() {
       const db = await getDb();
@@ -24,18 +34,28 @@
           : mediaList.filter((m) => m.status === statusFilter)
   );
 
-  async function addMedia() {
-      if (!newTitle.trim()) return;
-      const db = await getDb();
-      await db.execute(
-          'INSERT INTO media (title, tag, color) VALUES ($1, $2, $3)',
-          [newTitle, newTag || null, newColor]
-      );
-      newTitle = '';
-      newTag = '';
-      showAddModal = false;
-      await loadMedia();
+  async function handlePickCover() {
+          const path = await pickCoverImage();
+          if (path) newCoverPath = path;
   }
+
+  async function addMedia() {
+          if (!newTitle.trim()) return;
+          const db = await getDb();
+          await db.execute(
+              'INSERT INTO media (title, tag, color, cover_path) VALUES ($1, $2, $3, $4)',
+              [newTitle, newTag || null, newColor, newCoverPath]
+          );
+          newTitle = '';
+          newTag = '';
+          newCoverPath = null;
+          showAddModal = false;
+          await loadMedia();
+      }
+
+  function handleStatusFilterChange(e) {
+          statusFilter = e.target.value;
+    }
 
   function openMedia(id) {
       goto(`/media/${id}`);
@@ -46,41 +66,49 @@
 
 <main class="page home">
     <div class="toolbar">
-            <select bind:value={statusFilter}>
-                <option value="all">All</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="completed">Completed</option>
-                <option value="dropped">Dropped</option>
-            </select>
-            <button onclick={() => (showAddModal = true)}>+ Add media</button>
-        </div>
+            
+        <SelectInput
+                options={statusOptions}
+                value={statusFilter}
+                on:change={handleStatusFilterChange}
+        />
+        <button onclick={() => (showAddModal = true)}>+ Add media</button>
+    </div>
     
         <div class="grid">
             {#each filtered as media (media.id)}
                 <button class="card" style="--accent: {media.color}" onclick={() => openMedia(media.id)}>
-                    {#if media.cover_path}
-                        <img src={media.cover_path} alt={media.title} />
-                    {:else}
-                        <div class="placeholder"></div>
-                    {/if}
+                    <div class="cover">
+                        {#if media.cover_path}
+                            <img src={coverSrc(media.cover_path)} alt={media.title} />
+                        {:else}
+                            <div class="cover-placeholder"></div>
+                        {/if}
+                    </div>
                     <div class="title">{media.title}</div>
                     <div class="status">{media.status}</div>
                 </button>
             {/each}
         </div>
     
-    {#if showAddModal}
-        <div class="modal-backdrop" onclick={() => (showAddModal = false)}>
-            <div class="modal" onclick={(e) => e.stopPropagation()}>
-                <h3>Add media</h3>
-                <input placeholder="Title" bind:value={newTitle} />
-                <input placeholder="Tag" bind:value={newTag} />
-                <input type="color" bind:value={newColor} />
-                <button onclick={addMedia}>Add</button>
+        {#if showAddModal}
+            <div class="modal-backdrop" onclick={() => (showAddModal = false)}>
+                <div class="modal" onclick={(e) => e.stopPropagation()}>
+                    <h3>Add media</h3>
+                    <button class="cover-picker" onclick={handlePickCover}>
+                        {#if newCoverPath}
+                            <img src={coverSrc(newCoverPath)} alt="cover preview" />
+                        {:else}
+                            <span>+ Choose cover</span>
+                        {/if}
+                    </button>
+                    <input placeholder="Title" bind:value={newTitle} />
+                    <input placeholder="Tag" bind:value={newTag} />
+                    <input type="color" bind:value={newColor} />
+                    <button onclick={addMedia}>Add</button>
+                </div>
             </div>
-        </div>
-    {/if}
+        {/if}
 </main>
 
 <div class="logo">
@@ -112,18 +140,16 @@
 </nav>
 
 <style>
-    .home {
+    .page.home {
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: flex-start;
-        text-align: center;
         gap: 1rem;
-
-        transform: scale(var(--page-scale, 1));
-        transform-origin: top center;
-        height: 100vh;
-        overflow: hidden;
+        box-sizing: border-box;
+        width: 100%;
+        padding-top: 2rem;
+        padding-right: calc(1rem + 48px + 1.5rem);
+        padding-left: calc(1rem + 48px + 1.5rem);
     }
 
     h1 {
@@ -317,5 +343,99 @@
         object-fit: contain;
         opacity: 0.8;
         border-radius: 3px;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 3rem;
+        width: 100%;
+        max-width: 1100px; /* optional: stop cards from getting absurdly wide on a huge monitor */
+    }
+    
+    /* Very narrow: single column, tighter padding */
+    @media (max-width: 550px) {
+        .grid {
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
+        }
+        .content {
+            padding-inline: 1rem;
+        }
+    }
+
+    
+    .card {
+        display: flex;
+        flex-direction: column;
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        text-align: left;
+        color: inherit;
+    }
+    
+    .cover {
+        aspect-ratio: 2 / 3;
+        width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--surface1, #313244);
+        border: 2px solid transparent;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    
+    .card:hover .cover {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+    }
+    
+    .cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    
+    .cover-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--surface1, #313244), var(--surface0, #1e1e2e));
+    }
+    
+    .title {
+        margin-top: 0.5rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .status {
+        font-size: 0.75rem;
+        color: var(--subtext0, #a6adc8);
+        text-transform: capitalize;
+    }
+    
+    .cover-picker {
+        aspect-ratio: 2 / 3;
+        width: 120px;
+        border: 2px dashed var(--surface2, #45475a);
+        border-radius: 8px;
+        background: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        color: var(--subtext0, #a6adc8);
+        font-size: 0.8rem;
+    }
+    
+    .cover-picker img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
     }
 </style>

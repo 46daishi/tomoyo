@@ -8,6 +8,14 @@
     "opener:default",
     "sql:default",
     "sql:allow-execute",
-    "sql:allow-select"
+    "sql:allow-select",
+    "dialog:default",
+    "fs:allow-copy-file",
+    "fs:allow-mkdir",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:scope",
+      "allow": ["$APPDATA/covers", "$APPDATA/covers/**"]
+    }
   ]
 }
