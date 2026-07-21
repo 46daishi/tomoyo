@@ -5,6 +5,9 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getDb, pickCoverImage, coverSrc } from '$lib/db';
+  import { confirm } from '@tauri-apps/plugin-dialog';
+
+  let editingId = $state(null);
 
   let mediaList = $state([]);
   let statusFilter = $state('all');
@@ -35,23 +38,89 @@
       completed: '#cba6f7'
   };
 
+  const STATUS_ORDER = Object.fromEntries(statusOptions.map((o, i) => [o.value, i]));
+
   async function loadMedia() {
       const db = await getDb();
       mediaList = await db.select('SELECT * FROM media ORDER BY updated_at DESC');
   }
 
   let filtered = $derived(
-      statusFilter === 'all'
+      (statusFilter === 'all'
           ? mediaList
           : mediaList.filter((m) => m.status === statusFilter)
+      ).slice().sort((a, b) => {
+          const rankDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          if (rankDiff !== 0) return rankDiff;
+          return b.updated_at - a.updated_at; // most recently updated first, within same status
+      })
   );
 
+  function openAddModal() {
+      editingId = null;
+      newTitle = '';
+      newTag = '';
+      newStatus = 'active';
+      newColor = '#89b4fa';
+      newCoverPath = null;
+      showAddModal = true;
+  }
+
+  function openEditModal(media) {
+      editingId = media.id;
+      newTitle = media.title;
+      newTag = media.tag ?? '';
+      newStatus = media.status;
+      newColor = media.color;
+      newCoverPath = media.cover_path;
+      showAddModal = true;
+  }
+
   function closeAddModal() {
-          showAddModal = false;
-          newTitle = '';
-          newTag = '';
-          newStatus = 'active';
-          newCoverPath = null;
+      showAddModal = false;
+      editingId = null;
+      newTitle = '';
+      newTag = '';
+      newStatus = 'active';
+      newCoverPath = null;
+  }
+
+  async function saveMedia() {
+      if (!newTitle.trim()) return;
+      const db = await getDb();
+  
+      if (editingId) {
+          await db.execute(
+              'UPDATE media SET title = $1, tag = $2, status = $3, color = $4, cover_path = $5, updated_at = unixepoch() WHERE id = $6',
+              [newTitle, newTag || null, newStatus, newColor, newCoverPath, editingId]
+          );
+      } else {
+          await db.execute(
+              'INSERT INTO media (title, tag, status, color, cover_path) VALUES ($1, $2, $3, $4, $5)',
+              [newTitle, newTag || null, newStatus, newColor, newCoverPath]
+          );
+      }
+      closeAddModal();
+      await loadMedia();
+  }
+
+  async function handleDelete(media) {
+      const yes = await confirm(
+          `Delete "${media.title}"? This cannot be undone.`,
+          { title: 'Delete media', kind: 'warning' }
+      );
+      if (!yes) return;
+  
+      const db = await getDb();
+      await db.execute('DELETE FROM media WHERE id = $1', [media.id]);
+      await loadMedia();
+  }
+  
+  function handleCardKeydown(e, id) {
+      if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openMedia(id);
+      }
   }
 
   async function handlePickCover() {
@@ -61,18 +130,6 @@
           } catch (err) {
               console.error('cover pick failed:', err);
           }
-      }
-
-
-      async function addMedia() {
-              if (!newTitle.trim()) return;
-              const db = await getDb();
-              await db.execute(
-                  'INSERT INTO media (title, tag, status, color, cover_path) VALUES ($1, $2, $3, $4, $5)',
-                  [newTitle, newTag || null, newStatus, newColor, newCoverPath]
-              );
-              closeAddModal();
-              await loadMedia();
       }
 
   function handleStatusFilterChange(e) {
@@ -109,24 +166,46 @@
         />
     </div>
     
-        <div class="grid">
-            {#each filtered as media (media.id)}
-                <button class="card" style="--accent: {media.color}" onclick={() => openMedia(media.id)}>
-                    <div class="cover">
-                        {#if media.cover_path}
-                            <img src={coverSrc(media.cover_path)} alt={media.title} />
-                        {:else}
-                            <div class="cover-placeholder"></div>
-                        {/if}
+    <div class="grid">
+        {#each filtered as media (media.id)}
+            <div
+                class="card"
+                style="--accent: {media.color}"
+                onclick={() => openMedia(media.id)}
+                onkeydown={(e) => handleCardKeydown(e, media.id)}
+                role="button"
+                tabindex="0"
+            >
+                <div class="cover">
+                    {#if media.cover_path}
+                        <img src={coverSrc(media.cover_path)} alt={media.title} />
+                    {:else}
+                        <div class="cover-placeholder"></div>
+                    {/if}
+    
+                    <div class="cover-actions" onclick={(e) => e.stopPropagation()}>
+                        <ActionButton
+                            icon={ICONS.edit}
+                            variant="primary"
+                            size="mini"
+                            onAction={() => openEditModal(media)}
+                        />
+                        <ActionButton
+                            icon={ICONS.trash}
+                            variant="danger"
+                            size="mini"
+                            onAction={() => handleDelete(media)}
+                        />
                     </div>
-                    <div class="title">{media.title}</div>
-                    <div class="status">
-                        <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
-                        {media.status}
-                    </div>
-                </button>
-            {/each}
-        </div>
+                </div>
+                <div class="title">{media.title}</div>
+                <div class="status">
+                    <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
+                    {media.status}
+                </div>
+            </div>
+        {/each}
+    </div>
 
         {#if mediaList.length > 0 && filtered.length === 0}
             <p class="empty-notice">There are no media entries that match this query.</p>
@@ -135,7 +214,7 @@
         {#if showAddModal}
             <div class="modal-overlay" onclick={closeAddModal}>
                 <div class="modal add-media-modal" onclick={(e) => e.stopPropagation()}>
-                    <h3 class="modal-title">Add media</h3>
+                    <h3 class="modal-title">{editingId ? 'Edit media' : 'Add media'}</h3>
         
                     <div class="modal-body">
                         <button class="cover-picker" onclick={handlePickCover}>
@@ -164,8 +243,8 @@
                     </div>
         
                     <div class="modal-actions">
-                        <button class="modal-btn primary" onclick={addMedia}>Add</button>
-                        <button class="modal-btn" onclick={closeAddModal}>Cancel</button>
+                                <button class="modal-btn primary" onclick={saveMedia}>{editingId ? 'Save' : 'Add'}</button>
+                                <button class="modal-btn" onclick={closeAddModal}>Cancel</button>
                     </div>
                 </div>
             </div>
@@ -262,7 +341,7 @@
         border: 1px solid transparent;
         border-radius: 100px;
         padding: 0.3em 0.4em;
-        font-size: 0.45em;
+        font-size: 0.8em;
         cursor: pointer;
         box-shadow: 0 4px 8px var(--theme-shadow, rgba(0, 0, 0, 0.3));
         transition: all 0.3s ease;
@@ -414,7 +493,7 @@
     .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 2rem 3rem;
+        gap: 1.5rem 2.5rem;
         width: 100%;
         max-width: 1100px; /* optional: stop cards from getting absurdly wide on a huge monitor */
         margin-top: 10px;
@@ -461,19 +540,46 @@
     }
     
     .cover {
+        position: relative;
         aspect-ratio: 2 / 3;
         width: 100%;
         border-radius: 8px;
         overflow: hidden;
         background: var(--surface1, #313244);
         border: 2px solid transparent;
-        transition: border-color 0.15s ease, transform 0.15s ease, filter 0.3s ease;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+        /* filter removed from here */
+    }
+    
+    .cover img,
+    .cover-placeholder {
+        transition: filter 0.3s ease;
     }
     
     .card:hover .cover {
         border-color: var(--accent);
         transform: translateY(-2px);
-        filter: brightness(70%)
+    }
+    
+    .card:hover .cover img,
+    .card:hover .cover-placeholder {
+        filter: brightness(60%);
+    }
+
+    .cover-actions {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        gap: 0.4rem;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        z-index: 2;
+    }
+
+    .card:hover .cover-actions,
+    .card:focus-visible .cover-actions {
+        opacity: 1;
     }
     
     .cover img {

@@ -8,7 +8,7 @@
     /** Visual style variant. */
     export let variant = "primary"; // "primary" | "secondary" | "danger"
     /** Size preset. */
-    export let size = "default"; // "default" | "tiny" | "small" | "large"
+    export let size = "default"; // "default" | "tiny" | "small" | "large" | "mini"
     /** When true, the button is non-interactive and visually dimmed. */
     export let disabled = false;
 
@@ -102,6 +102,10 @@
     .action-button.tiny {
         padding: 0.7em 0.9em;
         font-size: 0.9em;
+    }
+    .action-button.mini {
+        padding: 0.5em 0.6em;
+        font-size: 0.8em;
     }
     .action-button.small {
         padding: 0.8em 1em;
