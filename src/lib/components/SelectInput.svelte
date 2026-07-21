@@ -24,7 +24,7 @@
         color: var(--theme-text, #f6f6f6);
         border: 2px solid var(--theme-border, #404040);
         border-radius: 8px;
-        padding: 0.4rem 1rem 0.4rem 1rem;
+        padding: 0.4rem 2.5rem 0.4rem 1rem;
         font-size: 0.9rem;
         font-weight: 500;
         cursor: pointer;

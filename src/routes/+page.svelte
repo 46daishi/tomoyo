@@ -14,14 +14,17 @@
   let newTag = $state('');
   let newColor = $state('#89b4fa');
   let newCoverPath = $state(null);
+  let newStatus = $state("active");
 
-  const statusOptions = [
+  const filterOptions = [
           { value: 'all', label: 'All' },
           { value: 'active', label: 'Active' },
           { value: 'paused', label: 'Paused' },
           { value: 'completed', label: 'Completed' },
           { value: 'dropped', label: 'Dropped' }
   ];
+
+  const statusOptions = filterOptions.filter((o) => o.value !== 'all');
 
   async function loadMedia() {
       const db = await getDb();
@@ -34,27 +37,45 @@
           : mediaList.filter((m) => m.status === statusFilter)
   );
 
-  async function handlePickCover() {
-          const path = await pickCoverImage();
-          if (path) newCoverPath = path;
-  }
-
-  async function addMedia() {
-          if (!newTitle.trim()) return;
-          const db = await getDb();
-          await db.execute(
-              'INSERT INTO media (title, tag, color, cover_path) VALUES ($1, $2, $3, $4)',
-              [newTitle, newTag || null, newColor, newCoverPath]
-          );
+  function closeAddModal() {
+          showAddModal = false;
           newTitle = '';
           newTag = '';
+          newStatus = 'active';
           newCoverPath = null;
-          showAddModal = false;
-          await loadMedia();
+  }
+
+  async function handlePickCover() {
+          try {
+              const path = await pickCoverImage();
+              if (path) newCoverPath = path;
+          } catch (err) {
+              console.error('cover pick failed:', err);
+          }
+      }
+
+
+      async function addMedia() {
+              if (!newTitle.trim()) return;
+              const db = await getDb();
+              await db.execute(
+                  'INSERT INTO media (title, tag, status, color, cover_path) VALUES ($1, $2, $3, $4, $5)',
+                  [newTitle, newTag || null, newStatus, newColor, newCoverPath]
+              );
+              closeAddModal();
+              await loadMedia();
       }
 
   function handleStatusFilterChange(e) {
           statusFilter = e.target.value;
+    }
+
+    function handleNewStatusChange(e) {
+            newStatus = e.target.value;
+    }
+
+    function handleTagInput(e) {
+            newTag = e.target.value.replace(/^#+/, '');
     }
 
   function openMedia(id) {
@@ -67,7 +88,7 @@
 <main class="page home">
     <div class="toolbar">
         <SelectInput
-                options={statusOptions}
+                options={filterOptions}
                 value={statusFilter}
                 on:change={handleStatusFilterChange}
         />
@@ -96,20 +117,40 @@
         </div>
     
         {#if showAddModal}
-            <div class="modal-backdrop" onclick={() => (showAddModal = false)}>
-                <div class="modal" onclick={(e) => e.stopPropagation()}>
-                    <h3>Add media</h3>
-                    <button class="cover-picker" onclick={handlePickCover}>
-                        {#if newCoverPath}
-                            <img src={coverSrc(newCoverPath)} alt="cover preview" />
-                        {:else}
-                            <span>+ Choose cover</span>
-                        {/if}
-                    </button>
-                    <input placeholder="Title" bind:value={newTitle} />
-                    <input placeholder="Tag" bind:value={newTag} />
-                    <input type="color" bind:value={newColor} />
-                    <button onclick={addMedia}>Add</button>
+            <div class="modal-overlay" onclick={closeAddModal}>
+                <div class="modal add-media-modal" onclick={(e) => e.stopPropagation()}>
+                    <h3 class="modal-title">Add media</h3>
+        
+                    <div class="modal-body">
+                        <button class="cover-picker" onclick={handlePickCover}>
+                            {#if newCoverPath}
+                                <img src={coverSrc(newCoverPath)} alt="cover preview" />
+                            {:else}
+                                <span>+ Cover</span>
+                            {/if}
+                        </button>
+        
+                        <div class="form-fields">
+                            <input class="modal-input" placeholder="Title" bind:value={newTitle} />
+        
+                            <div class="tag-input-group">
+                                <span class="tag-prefix">#</span>
+                                <input class="modal-input tag-input" placeholder="tag" value={newTag} oninput={handleTagInput} />
+                            </div>
+        
+                            <div class="status-color-row">
+                                <div class="status-field">
+                                    <SelectInput options={statusOptions} value={newStatus} on:change={handleNewStatusChange} />
+                                </div>
+                                <input class="color-input" type="color" bind:value={newColor} title="Card color" />
+                            </div>
+                        </div>
+                    </div>
+        
+                    <div class="modal-actions">
+                        <button class="modal-btn primary" onclick={addMedia}>Add</button>
+                        <button class="modal-btn" onclick={closeAddModal}>Cancel</button>
+                    </div>
                 </div>
             </div>
         {/if}
@@ -447,5 +488,97 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
+    }
+
+    .add-media-modal {
+        width: 420px;
+        align-items: stretch; /* override global .modal's center-alignment so this layout can go full-width */
+    }
+    
+    .modal-body {
+        display: flex;
+        gap: 1.25rem;
+        align-items: flex-start;
+    }
+    
+    .cover-picker {
+        flex-shrink: 0;
+        aspect-ratio: 2 / 3;
+        width: 110px;
+        border: 2px dashed var(--theme-border, #404040);
+        border-radius: 12px;
+        background: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.85rem;
+        transition: border-color 0.15s ease;
+    }
+    
+    .cover-picker:hover {
+        border-color: var(--theme-primary, #36b7bd);
+    }
+    
+    .cover-picker img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .form-fields {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+    
+    .form-fields .modal-input {
+        width: 100%;
+        text-align: left;
+    }
+    
+    .tag-input-group {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    
+    .tag-prefix {
+        position: absolute;
+        left: 0.9rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-weight: 600;
+        pointer-events: none;
+    }
+    
+    .tag-input {
+        padding-left: 1.7rem;
+    }
+    
+    .status-color-row {
+        display: flex;
+        justify-content: flex-start;
+        gap: 0.6rem;
+        align-items: center;
+    }
+    
+    .status-field {
+        flex: none;      /* was flex: 1 — stop stretching to fill the row */
+        min-width: 110px; /* adjust to whatever fits your status labels comfortably */
+    }
+    
+    .color-input {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border: 2px solid var(--theme-border, #404040);
+        border-radius: 10px;
+        background: var(--theme-background, #1a1a1a);
+        cursor: pointer;
+        padding: 2px;
     }
 </style>
