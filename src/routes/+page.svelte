@@ -66,13 +66,17 @@
 
 <main class="page home">
     <div class="toolbar">
-            
         <SelectInput
                 options={statusOptions}
                 value={statusFilter}
                 on:change={handleStatusFilterChange}
         />
-        <button onclick={() => (showAddModal = true)}>+ Add media</button>
+        <ActionButton
+            icon={ICONS.plus}
+            variant="primary"
+            size="tiny"
+            onAction={() => showAddModal = true}
+        />
     </div>
     
         <div class="grid">
@@ -127,12 +131,12 @@
           size="small"
       />
       <ActionButton
-          icon={ICONS.unmute}
+          icon={ICONS.book}
           variant="secondary"
           size="small"
       />
       <ActionButton
-          icon={ICONS.plus}
+          icon={ICONS.question}
           variant="secondary"
           size="small"
       />
@@ -150,6 +154,11 @@
         padding-top: 2rem;
         padding-right: calc(1rem + 48px + 1.5rem);
         padding-left: calc(1rem + 48px + 1.5rem);
+    }
+
+    .toolbar {
+        display: flex;
+        gap: 10px;
     }
 
     h1 {
