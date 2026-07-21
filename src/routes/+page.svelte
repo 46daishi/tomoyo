@@ -127,6 +127,10 @@
                 </button>
             {/each}
         </div>
+
+        {#if mediaList.length > 0 && filtered.length === 0}
+            <p class="empty-notice">There are no media entries that match this query.</p>
+        {/if}
     
         {#if showAddModal}
             <div class="modal-overlay" onclick={closeAddModal}>
@@ -611,5 +615,13 @@
         background: var(--theme-background, #1a1a1a);
         cursor: pointer;
         padding: 2px;
+    }
+
+    .empty-notice {
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 1.3rem;
+        text-align: center;
+        margin-top: 2rem;
+        opacity: 0.8;
     }
 </style>
