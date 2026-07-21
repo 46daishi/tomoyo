@@ -20,11 +20,20 @@
           { value: 'all', label: 'All' },
           { value: 'active', label: 'Active' },
           { value: 'paused', label: 'Paused' },
+          { value: 'planned', label: 'Planned' },
           { value: 'completed', label: 'Completed' },
           { value: 'dropped', label: 'Dropped' }
   ];
 
   const statusOptions = filterOptions.filter((o) => o.value !== 'all');
+
+  const STATUS_COLORS = {
+      active: '#a6e3a1',
+      planned: '#89b4fa',
+      paused: '#fab387',
+      dropped: '#f38ba8',
+      completed: '#cba6f7'
+  };
 
   async function loadMedia() {
       const db = await getDb();
@@ -111,7 +120,10 @@
                         {/if}
                     </div>
                     <div class="title">{media.title}</div>
-                    <div class="status">{media.status}</div>
+                    <div class="status">
+                        <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
+                        {media.status}
+                    </div>
                 </button>
             {/each}
         </div>
@@ -398,9 +410,28 @@
     .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 3rem;
+        gap: 2rem 3rem;
         width: 100%;
         max-width: 1100px; /* optional: stop cards from getting absurdly wide on a huge monitor */
+        margin-top: 10px;
+    }
+
+    .status {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-left: 0.2rem;
+        font-size: 0.75rem;
+        color: var(--subtext0, #a6adc8);
+        text-transform: capitalize;
+    }
+    
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--dot-color, var(--subtext0, #a6adc8));
+        flex-shrink: 0;
     }
     
     /* Very narrow: single column, tighter padding */
