@@ -382,12 +382,13 @@
         overflow: hidden;
         background: var(--surface1, #313244);
         border: 2px solid transparent;
-        transition: border-color 0.15s ease, transform 0.15s ease;
+        transition: border-color 0.15s ease, transform 0.15s ease, filter 0.3s ease;
     }
     
     .card:hover .cover {
         border-color: var(--accent);
         transform: translateY(-2px);
+        filter: brightness(70%)
     }
     
     .cover img {
