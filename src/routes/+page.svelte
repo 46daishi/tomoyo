@@ -290,6 +290,9 @@
         padding-top: 2rem;
         padding-right: calc(1rem + 48px + 1.5rem);
         padding-left: calc(1rem + 48px + 1.5rem);
+        padding-bottom: 2rem; /* breathing room at the bottom of the scroll */
+        max-height: 100vh;
+        overflow-y: auto;
     }
 
     .toolbar {
