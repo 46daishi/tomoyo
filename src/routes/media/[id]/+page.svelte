@@ -51,6 +51,27 @@
             if (timerHandle) clearInterval(timerHandle);
         };
     });
+
+    import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
+    
+    let currentSentence = $state('');
+    
+    function handleClipboardChange(text) {
+        currentSentence = text;
+        // later: run JP-detection + tokenizer here before accepting it
+    }
+    
+    $effect(() => {
+        if (sessionRunning) {
+            startClipboardListener(handleClipboardChange);
+        } else {
+            stopClipboardListener();
+        }
+    
+        return () => {
+            stopClipboardListener();
+        };
+    });
 </script>
 
 <main class="page home">
@@ -82,7 +103,11 @@
         </div>
 
         <div class="sentence-window">
-            <p class="sentence-placeholder">Waiting for a sentence…</p>
+            {#if currentSentence}
+                <p class="sentence-text">{currentSentence}</p>
+            {:else}
+                <p class="sentence-placeholder">Waiting for a sentence…</p>
+            {/if}
         </div>
     {:else}
         <p>Loading…</p>
@@ -164,7 +189,7 @@
         gap: 1.5rem;
         align-items: flex-start;
         width: 100%;
-        max-width: 700px;
+        max-width: 800px;
         margin-top:1rem;
     }
     
@@ -241,17 +266,28 @@
     
     .sentence-window {
         width: 100%;
-        max-width: 700px;
-        min-height: 240px;
+        max-width: 800px;
+        min-height: 200px;
         margin-top: 2rem;
         background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 70%, #000);
         border: 1px solid var(--theme-border, #404040);
         border-radius: 16px;
         display: flex;
-        align-items: center;
+        align-items: top;
         justify-content: center;
-        padding: 2rem;
+        padding: 2rem 2.5rem;
         box-sizing: border-box;
+    }
+
+    .sentence-text {
+        font-family: "Noto Sans JP", Inter, sans-serif;
+        color: var(--theme-text, #f6f6f6);
+        font-size: 1.9rem;
+        font-weight: 700;
+        line-height: 1.6;
+        text-align: left;
+        margin: 0;
+        width: 100%;
     }
     
     .sentence-placeholder {

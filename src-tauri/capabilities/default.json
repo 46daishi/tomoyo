@@ -13,6 +13,7 @@
     "fs:allow-copy-file",
     "fs:allow-mkdir",
     "fs:allow-exists",
+    "clipboard-manager:allow-read-text",
     {
       "identifier": "fs:scope",
       "allow": ["$APPDATA/covers", "$APPDATA/covers/**"]
