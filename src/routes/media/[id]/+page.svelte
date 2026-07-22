@@ -4,6 +4,7 @@
     import ActionButton from '$lib/components/ActionButton.svelte';
     import { ICONS } from '$lib/icons';
     import { coverSrc } from '$lib/db';
+    import { fly } from 'svelte/transition';
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
@@ -16,6 +17,38 @@
 
     $effect(() => {
         loadMedia(mediaId);
+    });
+
+    let sessionRunning = $state(false);
+    let sessionSeconds = $state(0);
+    let timerHandle = null;
+    
+    function formatTime(totalSeconds) {
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    }
+    
+    function toggleSession() {
+        if (sessionRunning) {
+            clearInterval(timerHandle);
+            timerHandle = null;
+            sessionRunning = false;
+            sessionSeconds = 0;
+        } else {
+            sessionRunning = true;
+            timerHandle = setInterval(() => {
+                sessionSeconds += 1;
+            }, 1000);
+        }
+    }
+    
+    $effect(() => {
+        return () => {
+            if (timerHandle) clearInterval(timerHandle);
+        };
     });
 </script>
 
@@ -60,10 +93,16 @@
           size="small"
       />
       <ActionButton
-          icon={ICONS.play}
-          variant="primary"
-          size="small"
+                icon={sessionRunning ? ICONS.pause : ICONS.play}
+                variant="primary"
+                size="small"
+                onAction={toggleSession}
       />
+      {#if sessionRunning}
+          <span class="session-timer" transition:fly={{ y: -8, duration: 200 }}>
+              {formatTime(sessionSeconds)}
+          </span>
+      {/if}
   </div>
 </nav>
 <style>
@@ -90,5 +129,13 @@
 
     .side-nav {
         top: 9.4rem;
+    }
+
+    .session-timer {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-variant-numeric: tabular-nums; /* keeps digit widths consistent so it doesn't jitter as numbers change */
+        text-align: center;
     }
 </style>
