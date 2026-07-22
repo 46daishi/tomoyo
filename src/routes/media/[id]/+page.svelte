@@ -6,6 +6,8 @@
     import { coverSrc } from '$lib/db';
     import { fly } from 'svelte/transition';
     import { STATUS_COLORS } from '$lib/constants.js';
+    import { isMostlyJapanese } from '$lib/japaneseDetect.js';
+    import { tokenizeSentence } from '$lib/tokenize.js';
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
@@ -54,11 +56,11 @@
 
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     
-    let currentSentence = $state('');
+    let tokens = $state([]);
     
-    function handleClipboardChange(text) {
-        currentSentence = text;
-        // later: run JP-detection + tokenizer here before accepting it
+    async function handleClipboardChange(text) {
+        if (!isMostlyJapanese(text)) return;
+        tokens = await tokenizeSentence(text);
     }
     
     $effect(() => {
@@ -72,6 +74,7 @@
             stopClipboardListener();
         };
     });
+
 </script>
 
 <main class="page home">
@@ -103,8 +106,12 @@
         </div>
 
         <div class="sentence-window">
-            {#if currentSentence}
-                <p class="sentence-text">{currentSentence}</p>
+            {#if tokens.length > 0}
+                <p class="sentence-text">
+                    {#each tokens as token}
+                        <span class="word-token">{token.surface}</span>
+                    {/each}
+                </p>
             {:else}
                 <p class="sentence-placeholder">Waiting for a sentence…</p>
             {/if}
@@ -295,5 +302,15 @@
         font-size: 1rem;
         text-align: center;
         margin: 0;
+    }
+
+    .word-token {
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background 0.15s ease;
+    }
+    
+    .word-token:hover {
+        background: color-mix(in srgb, var(--theme-primary, #36b7bd) 20%, transparent);
     }
 </style>

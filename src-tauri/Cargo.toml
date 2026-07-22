@@ -26,4 +26,6 @@ tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-fs = "2.5.1"
 tauri-plugin-clipboard-manager = "2.3.2"
+vibrato = "0.5.2"
+zstd = "0.13.3"
 
