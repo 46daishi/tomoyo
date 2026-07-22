@@ -6,6 +6,7 @@
   import { goto } from '$app/navigation';
   import { getDb, pickCoverImage, coverSrc } from '$lib/db';
   import { confirm } from '@tauri-apps/plugin-dialog';
+  import { STATUS_COLORS } from '$lib/constants.js';
 
   let editingId = $state(null);
 
@@ -29,14 +30,6 @@
   ];
 
   const statusOptions = filterOptions.filter((o) => o.value !== 'all');
-
-  const STATUS_COLORS = {
-      active: '#a6e3a1',
-      planned: '#89b4fa',
-      paused: '#fab387',
-      dropped: '#f38ba8',
-      completed: '#cba6f7'
-  };
 
   const STATUS_ORDER = Object.fromEntries(statusOptions.map((o, i) => [o.value, i]));
 
@@ -326,12 +319,6 @@
     .profile-picker {
         margin-top: 1.5rem;
         transition: opacity 0.2s ease;
-    }
-
-    .logo img {
-        width: 50px;
-        height: 50px;
-        object-fit: contain;
     }
 
     /* Shared pill button style (edit + extend) */

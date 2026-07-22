@@ -109,6 +109,12 @@ body {
     gap: 0.5rem;
 }
 
+.logo img {
+    width: 55px;
+    height: 55px;
+    object-fit: contain;
+}
+
 .bottom-nav {
     position: fixed;
     bottom: 4rem;

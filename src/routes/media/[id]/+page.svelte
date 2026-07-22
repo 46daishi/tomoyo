@@ -5,6 +5,7 @@
     import { ICONS } from '$lib/icons';
     import { coverSrc } from '$lib/db';
     import { fly } from 'svelte/transition';
+    import { STATUS_COLORS } from '$lib/constants.js';
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
@@ -54,21 +55,43 @@
 
 <main class="page home">
     {#if media}
-        <h1>{media.title}</h1>
-        <p>Status: {media.status}</p>
-        {#if media.cover_path}
-            <div class="logo">
-                <img src={coverSrc(media.cover_path)} alt={media.title} />
+        <div class="media-header">
+            <div class="cover">
+                {#if media.cover_path}
+                    <img src={coverSrc(media.cover_path)} alt={media.title} />
+                {:else}
+                    <div class="cover-placeholder"></div>
+                {/if}
             </div>
-        {:else}
-            <div class="cover-placeholder"></div>
-        {/if}
-        
+
+            <div class="media-info">
+                <div class="title-row">
+                    <h1 class="media-title">{media.title}</h1>
+                    {#if media.tag}
+                        <span class="tag-pill" style="--tag-color: {media.color}">#{media.tag}</span>
+                    {/if}
+                </div>
+            
+                <div class="media-meta">
+                    <span class="status">
+                        <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
+                        {media.status}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sentence-window">
+            <p class="sentence-placeholder">Waiting for a sentence…</p>
+        </div>
     {:else}
         <p>Loading…</p>
     {/if}
 </main>
 
+<div class="logo">
+    <a href="https://x.com/46daishi" target="_blank" rel="noopener noreferrer"><img src="/tomoyo_full.png" alt="tomoyo" /></a>
+</div>
 <nav class="side-nav" aria-label="App navigation">
   <div class="nav-actions">
       <ActionButton
@@ -120,16 +143,6 @@
         max-height: 100vh;
         overflow-y: auto;
     }
-    
-    .logo img {
-        width: 55px;
-        height: 90px;
-        object-fit: cover;
-    }
-
-    .side-nav {
-        top: 9.4rem;
-    }
 
     .session-timer {
         font-size: 0.75rem;
@@ -137,5 +150,114 @@
         color: var(--theme-textSecondary, #b3b3b3);
         font-variant-numeric: tabular-nums; /* keeps digit widths consistent so it doesn't jitter as numbers change */
         text-align: center;
+    }
+    
+    .title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+    }
+
+    .media-header {
+        display: flex;
+        gap: 1.5rem;
+        align-items: flex-start;
+        width: 100%;
+        max-width: 700px;
+        margin-top:1rem;
+    }
+    
+    .cover {
+        flex-shrink: 0;
+        aspect-ratio: 2 / 3;
+        width: 130px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--surface1, #313244);
+    }
+    
+    .cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    
+    .cover-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--surface1, #313244), var(--surface0, #1e1e2e));
+    }
+    
+    .media-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+        gap: 0.3rem;
+        padding-top: 0.4rem;
+    }
+    
+    .media-title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .media-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+    }
+    
+    .status {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        text-transform: capitalize;
+    }
+    
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--dot-color, var(--theme-textSecondary, #b3b3b3));
+        flex-shrink: 0;
+    }
+    
+    .tag-pill {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.01em 0.7em;
+        border-radius: 100px;
+        color: var(--tag-color, #89b4fa);
+        background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--tag-color, #89b4fa) 40%, transparent);
+    }
+    
+    .sentence-window {
+        width: 100%;
+        max-width: 700px;
+        min-height: 240px;
+        margin-top: 2rem;
+        background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 70%, #000);
+        border: 1px solid var(--theme-border, #404040);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        box-sizing: border-box;
+    }
+    
+    .sentence-placeholder {
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 1rem;
+        text-align: center;
+        margin: 0;
     }
 </style>
