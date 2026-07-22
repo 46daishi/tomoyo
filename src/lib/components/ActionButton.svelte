@@ -93,6 +93,11 @@
         border-color:  #dc3545;
         color: #ffffff;
     }
+
+    .action-button.danger:hover:not(:disabled) {
+        background-color: #CF2B3B;
+        border-color: #dc3445;
+    }
     
     .action-button.danger:hover:not(:disabled) {
         opacity: 0.85;
