@@ -8,6 +8,7 @@
     import { STATUS_COLORS } from '$lib/constants.js';
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
     import { tokenizeSentence } from '$lib/tokenize.js';
+    import { lookupSentence } from '$lib/lookup.js';
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
@@ -57,10 +58,11 @@
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     
     let tokens = $state([]);
+    let spans = $state([]);
     
     async function handleClipboardChange(text) {
         if (!isMostlyJapanese(text)) return;
-        tokens = await tokenizeSentence(text);
+        spans = await lookupSentence(text);
     }
     
     $effect(() => {
@@ -74,6 +76,9 @@
             stopClipboardListener();
         };
     });
+
+    
+    
 
 </script>
 
@@ -106,10 +111,12 @@
         </div>
 
         <div class="sentence-window">
-            {#if tokens.length > 0}
+            {#if spans.length > 0}
                 <p class="sentence-text">
-                    {#each tokens as token}
-                        <span class="word-token">{token.surface}</span>
+                    {#each spans as span}
+                        <span class="word-token" class:no-match={span.entries.length === 0}>
+                            {span.surface}
+                        </span>
                     {/each}
                 </p>
             {:else}
@@ -312,5 +319,13 @@
     
     .word-token:hover {
         background: color-mix(in srgb, var(--theme-primary, #36b7bd) 20%, transparent);
+    }
+
+    .word-token.no-match {
+        cursor: default;
+    }
+    
+    .word-token.no-match:hover {
+        background: none;
     }
 </style>

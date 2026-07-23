@@ -35,6 +35,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["resources/*.dic.zst"]
+    "resources": ["resources/*.dic.zst", "resources/*.json"]
   }
 }
