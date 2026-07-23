@@ -1,10 +1,14 @@
-use std::sync::Mutex;
+mod deconjugate;
+mod normalize;
+use deconjugate::{build_deconjugation_rules, deconjugate, DeconjRule};
+use normalize::normalize_variants;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use vibrato::{Dictionary, Tokenizer};
 use serde::Serialize;
 use tauri_plugin_sql::{Migration, MigrationKind};
 use zstd::Decoder;
-use std::collections::HashMap;
 use serde::Deserialize;
 
 #[derive(Serialize)]
@@ -27,73 +31,163 @@ struct DictEntry {
 }
 
 struct DictionaryIndex {
-    // maps any surface form (kanji OR kana) to the entries that use it
-    by_text: HashMap<String, Vec<DictEntry>>,
+    // Keyed by *normalized* text (see normalize::normalize_text) so that
+    // width/kana-script/iteration-mark variants of a spelling or reading
+    // all resolve to the same entries, the way JL's lookup does.
+    //
+    // Values are Arc<DictEntry>: each entry is allocated once and shared
+    // (pointer clone) across every spelling/reading key it's filed
+    // under, and every lookup hit that returns it — instead of the old
+    // deep clone of every Vec<String> field on each match.
+    by_text: HashMap<String, Vec<Arc<DictEntry>>>,
 }
 
 impl DictionaryIndex {
     fn build(entries: Vec<DictEntry>) -> Self {
-        let mut by_text: HashMap<String, Vec<DictEntry>> = HashMap::new();
+        let mut by_text: HashMap<String, Vec<Arc<DictEntry>>> = HashMap::new();
         for entry in entries {
+            let entry = Arc::new(entry);
             for spelling in entry.spellings.iter().chain(entry.readings.iter()) {
-                by_text.entry(spelling.clone()).or_default().push(entry.clone());
+                let key = normalize::normalize_text(spelling);
+                by_text.entry(key).or_default().push(Arc::clone(&entry));
             }
         }
         Self { by_text }
     }
 }
 
-const MAX_MATCH_CHARS: usize = 12; // JMdict entries rarely exceed this; tune if needed
+struct DeconjRulesState(Vec<DeconjRule>);
 
 #[derive(serde::Serialize)]
 struct MatchSpan {
-    start: usize,     // char index into the sentence
-    end: usize,       // char index (exclusive)
+    start: usize,
+    end: usize,
     surface: String,
-    entries: Vec<DictEntry>, // empty if this span is an unmatched fallback
+    entries: Vec<Arc<DictEntry>>,
+    deconjugated_from: Option<String>, // e.g. "must + past" — None if it was a literal match
 }
 
-fn longest_match_scan(text: &str, index: &DictionaryIndex) -> Vec<MatchSpan> {
+// Character count (not morpheme count) a phrase match can span. This is
+// purely a performance/sanity cap on how far the longest-match scan looks
+// ahead from a given position — it is NOT a linguistic boundary. JL does
+// not use POS tagging or any tokenizer to decide where a match is allowed
+// to end; the dictionary (plus deconjugation) is the only thing that
+// decides that. Whatever doesn't resolve to a real entry at a given
+// length just falls through to a shorter candidate at the same position.
+const MAX_CHARS_COMBINED: usize = 16;
+
+/// Mirrors JL's actual interaction model: JL does not pre-segment or
+/// pre-highlight a whole sentence. It resolves exactly one match, starting
+/// at the exact character position the user is pointing at (mouse
+/// position / cursor / click), by trying the longest candidate substring
+/// first and shrinking one character at a time until something resolves
+/// against the dictionary (literally or via deconjugation). Nothing is
+/// computed for the rest of the text — if the guess is wrong, the user
+/// just points one character over and a fresh lookup runs from there.
+///
+/// `skip` selects which successful match to return, counting from longest
+/// (skip = 0) downward — e.g. if 今日は, 今日, and 今 are all separately
+/// in the dictionary, skip=1 returns 今日 and skip=2 returns 今, letting
+/// a shorter word that a longer match "swallows" still be reached from
+/// the same starting character (JL/Yomitan expose this as a
+/// cycle-to-shorter-candidate hotkey rather than making longest-match
+/// smarter, since there's no general way to know which length the user
+/// actually wants).
+///
+/// Returns `None` if `position` is out of bounds, or if `skip` asks for
+/// more candidates than exist at this position (the caller should treat
+/// that as "wrap back to skip = 0"). A position with no dictionary/
+/// deconjugation match at all still returns `Some` at skip = 0, as a
+/// one-character span with empty `entries`.
+fn lookup_from_position(
+    text: &str,
+    position: usize,
+    skip: usize,
+    index: &DictionaryIndex,
+    decon_rules: &[DeconjRule],
+) -> Option<MatchSpan> {
     let chars: Vec<char> = text.chars().collect();
-    let mut spans = Vec::new();
-    let mut pos = 0;
+    let len = chars.len();
+    if position >= len {
+        return None;
+    }
 
-    while pos < chars.len() {
-        let max_len = (chars.len() - pos).min(MAX_MATCH_CHARS);
-        let mut matched = None;
-
-        // try longest substring first, shrink until something matches
-        for len in (1..=max_len).rev() {
-            let candidate: String = chars[pos..pos + len].iter().collect();
-            if let Some(entries) = index.by_text.get(&candidate) {
-                matched = Some((len, candidate, entries.clone()));
-                break;
+    let max_len = MAX_CHARS_COMBINED.min(len - position);
+    let mut found = 0usize;
+    for span_len in (1..=max_len).rev() {
+        let candidate: String = chars[position..position + span_len].iter().collect();
+        if let Some((entries, deconj_info)) = lookup_candidate(&candidate, index, decon_rules) {
+            if found == skip {
+                return Some(MatchSpan {
+                    start: position,
+                    end: position + span_len,
+                    surface: candidate,
+                    entries,
+                    deconjugated_from: deconj_info,
+                });
             }
+            found += 1;
         }
+    }
 
-        match matched {
-            Some((len, surface, entries)) => {
-                spans.push(MatchSpan { start: pos, end: pos + len, surface, entries });
-                pos += len;
-            }
-            None => {
-                // no dictionary entry at all starting here — emit a 1-char
-                // fallback span so the frontend still has something to render/click
-                let surface: String = chars[pos..pos + 1].iter().collect();
-                spans.push(MatchSpan { start: pos, end: pos + 1, surface, entries: vec![] });
-                pos += 1;
+    if skip == 0 {
+        let surface: String = chars[position..position + 1].iter().collect();
+        return Some(MatchSpan { start: position, end: position + 1, surface, entries: vec![], deconjugated_from: None });
+    }
+
+    None
+}
+
+/// Tries every normalized variant of `candidate` (there can be more than
+/// one due to chouonpu ambiguity — see normalize::chouonpu_variants)
+/// against the dictionary index: literal match first, then deconjugation.
+/// Among deconjugated hits, keeps the one with the *fewest* rule-chain
+/// steps, mirroring JL's "show only deconjugation processes with the
+/// fewest steps" behavior — otherwise rule iteration order can surface a
+/// bogus multi-step chain ahead of a correct one-step chain.
+// Increase depth from 3 to 5 to accommodate stacked causative-passive + desire + negative + past
+const MAX_DECONJUGATION_DEPTH: usize = 5;
+
+fn lookup_candidate(
+    candidate: &str,
+    index: &DictionaryIndex,
+    decon_rules: &[DeconjRule],
+) -> Option<(Vec<Arc<DictEntry>>, Option<String>)> {
+    let variants = normalize_variants(candidate);
+
+    for key in &variants {
+        if let Some(entries) = index.by_text.get(key) {
+            return Some((entries.clone(), None));
+        }
+    }
+
+    let mut best: Option<(usize, Vec<Arc<DictEntry>>, String)> = None;
+    for key in &variants {
+        for form in deconjugate(key, decon_rules, MAX_DECONJUGATION_DEPTH) {
+            if let Some(entries) = index.by_text.get(&form.text) {
+                let chain_len = form.rule_chain.len();
+                let is_better = best.as_ref().map_or(true, |(best_len, _, _)| chain_len < *best_len);
+                if is_better {
+                    best = Some((chain_len, entries.clone(), form.rule_chain.join(" + ")));
+                }
             }
         }
     }
 
-    spans
+    best.map(|(_, entries, chain)| (entries, Some(chain)))
 }
 
 struct DictState(DictionaryIndex);
 
 #[tauri::command]
-fn lookup_sentence(state: tauri::State<DictState>, text: String) -> Vec<MatchSpan> {
-    longest_match_scan(&text, &state.0)
+fn lookup_at_position(
+    dict_state: tauri::State<DictState>,
+    decon_state: tauri::State<DeconjRulesState>,
+    text: String,
+    position: usize,
+    skip: usize,
+) -> Option<MatchSpan> {
+    lookup_from_position(&text, position, skip, &dict_state.0, &decon_state.0)
 }
 
 #[tauri::command]
@@ -139,7 +233,7 @@ pub fn run() {
                 .add_migrations("sqlite:immersion.db", migrations)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![tokenize_text, lookup_sentence])
+        .invoke_handler(tauri::generate_handler![tokenize_text, lookup_at_position])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
 
@@ -149,7 +243,10 @@ pub fn run() {
             #[cfg(target_os = "linux")]
             window.set_decorations(false)?;
 
-            // ── Tokenizer (Vibrato) ──
+            // ── Tokenizer (Vibrato) — still used by tokenize_text for
+            // per-word reading/POS/base-form breakdown. It is not used by
+            // lookup_at_position, which resolves matches purely from the
+            // dictionary index + deconjugation rules. ──
             let resource_path = app
                 .path()
                 .resolve("resources/ipadic-mecab.dic.zst", tauri::path::BaseDirectory::Resource)?;
@@ -168,6 +265,7 @@ pub fn run() {
             let entries: Vec<DictEntry> = serde_json::from_str(&jmdict_json)?;
             let dictionary_index = DictionaryIndex::build(entries);
             app.manage(DictState(dictionary_index));
+            app.manage(DeconjRulesState(build_deconjugation_rules()));
 
             Ok(())
         })
