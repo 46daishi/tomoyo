@@ -12,7 +12,7 @@
     import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
     import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
     import { emit } from '@tauri-apps/api/event';
-    
+    import { onMount } from 'svelte';
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
@@ -180,27 +180,51 @@
         await tooltip.hide();
     }
 
+    const MINI_ENTER_WIDTH = 550;
+    const MINI_ENTER_HEIGHT = 400;
+    const MINI_EXIT_WIDTH = 620;   // slightly larger than enter, to avoid flicker at the boundary
+    const MINI_EXIT_HEIGHT = 350;
+    
     let miniMode = $state(false);
+    let resizeDebounceHandle = null;
     
-    async function toggleMiniMode() {
-        try {
-            const win = getCurrentWindow();
-            miniMode = !miniMode;
+    function applyMiniModeClasses(active) {
+        document.documentElement.classList.toggle('mini-mode', active);
+        document.body.classList.toggle('mini-mode', active);
+    }
     
-            if (miniMode) {
-                await win.setSize(new LogicalSize(500, 160));
-                await hideTooltip();
-                tooltipVisible = false;
-            } else {
-                await win.setSize(new LogicalSize(1000, 700));
-            }
+    function checkWindowSize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
     
-            document.body.classList.toggle('mini-mode', miniMode);
-            console.log('mini mode toggled, now:', miniMode);
-        } catch (err) {
-            console.error('toggleMiniMode failed:', err);
+        if (!miniMode && (w <= MINI_ENTER_WIDTH || h <= MINI_ENTER_HEIGHT)) {
+            miniMode = true;
+            applyMiniModeClasses(true);
+            hideTooltip();
+            tooltipVisible = false;
+        } else if (miniMode && w >= MINI_EXIT_WIDTH && h >= MINI_EXIT_HEIGHT) {
+            miniMode = false;
+            applyMiniModeClasses(false);
         }
     }
+    
+    function handleWindowResize() {
+        // Resize fires continuously while dragging — debounce so the
+        // threshold check (and its class toggling) doesn't run dozens of
+        // times a second mid-drag.
+        clearTimeout(resizeDebounceHandle);
+        resizeDebounceHandle = setTimeout(checkWindowSize, 50);
+    }
+    
+    onMount(() => {
+        checkWindowSize(); // handle the case where the window is already small on mount
+    
+        window.addEventListener('resize', handleWindowResize);
+        return () => {
+            window.removeEventListener('resize', handleWindowResize);
+            clearTimeout(resizeDebounceHandle);
+        };
+    });
 
     let tooltipX = $state(0);
     let tooltipY = $state(0);
@@ -360,14 +384,6 @@
             {:else}
                 <p class="sentence-placeholder">Waiting for a sentence…</p>
             {/if}
-            <div class="mini-toggle-wrapper">
-                    <ActionButton
-                        icon={miniMode ? ICONS.expand : ICONS.collapse}
-                        variant="secondary"
-                        size="mini"
-                        onAction={toggleMiniMode}
-                    />
-                </div>
 
         </div>
     {:else}
@@ -624,10 +640,11 @@
         border-radius: 0;
         border: none;
         padding: 1.5rem;
-        background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 45%, transparent);
+        background: color-mix(
+            in srgb,
+            color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 20%) 70%,
+            transparent
+        );
     }
-    
-    :global(body.mini-mode) .sentence-text {
-        font-size: 1.5rem; /* smaller than normal-mode's 1.9rem, since the window itself is now much smaller */
-    }
+
 </style>
