@@ -255,19 +255,17 @@
                                 <span class="tooltip-deconj">({tooltipSpan.deconjugated_from})</span>
                             {/if}
                         </div>
-                        {#if tooltipSpan.entries.length > 0}
+                        {#if tooltipSpan.entries.length > 0 || tooltipSpan.related_entries.length > 0}
                             <ul class="tooltip-entries">
-                                {#each tooltipSpan.entries as entry}
+                                {#each [...tooltipSpan.entries, ...tooltipSpan.related_entries] as entry}
                                     <li>
-                                        <div class="entry-readings">
-                                            {entry.spellings.join('・')}
-                                            {#if entry.readings.length > 0}
-                                                <span class="entry-reading-kana">【{entry.readings.join('・')}】</span>
+                                        <span class="entry-readings">
+                                            {entry.spellings[0] ?? entry.readings[0]}
+                                            {#if entry.readings[0] && entry.spellings.length > 0}
+                                                <span class="entry-reading-kana">({entry.readings[0]})</span>
                                             {/if}
-                                        </div>
-                                        {#if entry.pos.length > 0}
-                                            <div class="entry-pos">{entry.pos.join(', ')}</div>
-                                        {/if}
+                                        </span>
+                                        <div class="entry-pos">{entry.pos.join(', ')}</div>
                                         <div class="entry-definitions">{entry.definitions.join('; ')}</div>
                                     </li>
                                 {/each}

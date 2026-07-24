@@ -10,6 +10,7 @@ use serde::Serialize;
 use tauri_plugin_sql::{Migration, MigrationKind};
 use zstd::Decoder;
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Serialize)]
 struct TokenOut {
@@ -31,29 +32,99 @@ struct DictEntry {
 }
 
 struct DictionaryIndex {
-    // Keyed by *normalized* text (see normalize::normalize_text) so that
-    // width/kana-script/iteration-mark variants of a spelling or reading
-    // all resolve to the same entries, the way JL's lookup does.
-    //
-    // Values are Arc<DictEntry>: each entry is allocated once and shared
-    // (pointer clone) across every spelling/reading key it's filed
-    // under, and every lookup hit that returns it — instead of the old
-    // deep clone of every Vec<String> field on each match.
     by_text: HashMap<String, Vec<Arc<DictEntry>>>,
+    by_id: HashMap<u32, Arc<DictEntry>>,
+    // Maps each bigram (and, for single-character text, each unigram) to
+    // the set of entry ids that contain it somewhere in a spelling or
+    // reading. Used to narrow "contains" searches to a small candidate
+    // set instead of scanning every entry.
+    by_bigram: HashMap<String, HashSet<u32>>,
+}
+
+fn bigrams(text: &str) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() < 2 {
+        // single-character text: index the character itself so short
+        // queries/spellings are still reachable
+        return vec![chars.iter().collect()];
+    }
+    chars.windows(2).map(|w| w.iter().collect()).collect()
 }
 
 impl DictionaryIndex {
     fn build(entries: Vec<DictEntry>) -> Self {
         let mut by_text: HashMap<String, Vec<Arc<DictEntry>>> = HashMap::new();
+        let mut by_id: HashMap<u32, Arc<DictEntry>> = HashMap::new();
+        let mut by_bigram: HashMap<String, HashSet<u32>> = HashMap::new();
+
         for entry in entries {
             let entry = Arc::new(entry);
+
             for spelling in entry.spellings.iter().chain(entry.readings.iter()) {
                 let key = normalize::normalize_text(spelling);
-                by_text.entry(key).or_default().push(Arc::clone(&entry));
+                by_text.entry(key.clone()).or_default().push(Arc::clone(&entry));
+
+                for gram in bigrams(&key) {
+                    by_bigram.entry(gram).or_default().insert(entry.id);
+                }
+            }
+
+            by_id.insert(entry.id, Arc::clone(&entry));
+        }
+
+        Self { by_text, by_id, by_bigram }
+    }
+}
+
+fn find_containing(query: &str, index: &DictionaryIndex, limit: usize) -> Vec<Arc<DictEntry>> {
+    let normalized = normalize::normalize_text(query);
+    if normalized.is_empty() {
+        return Vec::new();
+    }
+
+    let grams = bigrams(&normalized);
+
+    // Intersect posting lists, starting from the smallest to minimize work.
+    let mut posting_sets: Vec<&HashSet<u32>> = grams
+        .iter()
+        .filter_map(|g| index.by_bigram.get(g))
+        .collect();
+
+    if posting_sets.len() < grams.len() {
+        // at least one bigram in the query doesn't exist anywhere in the
+        // dictionary at all, so no entry can possibly contain the query
+        return Vec::new();
+    }
+
+    posting_sets.sort_by_key(|s| s.len());
+
+    let mut candidates: HashSet<u32> = posting_sets[0].clone();
+    for set in &posting_sets[1..] {
+        candidates.retain(|id| set.contains(id));
+        if candidates.is_empty() {
+            return Vec::new();
+        }
+    }
+
+    let mut results = Vec::new();
+    for id in candidates {
+        if let Some(entry) = index.by_id.get(&id) {
+            let actually_contains = entry
+                .spellings
+                .iter()
+                .chain(entry.readings.iter())
+                .any(|s| normalize::normalize_text(s).contains(&normalized));
+
+            if actually_contains {
+                results.push(Arc::clone(entry));
+                if results.len() >= limit {
+                    break;
+                }
             }
         }
-        Self { by_text }
     }
+
+    results
 }
 
 struct DeconjRulesState(Vec<DeconjRule>);
@@ -64,7 +135,8 @@ struct MatchSpan {
     end: usize,
     surface: String,
     entries: Vec<Arc<DictEntry>>,
-    deconjugated_from: Option<String>, // e.g. "must + past" — None if it was a literal match
+    deconjugated_from: Option<String>,
+    related_entries: Vec<Arc<DictEntry>>, // entries containing `surface`, excluding exact matches already in `entries`
 }
 
 // Character count (not morpheme count) a phrase match can span. This is
@@ -118,12 +190,20 @@ fn lookup_from_position(
         let candidate: String = chars[position..position + span_len].iter().collect();
         if let Some((entries, deconj_info)) = lookup_candidate(&candidate, index, decon_rules) {
             if found == skip {
+                // ── NEW: compute related entries before returning ──
+                let exact_ids: HashSet<u32> = entries.iter().map(|e| e.id).collect();
+                let related = find_containing(&candidate, index, 20)
+                    .into_iter()
+                    .filter(|e| !exact_ids.contains(&e.id))
+                    .collect();
+
                 return Some(MatchSpan {
                     start: position,
                     end: position + span_len,
                     surface: candidate,
                     entries,
                     deconjugated_from: deconj_info,
+                    related_entries: related, // NEW field
                 });
             }
             found += 1;
@@ -132,7 +212,18 @@ fn lookup_from_position(
 
     if skip == 0 {
         let surface: String = chars[position..position + 1].iter().collect();
-        return Some(MatchSpan { start: position, end: position + 1, surface, entries: vec![], deconjugated_from: None });
+
+        // ── NEW: related entries for the no-match fallback too ──
+        let related = find_containing(&surface, index, 20);
+
+        return Some(MatchSpan {
+            start: position,
+            end: position + 1,
+            surface,
+            entries: vec![],
+            deconjugated_from: None,
+            related_entries: related, // NEW field
+        });
     }
 
     None
