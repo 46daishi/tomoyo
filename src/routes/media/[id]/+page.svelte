@@ -9,6 +9,10 @@
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
     import { tokenizeSentence } from '$lib/tokenize.js';
     import { lookupAtPosition } from '$lib/lookup.js';
+    import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+    import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
+    import { emit } from '@tauri-apps/api/event';
+    
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
@@ -145,6 +149,59 @@
         }
     }
 
+    let tooltipWindow = null;
+    
+    function getTooltipWindow() {
+        if (!tooltipWindow) {
+            tooltipWindow = WebviewWindow.getByLabel('tooltip');
+        }
+        return tooltipWindow;
+    }
+    
+    async function showTooltipAt(clientX, clientY, spanData) {
+        const tooltip = await getTooltipWindow();
+        const mainWindow = getCurrentWindow();
+        const mainPos = await mainWindow.outerPosition(); // physical px, top-left of the main window on screen
+        const scale = await mainWindow.scaleFactor();
+    
+        // clientX/clientY are CSS pixels relative to the webview's own viewport;
+        // convert to physical screen pixels and add the main window's own
+        // screen offset to get an absolute screen position for the tooltip window.
+        const screenX = mainPos.x + clientX * scale;
+        const screenY = mainPos.y + clientY * scale;
+    
+        await tooltip.setPosition(new LogicalPosition(screenX / scale, screenY / scale));
+        await emit('tooltip-content', spanData);
+        await tooltip.show();
+    }
+    
+    async function hideTooltip() {
+        const tooltip = await getTooltipWindow();
+        await tooltip.hide();
+    }
+
+    let miniMode = $state(false);
+    
+    async function toggleMiniMode() {
+        try {
+            const win = getCurrentWindow();
+            miniMode = !miniMode;
+    
+            if (miniMode) {
+                await win.setSize(new LogicalSize(500, 160));
+                await hideTooltip();
+                tooltipVisible = false;
+            } else {
+                await win.setSize(new LogicalSize(1000, 700));
+            }
+    
+            document.body.classList.toggle('mini-mode', miniMode);
+            console.log('mini mode toggled, now:', miniMode);
+        } catch (err) {
+            console.error('toggleMiniMode failed:', err);
+        }
+    }
+
     let tooltipX = $state(0);
     let tooltipY = $state(0);
     let sentenceWindowEl;
@@ -153,19 +210,24 @@
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
             if (tooltipVisible && tooltipSpan === hoveredSpan) {
                 tooltipVisible = false;
+                if (miniMode) hideTooltip();
             } else {
                 tooltipSpan = hoveredSpan;
                 tooltipVisible = true;
     
                 const charRect = event.currentTarget.getBoundingClientRect();
-                const containerRect = sentenceWindowEl.getBoundingClientRect();
     
-                const rawX = charRect.left - containerRect.left;
-                const tooltipWidth = 420; // matches CSS max-width
-                const maxX = containerRect.width - tooltipWidth - 16; // 16px safety margin
+                if (miniMode) {
+                    showTooltipAt(charRect.left, charRect.bottom + 6, hoveredSpan);
+                } else {
+                    const containerRect = sentenceWindowEl.getBoundingClientRect();
+                    const rawX = charRect.left - containerRect.left;
+                    const tooltipWidth = 420; // matches .lookup-tooltip's max-width
+                    const maxX = containerRect.width - tooltipWidth - 16;
     
-                tooltipX = Math.max(8, Math.min(rawX, maxX));
-                tooltipY = charRect.bottom - containerRect.top + 6;
+                    tooltipX = Math.max(8, Math.min(rawX, maxX));
+                    tooltipY = charRect.bottom - containerRect.top + 6;
+                }
             }
             event.stopPropagation();
         }
@@ -176,6 +238,7 @@
     // different word, dismisses it.
     function handleWindowClick() {
         tooltipVisible = false;
+        if (miniMode) hideTooltip();
     }
 
     // mouseleave (unlike mouseout) only fires when the pointer truly
@@ -261,7 +324,7 @@
                     {/each}
                 </p>
 
-                {#if tooltipVisible && tooltipSpan}
+                {#if tooltipVisible && tooltipSpan && !miniMode}
                     <div
                             class="lookup-tooltip"
                             style="left: {tooltipX}px; top: {tooltipY}px;"
@@ -297,6 +360,15 @@
             {:else}
                 <p class="sentence-placeholder">Waiting for a sentence…</p>
             {/if}
+            <div class="mini-toggle-wrapper">
+                    <ActionButton
+                        icon={miniMode ? ICONS.expand : ICONS.collapse}
+                        variant="secondary"
+                        size="mini"
+                        onAction={toggleMiniMode}
+                    />
+                </div>
+
         </div>
     {:else}
         <p>Loading…</p>
@@ -514,88 +586,48 @@
         border-bottom-right-radius: 4px;
     }
 
-    .lookup-tooltip {
+    .mini-toggle-wrapper {
         position: absolute;
-        text-align: left;
-        max-width: 420px;
-        background: var(--theme-surface, #1e1e2e);
-        border: 1px solid var(--theme-border, #404040);
-        border-radius: 10px;
-        padding: 0.9rem 1.1rem;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-        z-index: 10;
-        font-family: "Noto Sans JP", Inter, sans-serif;
+        bottom: 1rem;
+        right: 1rem;
+        z-index: 5;
+    }
+
+    :global(body.mini-mode) .side-nav,
+    :global(body.mini-mode) .logo,
+    :global(body.mini-mode) .side-nav,
+    :global(body.mini-mode) .logo {
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
     
-    .tooltip-surface {
-        font-family: "Noto Sans JP", Inter, sans-serif;
-        font-weight: 700;
-        font-size: 1.1rem;
-        color: var(--theme-text, #f6f6f6);
-        text-align: left;
-        margin: 0 0 0.7rem;
-        padding-bottom: 0.6rem;
-        border-bottom: 1px solid var(--theme-border, #404040);
+    :global(body.mini-mode) .media-header {
+        display: none !important;
     }
-    
-    .tooltip-entries {
-        list-style: none;
-        margin: 0;
+    :global(body.mini-mode) .page.home {
         padding: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start; /* in case any ancestor sets align-items: center via flex */
-        gap: 0.6rem;
-        max-height: 260px;
-        overflow-y: auto;
-        text-align: left;
+        max-height: 100vh;
+        overflow: hidden;
+        gap: 0;
     }
     
-    .tooltip-entries li {
-        text-align: left;
-        width: 100%;
-    }
-
-    .tooltip-entries li + li {
-        border-top: 1px solid var(--theme-border, #404040);
-        padding-top: 0.6rem;
+    :global(body.mini-mode) .page.home {
+        background: transparent !important;
     }
     
-    .tooltip-deconj {
-        font-weight: 400;
-        font-size: 0.8rem;
-        color: var(--theme-textSecondary, #b3b3b3);
-        margin-left: 0.4rem;
+    :global(body.mini-mode) .sentence-window {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        min-height: 0;
+        margin: 0;
+        border-radius: 0;
+        border: none;
+        padding: 1.5rem;
+        background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 45%, transparent);
     }
-
-    .entry-readings {
-        font-weight: 600;
-        color: var(--theme-primary, #f6f6f6);
-        font-size: 1.1rem;
-    }
-
-    .entry-reading-kana {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--theme-accent, #b3b3b3);
-    }
-
-    .entry-pos {
-        font-size: 0.65rem;
-        color: var(--theme-textSecondary, #36b7bd);
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        margin-top: 0.15rem;
-    }
-
-    .entry-definitions {
-        font-size: 0.95rem;
-        color: var(--theme-text, #b3b3b3);
-        margin-top: 0rem;
-    }
-
-    .tooltip-no-match {
-        font-size: 1rem;
-        color: var(--theme-textSecondary, #b3b3b3);
+    
+    :global(body.mini-mode) .sentence-text {
+        font-size: 1.5rem; /* smaller than normal-mode's 1.9rem, since the window itself is now much smaller */
     }
 </style>

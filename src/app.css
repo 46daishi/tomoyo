@@ -366,3 +366,100 @@ body {
     bottom: 4rem !important; /* different position */
     -webkit-tap-highlight-color: transparent; /* remove blue tap flash */
 }
+
+/* Tooltip stuff  */
+.lookup-tooltip {
+    position: absolute;
+    text-align: left;
+    min-width:300px;
+    max-width: 500px;
+    background: color-mix(
+        in srgb,
+        color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 100%) 95%,
+        transparent
+    );
+    border: 1px solid var(--theme-border, #404040);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    z-index: 10;
+    font-family: "Noto Sans JP", Inter, sans-serif;
+}
+
+.tooltip-surface {
+    font-family: "Noto Sans JP", Inter, sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--theme-text, #f6f6f6);
+    text-align: left;
+    margin: 0 0 0.7rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--theme-border, #404040);
+}
+
+.tooltip-entries {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* in case any ancestor sets align-items: center via flex */
+    gap: 0.6rem;
+    max-height: 260px;
+    overflow-y: auto;
+    text-align: left;
+}
+
+.tooltip-entries li {
+    text-align: left;
+    width: 100%;
+}
+
+.tooltip-entries li + li {
+    border-top: 1px solid var(--theme-border, #404040);
+    padding-top: 0.6rem;
+}
+
+.tooltip-deconj {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--theme-textSecondary, #b3b3b3);
+    margin-left: 0.4rem;
+}
+
+.entry-readings {
+    font-weight: 600;
+    color: var(--theme-primary, #f6f6f6);
+    font-size: 1.1rem;
+}
+
+.entry-reading-kana {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--theme-accent, #b3b3b3);
+}
+
+.entry-pos {
+    font-size: 0.65rem;
+    color: var(--theme-textSecondary, #36b7bd);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 0.15rem;
+}
+
+.entry-definitions {
+    font-size: 0.95rem;
+    color: var(--theme-text, #b3b3b3);
+    margin-top: 0rem;
+}
+
+.tooltip-no-match {
+    font-size: 1rem;
+    color: var(--theme-textSecondary, #b3b3b3);
+}
+
+html.mini-mode,
+body.mini-mode,
+body.mini-mode #svelte {
+    background: transparent !important;
+}

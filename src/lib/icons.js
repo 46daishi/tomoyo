@@ -29,4 +29,6 @@ export const ICONS = {
   reorder: "\udb80\udddb",
   book: "\uf02d",
   question: "\uf128",
+  expand: "\udb81\ude16",
+  collapse: "\udb81\ude15",
 };

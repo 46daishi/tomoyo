@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": ["main", "tooltip"],
   "permissions": [
     "core:default",
     "opener:default",
@@ -14,6 +14,14 @@
     "fs:allow-mkdir",
     "fs:allow-exists",
     "clipboard-manager:allow-read-text",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "core:window:allow-outer-position",
+    "core:window:allow-scale-factor",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
     {
       "identifier": "fs:scope",
       "allow": ["$APPDATA/covers", "$APPDATA/covers/**"]

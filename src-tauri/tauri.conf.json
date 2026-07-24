@@ -10,20 +10,32 @@
     "frontendDist": "../build"
   },
   "app": {
-    "windows": [
-      {
-        "title": "tomoyo",
-        "width": 800,
-        "height": 600
+      "windows": [
+          {
+              "label": "main",
+              "title": "Tomoyo",
+              "transparent": true
+          },
+          {
+              "label": "tooltip",
+              "url": "/tooltip",
+              "width": 420,
+              "height": 200,
+              "decorations": false,
+              "transparent": true,
+              "alwaysOnTop": true,
+              "skipTaskbar": true,
+              "visible": false,
+              "resizable": false,
+              "shadow": false
+          }
+      ],
+      "security": {
+          "assetProtocol": {
+              "enable": true,
+              "scope": ["$APPDATA/covers/*"]
+          }
       }
-    ],
-    "security": {
-      "csp": null,
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["$APPDATA/covers/*"]
-      }
-    }
   },
   "bundle": {
     "active": true,
