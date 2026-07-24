@@ -13,14 +13,22 @@
     import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
     import { emit } from '@tauri-apps/api/event';
     import { onMount } from 'svelte';
+    import { setMediaTitle } from '$lib/stores/presence.svelte.js';
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
 
+    
+    
     async function loadMedia(id) {
         const db = await getDb();
         const rows = await db.select('SELECT * FROM media WHERE id = $1', [id]);
         media = rows[0] ?? null;
+        
+        // Update presence title when media is fetched
+        if (media?.title) {
+            setMediaTitle(media.title);
+        }
     }
 
     $effect(() => {

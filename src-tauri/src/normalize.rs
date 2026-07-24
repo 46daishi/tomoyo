@@ -197,16 +197,6 @@ pub fn normalize_variants(input: &str) -> Vec<String> {
     variants
 }
 
-pub fn to_hiragana_chars(input: &str) -> String {
-    input
-        .chars()
-        .map(|c| match c {
-            '\u{30A1}'..='\u{30F6}' => char::from_u32(c as u32 - 0x60).unwrap_or(c),
-            _ => c,
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

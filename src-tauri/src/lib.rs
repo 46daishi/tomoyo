@@ -1,5 +1,7 @@
 mod deconjugate;
 mod normalize;
+mod discord_rpc;
+
 use deconjugate::{build_deconjugation_rules, deconjugate, DeconjRule};
 use normalize::normalize_variants;
 use std::collections::HashMap;
@@ -11,6 +13,7 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 use zstd::Decoder;
 use serde::Deserialize;
 use std::collections::HashSet;
+use discord_rpc::DiscordState;
 
 #[derive(Serialize)]
 struct TokenOut {
@@ -324,7 +327,14 @@ pub fn run() {
                 .add_migrations("sqlite:immersion.db", migrations)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![tokenize_text, lookup_at_position])
+        .manage(DiscordState::new())
+        .invoke_handler(tauri::generate_handler![
+            discord_rpc::connect_discord,
+            discord_rpc::update_discord_presence,
+            discord_rpc::disconnect_discord,
+            tokenize_text,
+            lookup_at_position
+        ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
 
@@ -339,6 +349,9 @@ pub fn run() {
             
                 main_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { .. } = event {
+                        if let Some(discord_state) = app_handle.try_state::<DiscordState>() {
+                                    let _ = discord_state.disconnect();
+                        }
                         app_handle.exit(0);
                     }
             });
