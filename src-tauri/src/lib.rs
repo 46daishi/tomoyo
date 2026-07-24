@@ -334,6 +334,15 @@ pub fn run() {
             #[cfg(target_os = "linux")]
             window.set_decorations(false)?;
 
+            let main_window = app.get_webview_window("main").unwrap();
+                let app_handle = app.handle().clone();
+            
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { .. } = event {
+                        app_handle.exit(0);
+                    }
+            });
+
             // ── Tokenizer (Vibrato) — still used by tokenize_text for
             // per-word reading/POS/base-form breakdown. It is not used by
             // lookup_at_position, which resolves matches purely from the

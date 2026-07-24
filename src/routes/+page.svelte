@@ -586,6 +586,7 @@
     }
     
     .title {
+        font-family: "Noto Sans JP", Inter, sans-serif;
         margin-top: 0.5rem;
         font-weight: 600;
         font-size: 0.9rem;
