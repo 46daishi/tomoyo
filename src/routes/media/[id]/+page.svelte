@@ -145,6 +145,10 @@
         }
     }
 
+    let tooltipX = $state(0);
+    let tooltipY = $state(0);
+    let sentenceWindowEl;
+
     function handleCharClick(index, event) {
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
             if (tooltipVisible && tooltipSpan === hoveredSpan) {
@@ -152,8 +156,18 @@
             } else {
                 tooltipSpan = hoveredSpan;
                 tooltipVisible = true;
+    
+                const charRect = event.currentTarget.getBoundingClientRect();
+                const containerRect = sentenceWindowEl.getBoundingClientRect();
+    
+                const rawX = charRect.left - containerRect.left;
+                const tooltipWidth = 420; // matches CSS max-width
+                const maxX = containerRect.width - tooltipWidth - 16; // 16px safety margin
+    
+                tooltipX = Math.max(8, Math.min(rawX, maxX));
+                tooltipY = charRect.bottom - containerRect.top + 6;
             }
-            event.stopPropagation(); // don't let this same click reach handleWindowClick and immediately re-close it
+            event.stopPropagation();
         }
     }
 
@@ -231,7 +245,7 @@
             </div>
         </div>
 
-        <div class="sentence-window">
+        <div class="sentence-window" bind:this={sentenceWindowEl}>
             {#if currentChars.length > 0}
                 <p class="sentence-text" onmouseleave={handleSentenceLeave}>
                     {#each currentChars as char, i}
@@ -248,7 +262,12 @@
                 </p>
 
                 {#if tooltipVisible && tooltipSpan}
-                    <div class="lookup-tooltip" transition:fly={{ y: 6, duration: 120 }} onclick={(event) => event.stopPropagation()}>
+                    <div
+                            class="lookup-tooltip"
+                            style="left: {tooltipX}px; top: {tooltipY}px;"
+                            transition:fly={{ y: 6, duration: 120 }}
+                            onclick={(event) => event.stopPropagation()}
+                    >
                         <div class="tooltip-surface">
                             {tooltipSpan.surface}
                             {#if tooltipSpan.deconjugated_from}
@@ -262,7 +281,7 @@
                                         <span class="entry-readings">
                                             {entry.spellings[0] ?? entry.readings[0]}
                                             {#if entry.readings[0] && entry.spellings.length > 0}
-                                                <span class="entry-reading-kana">({entry.readings[0]})</span>
+                                                <span class="entry-reading-kana">{entry.readings[0]}</span>
                                             {/if}
                                         </span>
                                         <div class="entry-pos">{entry.pos.join(', ')}</div>
@@ -497,9 +516,7 @@
 
     .lookup-tooltip {
         position: absolute;
-        left: 2.5rem;
-        bottom: -0.5rem;
-        transform: translateY(100%);
+        text-align: left;
         max-width: 420px;
         background: var(--theme-surface, #1e1e2e);
         border: 1px solid var(--theme-border, #404040);
@@ -507,16 +524,43 @@
         padding: 0.9rem 1.1rem;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
         z-index: 10;
+        font-family: "Noto Sans JP", Inter, sans-serif;
     }
-
+    
     .tooltip-surface {
         font-family: "Noto Sans JP", Inter, sans-serif;
         font-weight: 700;
         font-size: 1.1rem;
         color: var(--theme-text, #f6f6f6);
-        margin-bottom: 0.5rem;
+        text-align: left;
+        margin: 0 0 0.7rem;
+        padding-bottom: 0.6rem;
+        border-bottom: 1px solid var(--theme-border, #404040);
+    }
+    
+    .tooltip-entries {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start; /* in case any ancestor sets align-items: center via flex */
+        gap: 0.6rem;
+        max-height: 260px;
+        overflow-y: auto;
+        text-align: left;
+    }
+    
+    .tooltip-entries li {
+        text-align: left;
+        width: 100%;
     }
 
+    .tooltip-entries li + li {
+        border-top: 1px solid var(--theme-border, #404040);
+        padding-top: 0.6rem;
+    }
+    
     .tooltip-deconj {
         font-weight: 400;
         font-size: 0.8rem;
@@ -524,48 +568,34 @@
         margin-left: 0.4rem;
     }
 
-    .tooltip-entries {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.6rem;
-        max-height: 260px;
-        overflow-y: auto;
-    }
-
-    .tooltip-entries li + li {
-        border-top: 1px solid var(--theme-border, #404040);
-        padding-top: 0.5rem;
-    }
-
     .entry-readings {
         font-weight: 600;
-        color: var(--theme-text, #f6f6f6);
+        color: var(--theme-primary, #f6f6f6);
+        font-size: 1.1rem;
     }
 
     .entry-reading-kana {
-        font-weight: 400;
-        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--theme-accent, #b3b3b3);
     }
 
     .entry-pos {
-        font-size: 0.75rem;
-        color: var(--theme-primary, #36b7bd);
+        font-size: 0.65rem;
+        color: var(--theme-textSecondary, #36b7bd);
         text-transform: uppercase;
         letter-spacing: 0.03em;
         margin-top: 0.15rem;
     }
 
     .entry-definitions {
-        font-size: 0.9rem;
-        color: var(--theme-textSecondary, #b3b3b3);
-        margin-top: 0.15rem;
+        font-size: 0.95rem;
+        color: var(--theme-text, #b3b3b3);
+        margin-top: 0rem;
     }
 
     .tooltip-no-match {
-        font-size: 0.9rem;
+        font-size: 1rem;
         color: var(--theme-textSecondary, #b3b3b3);
     }
 </style>
