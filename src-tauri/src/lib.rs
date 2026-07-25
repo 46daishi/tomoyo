@@ -1,7 +1,9 @@
 mod deconjugate;
 mod normalize;
 mod discord_rpc;
+mod settings;
 
+use settings::{get_settings, save_settings, load_settings_from_disk, SettingsState};
 use deconjugate::{build_deconjugation_rules, deconjugate, DeconjRule};
 use normalize::normalize_variants;
 use std::collections::HashMap;
@@ -332,8 +334,8 @@ pub fn run() {
             discord_rpc::connect_discord,
             discord_rpc::update_discord_presence,
             discord_rpc::disconnect_discord,
-            tokenize_text,
-            lookup_at_position
+            tokenize_text, lookup_at_position,
+            get_settings, save_settings,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -379,6 +381,9 @@ pub fn run() {
             let dictionary_index = DictionaryIndex::build(entries);
             app.manage(DictState(dictionary_index));
             app.manage(DeconjRulesState(build_deconjugation_rules()));
+
+            let initial_settings = settings::load_settings_from_disk(&app.handle());
+            app.manage(SettingsState(Mutex::new(initial_settings)));
 
             Ok(())
         })

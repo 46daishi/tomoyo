@@ -253,6 +253,7 @@
           icon={ICONS.settings}
           variant="secondary"
           size="small"
+          onAction={() => goto(`/settings`)}
       />
       <ActionButton
           icon={ICONS.stats}
