@@ -1,4 +1,5 @@
 import { writable } from "svelte/store";
+import { emit } from '@tauri-apps/api/event';
 
 /** @type {Record<string, { label: string, colors: Record<string, string> }>} */
 export const themes = {
@@ -362,17 +363,19 @@ export const currentTheme = writable("tomoyo");
  * updates the store, and persists to localStorage.
  * @param {string} themeKey  key in `themes`
  */
-export function applyTheme(themeKey) {
-  const theme = themes[themeKey];
-  if (!theme) return;
-
-  const root = document.documentElement;
-  for (const [k, v] of Object.entries(theme.colors))
-    root.style.setProperty(`--theme-${k}`, v);
-
-  currentTheme.set(themeKey);
-  localStorage.setItem("tomoyo-theme", themeKey);
-}
+ export function applyTheme(themeKey) {
+     const theme = themes[themeKey];
+     if (!theme) return;
+ 
+     const root = document.documentElement;
+     for (const [k, v] of Object.entries(theme.colors))
+         root.style.setProperty(`--theme-${k}`, v);
+ 
+     currentTheme.set(themeKey);
+     localStorage.setItem("tomoyo-theme", themeKey);
+ 
+     emit('theme-changed', theme.colors).catch(() => {}); // tooltip window may not exist yet — ignore failures
+ }
 
 /** Read persisted theme and apply it. Call once in the root layout's onMount. */
 export function initializeTheme() {

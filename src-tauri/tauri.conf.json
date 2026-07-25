@@ -19,8 +19,8 @@
           {
               "label": "tooltip",
               "url": "/tooltip",
-              "width": 420,
-              "height": 200,
+              "width": 500,
+              "height": 300,
               "decorations": false,
               "transparent": true,
               "alwaysOnTop": true,

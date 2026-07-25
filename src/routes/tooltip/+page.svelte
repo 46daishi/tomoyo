@@ -1,20 +1,44 @@
 <script>
     import { onMount } from 'svelte';
     import { listen } from '@tauri-apps/api/event';
-    import { getCurrentWindow } from '@tauri-apps/api/window';
+    import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+    
+    let tooltipRootEl;
 
     let span = $state(null);
 
     onMount(() => {
-        const unlisten = listen('tooltip-content', (event) => {
+        const unlistenContent = listen('tooltip-content', (event) => {
             span = event.payload;
         });
-        return () => { unlisten.then((f) => f()); };
+    
+        const unlistenTheme = listen('theme-changed', (event) => {
+            const root = document.documentElement;
+            for (const [k, v] of Object.entries(event.payload)) {
+                root.style.setProperty(`--theme-${k}`, v);
+            }
+        });
+
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const height = Math.ceil(entry.contentRect.height);
+                const width = Math.ceil(entry.contentRect.width);
+                getCurrentWindow().setSize(new LogicalSize(width, height));
+            }
+        });
+    
+        if (tooltipRootEl) resizeObserver.observe(tooltipRootEl);
+    
+        return () => {
+            unlistenContent.then((f) => f());
+            unlistenTheme.then((f) => f());
+            resizeObserver.disconnect();
+        };
     });
 </script>
 
 {#if span}
-    <div class="lookup-tooltip">
+    <div class="lookup-tooltip" bind:this={tooltipRootEl}>
         <div class="tooltip-surface">
             {span.surface}
             {#if span.deconjugated_from}
@@ -47,6 +71,7 @@
     :global(html), :global(body) {
         background: transparent;
         margin: 0;
+        overflow: hidden;
     }
 
     .lookup-tooltip {

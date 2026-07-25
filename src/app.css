@@ -372,7 +372,7 @@ body {
     position: absolute;
     text-align: left;
     min-width: 300px;
-    max-width: 500px;
+    max-width: 600px;
     background: color-mix(
         in srgb,
         color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 100%) 95%,
