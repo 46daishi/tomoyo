@@ -101,7 +101,7 @@
                             <span>Font size</span>
                             <span class="setting-value">{settings.font_size}px</span>
                         </div>
-                        <input type="range" min="14" max="32" bind:value={settings.font_size} oninput={queueSave} />
+                        <input type="range" min="12" max="48" bind:value={settings.font_size} oninput={queueSave} />
                     </div>
 
                     <div class="setting-row">

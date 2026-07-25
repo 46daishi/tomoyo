@@ -14,6 +14,7 @@
     import { onMount } from 'svelte';
     import { setMediaTitle } from '$lib/stores/presence.svelte.js';
     import MediaFormModal from '$lib/components/MediaFormModal.svelte';
+    import { loadSettings } from '$lib/settings.js';
     
     let showEditModal = $state(false);
 
@@ -225,15 +226,22 @@
         clearTimeout(resizeDebounceHandle);
         resizeDebounceHandle = setTimeout(checkWindowSize, 50);
     }
+
+    let settings = $state(null);
+    let fontSize;
     
     onMount(() => {
         checkWindowSize(); // handle the case where the window is already small on mount
-    
         window.addEventListener('resize', handleWindowResize);
         return () => {
             window.removeEventListener('resize', handleWindowResize);
             clearTimeout(resizeDebounceHandle);
         };
+    });
+
+    onMount(async () => {
+        settings = await loadSettings();
+        fontSize = settings.font_size
     });
 
     let tooltipX = $state(0);
@@ -344,7 +352,7 @@
 
         <div class="sentence-window" bind:this={sentenceWindowEl}>
             {#if currentChars.length > 0}
-                <p class="sentence-text" onmouseleave={handleSentenceLeave}>
+                <p class="sentence-text" onmouseleave={handleSentenceLeave} style={`--font-size: ${fontSize}px`}>
                     {#each currentChars as char, i}
                         <span
                             class="char-token"
@@ -576,7 +584,7 @@
     .sentence-text {
         font-family: "Noto Sans JP", Inter, sans-serif;
         color: var(--theme-text, #f6f6f6);
-        font-size: 1.9rem;
+        font-size: var(--font-size, 30px);
         font-weight: 700;
         line-height: 1.6;
         text-align: left;

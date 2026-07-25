@@ -46,7 +46,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             font_family: "Noto Sans JP".into(),
-            font_size: 19,
+            font_size: 32,
             resume_last_session: false,
             discord_rpc_enabled: true,
 
