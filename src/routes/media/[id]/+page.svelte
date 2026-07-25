@@ -7,13 +7,15 @@
     import { fly } from 'svelte/transition';
     import { STATUS_COLORS } from '$lib/constants.js';
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
-    import { tokenizeSentence } from '$lib/tokenize.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-    import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
+    import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
     import { emit } from '@tauri-apps/api/event';
     import { onMount } from 'svelte';
     import { setMediaTitle } from '$lib/stores/presence.svelte.js';
+    import MediaFormModal from '$lib/components/MediaFormModal.svelte';
+    
+    let showEditModal = $state(false);
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
@@ -397,6 +399,11 @@
     {:else}
         <p>Loading…</p>
     {/if}
+    <MediaFormModal
+        bind:show={showEditModal}
+        media={media}
+        onSaved={() => loadMedia(mediaId)}
+    />
 </main>
 
 <div class="logo">
@@ -414,6 +421,7 @@
           icon={ICONS.edit}
           variant="secondary"
           size="small"
+          onAction={() => (showEditModal = true)}
       />
       <ActionButton
           icon={ICONS.stats}
