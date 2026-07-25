@@ -4,245 +4,279 @@ import { writable } from "svelte/store";
 export const themes = {
   // ── Dark themes ────────────────────────────────────────────────────────────
   "tomoyo": {
-    label: "tomoyo",
+    label: "Tomoyo",
     colors: {
-      background: "#1a1a1a",
-      surface: "#2d2d2d",
-      text: "#ffffff",
-      textSecondary: "#b3b3b3",
-      border: "#404040",
-      shadow: "rgba(0,0,0,0.3)",
-      button: "#2d2d2d",
-      buttonText: "#ffffff",
-      primary: "#1ea2e0",
-      primaryHover: "#178fc5",
-      accent: "#63c8f0"
+      background:    "#12213a",
+      surface:       "#1c2f4f",
+      text:          "#eef2fa",
+      textSecondary: "#8ba3c7",
+      border:        "#2c4468",
+      shadow:        "rgba(0,0,0,0.45)",
+      button:        "#1c2f4f",
+      buttonText:    "#eef2fa",
+      primary:       "#5b8dd6",
+      primaryHover:  "#4874bb",
+      accent:        "#8fb2e8",
     },
-  },
-  
-  "tokyo-night": {
-    label: "Tokyo Night",
-    colors: {
-      background:    "#1a1b2e",
-      surface:       "#24253f",
-      text:          "#c0caf5",
-      textSecondary: "#565f89",
-      border:        "#32334a",
-      shadow:        "rgba(0,0,0,0.4)",
-      button:        "#24253f",
-      buttonText:    "#c0caf5",
-      primary:       "#7aa2f7",
-      primaryHover:  "#5d87f5",
-      accent:        "#bb9af7",
-    },
-  },
- 
-  "catppuccin-mocha": {
-    label: "Catppuccin Mocha",
-    colors: {
-      background:    "#1e1e2e",
-      surface:       "#313244",
-      text:          "#cdd6f4",
-      textSecondary: "#6c7086",
-      border:        "#45475a",
-      shadow:        "rgba(0,0,0,0.4)",
-      button:        "#313244",
-      buttonText:    "#cdd6f4",
-      primary:       "#cba6f7",
-      primaryHover:  "#b48ef5",
-      accent:        "#89b4fa",
-    },
-  },
- 
-  "gruvbox-dark": {
-      "label": "Gruvbox Dark",
-      "colors": {
-        "background": "#282828",
-        "surface": "#3c3836",
-        "text": "#ebdbb2",
-        "textSecondary": "#a89984",
-        "border": "#504945",
-        "shadow": "rgba(0,0,0,0.4)",
-        "button": "#504945",
-        "buttonText": "#ebdbb2",
-        "primary": "#fabd2f",
-        "primaryHover": "#d79921",
-        "accent": "#d79921"
-      }
-    },
- 
-  "nord": {
-    label: "Nord",
-    colors: {
-      background:    "#2e3440",
-      surface:       "#3b4252",
-      text:          "#eceff4",
-      textSecondary: "#4c566a",
-      border:        "#434c5e",
-      shadow:        "rgba(0,0,0,0.4)",
-      button:        "#3b4252",
-      buttonText:    "#eceff4",
-      primary:       "#88c0d0",
-      primaryHover:  "#6fafc2",
-      accent:        "#81a1c1",
-    },
-  },
- 
-  "cyber-pink": {
-      "label": "Cyber Pink (Dark)",
-      "colors": {
-        "background": "#1a161d",
-        "surface": "#2d242f",
-        "text": "#fdeef4",
-        "textSecondary": "#a18894",
-        "border": "#4a3b45",
-        "shadow": "rgba(0,0,0,0.5)",
-        "button": "#2d242f",
-        "buttonText": "#fdeef4",
-        "primary": "#ff75a8",
-        "primaryHover": "#ff5293",
-        "accent": "#ff9ec2"
-      }
   },
 
-  "crimson-ruby": {
-      "label": "Crimson Ruby (Dark)",
-      "colors": {
-        "background": "#1a0a0a",
-        "surface": "#2d1212",
-        "text": "#f5e6e6",
-        "textSecondary": "#a07a7a",
-        "border": "#4a1c1c",
-        "shadow": "rgba(0,0,0,0.6)",
-        "button": "#2d1212",
-        "buttonText": "#f5e6e6",
-        "primary": "#d93030",
-        "primaryHover": "#b02626",
-        "accent": "#ff6b6b"
-      }
+  "dusk-violet": {
+    label: "Dusk Violet",
+    colors: {
+      background:    "#1c1526",
+      surface:       "#2a1f3d",
+      text:          "#f1e9fb",
+      textSecondary: "#9d8bb8",
+      border:        "#3d2e57",
+      shadow:        "rgba(0,0,0,0.5)",
+      button:        "#2a1f3d",
+      buttonText:    "#f1e9fb",
+      primary:       "#a374e0",
+      primaryHover:  "#8c5cc9",
+      accent:        "#c9a6f0",
+    },
   },
 
-  "everforest": {
-    "label": "Everforest",
-    "colors": {
-      "background": "#2d353b",
-      "surface": "#374145",
-      "text": "#d3c6aa",
-      "textSecondary": "#859289",
-      "border": "#475258",
-      "shadow": "rgba(0,0,0,0.3)",
-      "button": "#374145",
-      "buttonText": "#d3c6aa",
-      "primary": "#a7c080",
-      "primaryHover": "#91a870",
-      "accent": "#8DC767"
-    }
+  "forest-canopy": {
+    label: "Forest Canopy",
+    colors: {
+      background:    "#14201a",
+      surface:       "#1e2f26",
+      text:          "#e6f1ea",
+      textSecondary: "#84a693",
+      border:        "#2e4638",
+      shadow:        "rgba(0,0,0,0.45)",
+      button:        "#1e2f26",
+      buttonText:    "#e6f1ea",
+      primary:       "#5cb87f",
+      primaryHover:  "#47a068",
+      accent:        "#8fd6a8",
+    },
   },
 
- 
+  "amber-glow": {
+    label: "Amber Glow",
+    colors: {
+      background:    "#201a12",
+      surface:       "#33281a",
+      text:          "#f7ecd9",
+      textSecondary: "#b39a76",
+      border:        "#4a3a24",
+      shadow:        "rgba(0,0,0,0.45)",
+      button:        "#33281a",
+      buttonText:    "#f7ecd9",
+      primary:       "#e8a53d",
+      primaryHover:  "#cc8e2c",
+      accent:        "#f0c47a",
+    },
+  },
+
+  "crimson-night": {
+    label: "Crimson Night",
+    colors: {
+      background:    "#1f1113",
+      surface:       "#33181c",
+      text:          "#f7e6e8",
+      textSecondary: "#b3838a",
+      border:        "#4a2429",
+      shadow:        "rgba(0,0,0,0.5)",
+      button:        "#33181c",
+      buttonText:    "#f7e6e8",
+      primary:       "#e0495a",
+      primaryHover:  "#c33547",
+      accent:        "#f08a95",
+    },
+  },
+
+  "slate-graphite": {
+    label: "Slate Graphite",
+    colors: {
+      background:    "#1a1c1f",
+      surface:       "#26292e",
+      text:          "#eceef0",
+      textSecondary: "#8d949c",
+      border:        "#383d44",
+      shadow:        "rgba(0,0,0,0.45)",
+      button:        "#26292e",
+      buttonText:    "#eceef0",
+      primary:       "#7c93a8",
+      primaryHover:  "#647c92",
+      accent:        "#a4b8c9",
+    },
+  },
+
+  "deep-teal": {
+    label: "Deep Teal",
+    colors: {
+      background:    "#0f2020",
+      surface:       "#173030",
+      text:          "#e2f4f2",
+      textSecondary: "#7ba8a4",
+      border:        "#264948",
+      shadow:        "rgba(0,0,0,0.45)",
+      button:        "#173030",
+      buttonText:    "#e2f4f2",
+      primary:       "#2fb3a6",
+      primaryHover:  "#25998e",
+      accent:        "#6fd4c6",
+    },
+  },
+
+  "plum-orchid": {
+    label: "Plum Orchid",
+    colors: {
+      background:    "#1e1420",
+      surface:       "#301f34",
+      text:          "#f5e8f5",
+      textSecondary: "#a486a6",
+      border:        "#4a2f4e",
+      shadow:        "rgba(0,0,0,0.5)",
+      button:        "#301f34",
+      buttonText:    "#f5e8f5",
+      primary:       "#c467bd",
+      primaryHover:  "#ab4ea3",
+      accent:        "#e29bd9",
+    },
+  },
+
+  "arctic-cyan": {
+    label: "Arctic Cyan",
+    colors: {
+      background:    "#0d1a1f",
+      surface:       "#152730",
+      text:          "#e3f3f8",
+      textSecondary: "#7c9fab",
+      border:        "#22404c",
+      shadow:        "rgba(0,0,0,0.45)",
+      button:        "#152730",
+      buttonText:    "#e3f3f8",
+      primary:       "#3fc1e0",
+      primaryHover:  "#2ea8c6",
+      accent:        "#7fdcf0",
+    },
+  },
+
+  "copper-forge": {
+    label: "Copper Forge",
+    colors: {
+      background:    "#1e1610",
+      surface:       "#332419",
+      text:          "#f7ebe0",
+      textSecondary: "#b3927a",
+      border:        "#4a3626",
+      shadow:        "rgba(0,0,0,0.45)",
+      button:        "#332419",
+      buttonText:    "#f7ebe0",
+      primary:       "#d97a45",
+      primaryHover:  "#bd6534",
+      accent:        "#eda06f",
+    },
+  },
+
+  "midnight-indigo": {
+    label: "Midnight Indigo",
+    colors: {
+      background:    "#12142b",
+      surface:       "#1c2044",
+      text:          "#e6e8f7",
+      textSecondary: "#8286b3",
+      border:        "#2d3260",
+      shadow:        "rgba(0,0,0,0.5)",
+      button:        "#1c2044",
+      buttonText:    "#e6e8f7",
+      primary:       "#6b74e0",
+      primaryHover:  "#555ec7",
+      accent:        "#9fa6f0",
+    },
+  },
+
   // ── Light themes ───────────────────────────────────────────────────────────
-  
-    "github-light": {
-        "label": "GitHub Light",
-        "colors": {
-          "background": "#ffffff",
-          "surface": "#f6f8fa",
-          "text": "#24292f",
-          "textSecondary": "#57606a",
-          "border": "#d0d7de",
-          "shadow": "rgba(0,0,0,0.08)",
-          "button": "#f6f8fa",
-          "buttonText": "#24292f",
-          "primary": "#0969da",
-          "primaryHover": "#0857b3",
-          "accent": "#54aeff"
-        }
-  },
 
-  "warm-sand": {
-      "label": "Warm Sand (Light)",
-      "colors": {
-        "background": "#fdf6e3",
-        "surface": "#fbf1d3",
-        "text": "#5d554a",
-        "textSecondary": "#9e917d",
-        "border": "#e4d9c0",
-        "shadow": "rgba(0,0,0,0.05)",
-        "button": "#fbf1d3",
-        "buttonText": "#5d554a",
-        "primary": "#b88835",
-        "primaryHover": "#9a722c",
-        "accent": "#d6a54f"
-      }
-  },
-
-  "sage-meadow": {
-      "label": "Sage Meadow (Light)",
-      "colors": {
-        "background": "#f4f7f2",
-        "surface": "#eaf0e6",
-        "text": "#3d4a3d",
-        "textSecondary": "#7a8a7a",
-        "border": "#d2dbd0",
-        "shadow": "rgba(0,0,0,0.05)",
-        "button": "#eaf0e6",
-        "buttonText": "#3d4a3d",
-        "primary": "#6c8a6c",
-        "primaryHover": "#566e56",
-        "accent": "#9ab59a"
-      }
-  },
-
-  "terracotta-clay": {
-      "label": "Terracotta Clay (Light)",
-      "colors": {
-        "background": "#fffaf7",
-        "surface": "#f5ece7",
-        "text": "#4a3b35",
-        "textSecondary": "#8c766d",
-        "border": "#e8d8d0",
-        "shadow": "rgba(0,0,0,0.06)",
-        "button": "#f5ece7",
-        "buttonText": "#4a3b35",
-        "primary": "#cc6b49",
-        "primaryHover": "#a8593d",
-        "accent": "#e69275"
-      }
-  },
-  "lavender-mist": {
-      "label": "Lavender Mist (Light)",
-      "colors": {
-        "background": "#f8f7ff",
-        "surface": "#efedfc",
-        "text": "#484063",
-        "textSecondary": "#8b85a3",
-        "border": "#dcd8f2",
-        "shadow": "rgba(0,0,0,0.05)",
-        "button": "#efedfc",
-        "buttonText": "#484063",
-        "primary": "#8676c9",
-        "primaryHover": "#6d5db5",
-        "accent": "#a99ce0"
-      }
+  "sakura-light": {
+    label: "Sakura (Light)",
+    colors: {
+      background:    "#fff6f8",
+      surface:       "#fce9ed",
+      text:          "#4a2c33",
+      textSecondary: "#96707a",
+      border:        "#f2d3da",
+      shadow:        "rgba(0,0,0,0.06)",
+      button:        "#fce9ed",
+      buttonText:    "#4a2c33",
+      primary:       "#d6597e",
+      primaryHover:  "#b8446a",
+      accent:        "#ea8ba6",
     },
-    "berry-blush": {
-      "label": "Berry Blush (Light)",
-      "colors": {
-        "background": "#fff5f5",
-        "surface": "#ffecec",
-        "text": "#633d3d",
-        "textSecondary": "#a37a7a",
-        "border": "#f2dcdc",
-        "shadow": "rgba(0,0,0,0.05)",
-        "button": "#ffecec",
-        "buttonText": "#633d3d",
-        "primary": "#d94e4e",
-        "primaryHover": "#b53d3d",
-        "accent": "#f08585"
-      }
-    }
-};
+  },
 
+  "mist-blue": {
+    label: "Mist Blue (Light)",
+    colors: {
+      background:    "#f5f9fc",
+      surface:       "#e7eff7",
+      text:          "#2c3b4a",
+      textSecondary: "#748a9e",
+      border:        "#d3e0ec",
+      shadow:        "rgba(0,0,0,0.05)",
+      button:        "#e7eff7",
+      buttonText:    "#2c3b4a",
+      primary:       "#3d7ab3",
+      primaryHover:  "#2f6494",
+      accent:        "#6fa3d1",
+    },
+  },
+
+  "linen-cream": {
+    label: "Linen Cream (Light)",
+    colors: {
+      background:    "#faf6ef",
+      surface:       "#f1ead9",
+      text:          "#4a4335",
+      textSecondary: "#8f8570",
+      border:        "#e2d7bf",
+      shadow:        "rgba(0,0,0,0.05)",
+      button:        "#f1ead9",
+      buttonText:    "#4a4335",
+      primary:       "#a8823e",
+      primaryHover:  "#8c6c30",
+      accent:        "#c9a35f",
+    },
+  },
+
+  "matcha-light": {
+    label: "Matcha (Light)",
+    colors: {
+      background:    "#f5f8f0",
+      surface:       "#e8f0dd",
+      text:          "#354a2c",
+      textSecondary: "#7d9270",
+      border:        "#d3e2c3",
+      shadow:        "rgba(0,0,0,0.05)",
+      button:        "#e8f0dd",
+      buttonText:    "#354a2c",
+      primary:       "#6f9c47",
+      primaryHover:  "#5a8236",
+      accent:        "#9bc178",
+    },
+  },
+
+  "clay-light": {
+    label: "Clay (Light)",
+    colors: {
+      background:    "#fff8f5",
+      surface:       "#faeae2",
+      text:          "#4a352c",
+      textSecondary: "#9c7c6c",
+      border:        "#efd9cb",
+      shadow:        "rgba(0,0,0,0.05)",
+      button:        "#faeae2",
+      buttonText:    "#4a352c",
+      primary:       "#c9673b",
+      primaryHover:  "#ab532c",
+      accent:        "#e0906a",
+    },
+  },
+};
 
 /** Flat list for ThemeSelector to render swatches. */
 export const themeList = Object.entries(themes).map(([value, t]) => ({
@@ -250,13 +284,13 @@ export const themeList = Object.entries(themes).map(([value, t]) => ({
   label: t.label,
   colors: t.colors,
 }));
- 
+
 // ─── Stores ───────────────────────────────────────────────────────────────────
- 
+
 export const currentTheme = writable("tomoyo");
- 
+
 // ─── Apply / init ─────────────────────────────────────────────────────────────
- 
+
 /**
  * Apply a theme by key: writes all CSS custom properties on :root,
  * updates the store, and persists to localStorage.
@@ -265,15 +299,15 @@ export const currentTheme = writable("tomoyo");
 export function applyTheme(themeKey) {
   const theme = themes[themeKey];
   if (!theme) return;
- 
+
   const root = document.documentElement;
   for (const [k, v] of Object.entries(theme.colors))
     root.style.setProperty(`--theme-${k}`, v);
- 
+
   currentTheme.set(themeKey);
   localStorage.setItem("tomoyo-theme", themeKey);
 }
- 
+
 /** Read persisted theme and apply it. Call once in the root layout's onMount. */
 export function initializeTheme() {
   const themeKey = localStorage.getItem("tomoyo-theme") ?? "tomoyo";
