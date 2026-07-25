@@ -29,7 +29,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
-        max-width: 360px;
+        max-width: 450px;
     }
 
     .swatch {

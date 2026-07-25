@@ -371,7 +371,7 @@ body {
 .lookup-tooltip {
     position: absolute;
     text-align: left;
-    min-width:300px;
+    min-width: 300px;
     max-width: 500px;
     background: color-mix(
         in srgb,
@@ -389,7 +389,7 @@ body {
 .tooltip-surface {
     font-family: "Noto Sans JP", Inter, sans-serif;
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     color: var(--theme-text, #f6f6f6);
     text-align: left;
     margin: 0 0 0.7rem;
@@ -405,7 +405,7 @@ body {
     flex-direction: column;
     align-items: flex-start; /* in case any ancestor sets align-items: center via flex */
     gap: 0.6rem;
-    max-height: 260px;
+    max-height: 300px;
     overflow-y: auto;
     text-align: left;
 }
@@ -422,20 +422,20 @@ body {
 
 .tooltip-deconj {
     font-weight: 400;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: var(--theme-textSecondary, #b3b3b3);
     margin-left: 0.4rem;
 }
 
 .entry-readings {
-    font-weight: 600;
+    font-weight: 500;
     color: var(--theme-primary, #f6f6f6);
-    font-size: 1.1rem;
+    font-size: 1.3rem;
 }
 
 .entry-reading-kana {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 500;
     color: var(--theme-accent, #b3b3b3);
 }
 
