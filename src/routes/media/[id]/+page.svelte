@@ -225,10 +225,16 @@
             applyMiniModeClasses(false);
         }
     }
+
+    function applyMiniModeTransparency(transparency) {
+        const colorWeight = Math.round((1 - transparency) * 100);
+        document.documentElement.style.setProperty('--mini-color-weight', `${colorWeight}%`);
+    }
     
     onMount(async () => {
         settings = await loadSettings();
         fontSize = settings.font_size;
+        applyMiniModeTransparency(settings.mini_mode_transparency);
     
         checkWindowSize(); // now settings is guaranteed to be loaded first
         window.addEventListener('resize', handleWindowResize);
@@ -313,6 +319,8 @@
             stopClipboardListener();
         };
     });
+
+    
 </script>
 
 <svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
@@ -661,7 +669,7 @@
         padding: 1.5rem;
         background: color-mix(
             in srgb,
-            color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 20%) 70%,
+            color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 20%) var(--mini-color-weight, 70%),
             transparent
         );
     }
