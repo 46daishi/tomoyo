@@ -74,6 +74,8 @@
     .settings-page {
         padding: 2rem;
         box-sizing: border-box;
+        height: 100vh;
+        overflow: hidden; /* the page itself no longer scrolls as a whole */
     }
 
     .settings-header {
@@ -87,11 +89,13 @@
         font-size: 1.5rem;
         margin: 0;
     }
-
+    
     .settings-layout {
         display: flex;
         gap: 2rem;
-        max-width: 900px;
+        max-width: 1800px;
+        height: calc(100vh - 2rem - 1.5rem - 2.5rem); /* viewport minus top/bottom page padding and the header's height+margin */
+        box-sizing: border-box;
     }
 
     .settings-tabs {
@@ -126,15 +130,33 @@
         color: #fff;
     }
 
+    
     .settings-content {
         flex: 1;
         display: flex;
         flex-direction: column;
         gap: 1.1rem;
         min-width: 0;
+        height: 100%;
+        overflow-y: auto;
+        padding-right: 1.5rem; /* more room now, so the scrollbar doesn't crowd the content */
+        padding-right: 2.5rem; /* pushes the scrollbar further from the content itself */
     }
-
-    .settings-key-input {
-        width: 10rem;
+    
+    .settings-content::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .settings-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .settings-content::-webkit-scrollbar-thumb {
+        background: var(--theme-border, #404040);
+        border-radius: 3px;
+    }
+    
+    .settings-content::-webkit-scrollbar-thumb:hover {
+        background: var(--theme-textSecondary, #b3b3b3);
     }
 </style>
