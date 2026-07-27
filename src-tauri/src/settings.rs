@@ -31,9 +31,7 @@ pub struct AppSettings {
     // ── Mini Mode ──
     pub mini_mode_enabled: bool,
     pub mini_mode_auto_trigger: bool,
-    pub mini_mode_enter_width: u32,
     pub mini_mode_enter_height: u32,
-    pub mini_mode_exit_width: u32,
     pub mini_mode_exit_height: u32,
     pub mini_mode_transparency: f32,
 
@@ -48,7 +46,7 @@ impl Default for AppSettings {
             font_family: "Noto Sans JP".into(),
             font_size: 32,
             resume_last_session: false,
-            discord_rpc_enabled: true,
+            discord_rpc_enabled: false,
 
             lookup_mode: "click".into(),
             cycle_key: "ShiftLeft".into(),
@@ -62,13 +60,11 @@ impl Default for AppSettings {
             websocket_address: "ws://127.0.0.1:6677".into(),
             jp_detection_threshold: 0.3,
             history_enabled: true,
-            history_span: 50,
+            history_span: 10,
 
             mini_mode_enabled: true,
             mini_mode_auto_trigger: true,
-            mini_mode_enter_width: 550,
             mini_mode_enter_height: 300,
-            mini_mode_exit_width: 620,
             mini_mode_exit_height: 350,
             mini_mode_transparency: 0.5,
 

@@ -124,6 +124,13 @@ export const SETTINGS_SCHEMA = [
           showIf: (s) => s.mini_mode_enabled,
       },
       {
+          key: 'mini_mode_exit_height',
+          label: 'Exit threshold (height)',
+          type: 'number',
+          subRow: true,
+          showIf: (s) => s.mini_mode_enabled,
+      },
+      {
           key: 'mini_mode_transparency',
           label: 'Transparency',
           type: 'slider',

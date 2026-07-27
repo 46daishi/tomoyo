@@ -190,11 +190,6 @@
         const tooltip = await getTooltipWindow();
         await tooltip.hide();
     }
-
-    const MINI_ENTER_WIDTH = 550;
-    const MINI_ENTER_HEIGHT = 400;
-    const MINI_EXIT_WIDTH = 620;   // slightly larger than enter, to avoid flicker at the boundary
-    const MINI_EXIT_HEIGHT = 350;
     
     let miniMode = $state(false);
     let resizeDebounceHandle = null;
@@ -204,20 +199,7 @@
         document.body.classList.toggle('mini-mode', active);
     }
     
-    function checkWindowSize() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
     
-        if (!miniMode && (w <= MINI_ENTER_WIDTH || h <= MINI_ENTER_HEIGHT)) {
-            miniMode = true;
-            applyMiniModeClasses(true);
-            hideTooltip();
-            tooltipVisible = false;
-        } else if (miniMode && w >= MINI_EXIT_WIDTH && h >= MINI_EXIT_HEIGHT) {
-            miniMode = false;
-            applyMiniModeClasses(false);
-        }
-    }
     
     function handleWindowResize() {
         // Resize fires continuously while dragging — debounce so the
@@ -229,19 +211,32 @@
 
     let settings = $state(null);
     let fontSize;
+
+    function checkWindowSize() {
+        const h = window.innerHeight;
     
-    onMount(() => {
-        checkWindowSize(); // handle the case where the window is already small on mount
+        if (!miniMode && h <= settings.mini_mode_enter_height) {
+            miniMode = true;
+            applyMiniModeClasses(true);
+            hideTooltip();
+            tooltipVisible = false;
+        } else if (miniMode && h >= settings.mini_mode_exit_height) {
+            miniMode = false;
+            applyMiniModeClasses(false);
+        }
+    }
+    
+    onMount(async () => {
+        settings = await loadSettings();
+        fontSize = settings.font_size;
+    
+        checkWindowSize(); // now settings is guaranteed to be loaded first
         window.addEventListener('resize', handleWindowResize);
+    
         return () => {
             window.removeEventListener('resize', handleWindowResize);
             clearTimeout(resizeDebounceHandle);
         };
-    });
-
-    onMount(async () => {
-        settings = await loadSettings();
-        fontSize = settings.font_size
     });
 
     let tooltipX = $state(0);
