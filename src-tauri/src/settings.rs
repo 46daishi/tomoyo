@@ -30,7 +30,6 @@ pub struct AppSettings {
 
     // ── Mini Mode ──
     pub mini_mode_enabled: bool,
-    pub mini_mode_auto_trigger: bool,
     pub mini_mode_enter_height: u32,
     pub mini_mode_exit_height: u32,
     pub mini_mode_transparency: f32,
@@ -63,7 +62,6 @@ impl Default for AppSettings {
             history_span: 10,
 
             mini_mode_enabled: true,
-            mini_mode_auto_trigger: true,
             mini_mode_enter_height: 300,
             mini_mode_exit_height: 350,
             mini_mode_transparency: 0.5,
