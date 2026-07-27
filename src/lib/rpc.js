@@ -2,10 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 const DISCORD_CLIENT_ID = "1530192543529304065";
 
-/**
- * Thin wrapper around the Tauri `discord_rpc` commands.
- * All methods return Promises and throw on failure.
- */
 class DiscordRPC {
 	constructor() {
 		this.connected = false;

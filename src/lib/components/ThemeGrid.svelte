@@ -49,6 +49,10 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
     }
 
+    .swatch.active:hover {
+        transform: none;
+    }
+
     .swatch.active {
         border-color: var(--theme-primary, #36b7bd);
         box-shadow: 0 0 0 1px var(--theme-primary, #36b7bd);

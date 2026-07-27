@@ -5,6 +5,7 @@ export const PRESENCE_ICONS = {
   immersionIcon: "https://i.imgur.com/yIObFbV.png",
   dictionaryIcon: "https://i.imgur.com/JeVqrIZ.png",
   logo: "https://i.imgur.com/mHL9UhJ.png",
+  smallLogo: "https://i.imgur.com/fJB2Acw.png"
 };
 
 /** Refers to the first line */
@@ -20,7 +21,6 @@ export const PRESENCE_DEFAULTS = {
   details: PRESENCE_DETAILS.homeDetails,
   largeImage: PRESENCE_ICONS.logo,
   largeText: "tomoyo - made by 46dai",
-  smallImage: PRESENCE_ICONS.immersionIcon,
   startTimestamp: undefined,
   endTimestamp: undefined,
 };

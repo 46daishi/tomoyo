@@ -5,6 +5,7 @@
     import { loadSettings, saveSettings } from '$lib/settings.js';
     import { SETTINGS_SCHEMA } from '$lib/settings.js';
     import SettingField from '$lib/components/SettingField.svelte';
+    import { discordEnabled } from '$lib/stores/discordSettings.js';
 
     let settings = $state(null);
     let activeTab = $state(SETTINGS_SCHEMA[0].id);
@@ -24,6 +25,9 @@
     function handleChange(key, value) {
         settings[key] = value;
         queueSave();
+        if (key === 'discord_rpc_enabled') {
+                discordEnabled.set(value);
+        }
     }
 
     function handleAction(action) {
@@ -159,4 +163,8 @@
     .settings-content::-webkit-scrollbar-thumb:hover {
         background: var(--theme-textSecondary, #b3b3b3);
     }
+    
+    .theme-grid {
+            align-items: flex-start; /* grid is taller than a single-line label now */
+        }
 </style>
