@@ -389,10 +389,10 @@
                     {#each displayedChars as char, i}
                         <span
                             class="char-token"
-                            class:hovered={isInHoveredSpan(i)}
-                            class:span-start={isSpanStart(i)}
-                            class:span-end={isSpanEnd(i)}
-                            class:no-match={isInHoveredSpan(i) && hoveredSpan.entries.length === 0}
+                            class:hovered={isInHoveredSpan(i) && settings?.word_highlight_enabled}
+                            class:span-start={isSpanStart(i) && settings?.word_highlight_enabled}
+                            class:span-end={isSpanEnd(i) && settings?.word_highlight_enabled}
+                            class:no-match={isInHoveredSpan(i) && hoveredSpan.entries.length === 0 && settings?.word_highlight_enabled}
                             onmouseenter={() => handleCharHover(i)}
                             onclick={(event) => handleCharClick(i, event)}
                         >{char}</span>
