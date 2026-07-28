@@ -413,9 +413,9 @@
                                 <span class="tooltip-deconj">({tooltipSpan.deconjugated_from})</span>
                             {/if}
                         </div>
-                        {#if tooltipSpan.entries.length > 0 || tooltipSpan.related_entries.length > 0}
+                        {#if tooltipSpan.entries.length > 0 || (tooltipSpan.related_entries.length > 0 && settings.show_related_entries)}
                             <ul class="tooltip-entries">
-                                {#each [...tooltipSpan.entries, ...tooltipSpan.related_entries] as entry}
+                                {#each [...tooltipSpan.entries, ...(settings.show_related_entries ? tooltipSpan.related_entries : [])] as entry}
                                     <li>
                                         <span class="entry-readings">
                                             {entry.spellings[0] ?? entry.readings[0]}
