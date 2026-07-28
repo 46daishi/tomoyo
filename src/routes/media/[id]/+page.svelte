@@ -405,6 +405,7 @@
                             style="left: {tooltipX}px; top: {tooltipY}px;"
                             transition:fly={{ y: 6, duration: 120 }}
                             onclick={(event) => event.stopPropagation()}
+                            onwheel={(event) => event.stopPropagation()}
                     >
                         <div class="tooltip-surface">
                             {tooltipSpan.surface}
