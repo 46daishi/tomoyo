@@ -47,6 +47,34 @@ body {
     font-style: normal;
 }
 
+@font-face {
+    font-family: "M PLUS 1p";
+    src: url("/fonts/MPLUS1p-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "M PLUS 1p";
+    src: url("/fonts/MPLUS1p-Bold.ttf") format("truetype");
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Zen Kaku Gothic New";
+    src: url("/fonts/ZenKakuGothicNew-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Zen Kaku Gothic New";
+    src: url("/fonts/ZenKakuGothicNew-Bold.ttf") format("truetype");
+    font-weight: 700;
+    font-style: normal;
+}
+
 /* Utility: Icon Rendering Class Engine */
 .nf {
     font-family: "Symbols Nerd Font", monospace;

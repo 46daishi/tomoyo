@@ -214,6 +214,7 @@
 
     let settings = $state(null);
     let fontSize;
+    let fontFamily;
 
     function checkWindowSize() {
         const h = window.innerHeight;
@@ -245,6 +246,7 @@
     onMount(async () => {
         settings = await loadSettings();
         fontSize = settings.font_size;
+        fontFamily = settings.font_family;
         applyMiniModeTransparency(settings.mini_mode_transparency);
 
         checkWindowSize();
@@ -386,7 +388,7 @@
                     class="sentence-text"
                     class:history-text={viewingHistory}
                     onmouseleave={handleSentenceLeave}
-                    style={`--font-size: ${fontSize}px`}
+                    style={`--font-size: ${fontSize}px; --font-family: '${fontFamily}'`}
                 >
                     {#each displayedChars as char, i}
                         <span
@@ -600,7 +602,7 @@
     }
 
     .sentence-text {
-        font-family: "Noto Sans JP", Inter, sans-serif;
+        font-family: var(--font-family, "Noto Sans JP"), Inter, sans-serif;
         color: var(--theme-text, #f6f6f6);
         font-size: var(--font-size, 30px);
         font-weight: 700;
