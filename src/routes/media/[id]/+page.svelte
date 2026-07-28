@@ -15,20 +15,17 @@
     import { setMediaTitle } from '$lib/stores/presence.svelte.js';
     import MediaFormModal from '$lib/components/MediaFormModal.svelte';
     import { loadSettings } from '$lib/settings.js';
-    
+
     let showEditModal = $state(false);
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(null);
 
-    
-    
     async function loadMedia(id) {
         const db = await getDb();
         const rows = await db.select('SELECT * FROM media WHERE id = $1', [id]);
         media = rows[0] ?? null;
-        
-        // Update presence title when media is fetched
+
         if (media?.title) {
             setMediaTitle(media.title);
         }
@@ -41,7 +38,7 @@
     let sessionRunning = $state(false);
     let sessionSeconds = $state(0);
     let timerHandle = null;
-    
+
     function formatTime(totalSeconds) {
         const h = Math.floor(totalSeconds / 3600);
         const m = Math.floor((totalSeconds % 3600) / 60);
@@ -49,7 +46,7 @@
         const pad = (n) => String(n).padStart(2, '0');
         return `${pad(h)}:${pad(m)}:${pad(s)}`;
     }
-    
+
     function toggleSession() {
         if (sessionRunning) {
             clearInterval(timerHandle);
@@ -63,7 +60,7 @@
             }, 1000);
         }
     }
-    
+
     $effect(() => {
         return () => {
             if (timerHandle) clearInterval(timerHandle);
@@ -77,7 +74,19 @@
     // a lookup only ever runs for the exact character the user is
     // pointing at, mirroring JL's click/cursor-driven model.
     let currentText = $state('');
-    let currentChars = $derived([...currentText]);
+
+    // ── History ──
+    // historyEntries[0] is the most recent past sentence, historyEntries[1]
+    // the one before that, etc. historyIndex === 0 means "showing the
+    // current sentence"; historyIndex === n means "n sentences back".
+    let historyEntries = $state([]);
+    let historyIndex = $state(0);
+
+    let displayedText = $derived(
+        historyIndex === 0 ? currentText : (historyEntries[historyIndex - 1] ?? currentText)
+    );
+    let displayedChars = $derived([...displayedText]);
+    let viewingHistory = $derived(historyIndex > 0);
 
     // The most recently resolved MatchSpan `{ start, end, surface, entries,
     // deconjugated_from }`, or null if nothing is currently hovered — this
@@ -104,7 +113,17 @@
 
     async function handleClipboardChange(text) {
         if (!isMostlyJapanese(text)) return;
+
+        // Push the sentence that was current a moment ago into history,
+        // before it gets overwritten — this is what "scrolling up 1
+        // sentence at a time" walks back through.
+        if (settings?.history_enabled && currentText) {
+            const span = settings.history_span ?? 50;
+            historyEntries = [currentText, ...historyEntries].slice(0, span);
+        }
+
         currentText = text;
+        historyIndex = 0; // a new clipboard sentence always returns to "current"
         hoveredSpan = null;
         tooltipSpan = null;
         tooltipVisible = false;
@@ -112,43 +131,33 @@
     }
 
     async function handleCharHover(index) {
-        // Already covered by the currently resolved span — no need to
-        // re-run the lookup for every character inside the same word.
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
             return;
         }
 
-        cycleSkip = 0; // fresh position — start from the longest match again
+        cycleSkip = 0;
         const requestId = ++hoverRequestId;
-        const result = await lookupAtPosition(currentText, index);
-        if (requestId !== hoverRequestId) return; // a newer hover superseded this one
+        const result = await lookupAtPosition(displayedText, index);
+        if (requestId !== hoverRequestId) return;
 
         hoveredSpan = result;
-        // Note: deliberately not touching tooltipVisible/tooltipSpan here —
-        // moving the hover around shouldn't affect an already-open tooltip.
     }
 
-    // Shift cycles the currently hovered position through progressively
-    // shorter dictionary matches (今日は → 今日 → 今, いい天気 → いい,
-    // etc.) — the same escape hatch JL/Yomitan give you for a shorter word
-    // a longer match swallows. Wraps back to the longest match once it
-    // runs out of shorter candidates.
     async function handleCycleShorter() {
         if (!hoveredSpan) return;
 
         const anchorPos = hoveredSpan.start;
         const nextSkip = cycleSkip + 1;
         const requestId = ++hoverRequestId;
-        let result = await lookupAtPosition(currentText, anchorPos, nextSkip);
+        let result = await lookupAtPosition(displayedText, anchorPos, nextSkip);
         if (requestId !== hoverRequestId) return;
 
         if (result) {
             cycleSkip = nextSkip;
             hoveredSpan = result;
         } else {
-            // Ran out of shorter candidates — wrap back to the longest.
             cycleSkip = 0;
-            result = await lookupAtPosition(currentText, anchorPos, 0);
+            result = await lookupAtPosition(displayedText, anchorPos, 0);
             if (requestId !== hoverRequestId) return;
             hoveredSpan = result;
         }
@@ -161,50 +170,42 @@
     }
 
     let tooltipWindow = null;
-    
+
     function getTooltipWindow() {
         if (!tooltipWindow) {
             tooltipWindow = WebviewWindow.getByLabel('tooltip');
         }
         return tooltipWindow;
     }
-    
+
     async function showTooltipAt(clientX, clientY, spanData) {
         const tooltip = await getTooltipWindow();
         const mainWindow = getCurrentWindow();
-        const mainPos = await mainWindow.outerPosition(); // physical px, top-left of the main window on screen
+        const mainPos = await mainWindow.outerPosition();
         const scale = await mainWindow.scaleFactor();
-    
-        // clientX/clientY are CSS pixels relative to the webview's own viewport;
-        // convert to physical screen pixels and add the main window's own
-        // screen offset to get an absolute screen position for the tooltip window.
+
         const screenX = mainPos.x + clientX * scale;
         const screenY = mainPos.y + clientY * scale;
-    
+
         await tooltip.setPosition(new LogicalPosition(screenX / scale, screenY / scale));
         await emit('tooltip-content', spanData);
         await tooltip.show();
     }
-    
+
     async function hideTooltip() {
         const tooltip = await getTooltipWindow();
         await tooltip.hide();
     }
-    
+
     let miniMode = $state(false);
     let resizeDebounceHandle = null;
-    
+
     function applyMiniModeClasses(active) {
         document.documentElement.classList.toggle('mini-mode', active);
         document.body.classList.toggle('mini-mode', active);
     }
-    
-    
-    
+
     function handleWindowResize() {
-        // Resize fires continuously while dragging — debounce so the
-        // threshold check (and its class toggling) doesn't run dozens of
-        // times a second mid-drag.
         clearTimeout(resizeDebounceHandle);
         resizeDebounceHandle = setTimeout(checkWindowSize, 50);
     }
@@ -214,7 +215,7 @@
 
     function checkWindowSize() {
         const h = window.innerHeight;
-    
+
         if (!miniMode && h <= settings.mini_mode_enter_height) {
             miniMode = true;
             applyMiniModeClasses(true);
@@ -230,15 +231,23 @@
         const colorWeight = Math.round((1 - transparency) * 100);
         document.documentElement.style.setProperty('--mini-color-weight', `${colorWeight}%`);
     }
-    
+
+    // Keep stored history within whatever span the user currently has set,
+    // even if they shrink it live from the settings page mid-session.
+    $effect(() => {
+        if (settings?.history_span != null && historyEntries.length > settings.history_span) {
+            historyEntries = historyEntries.slice(0, settings.history_span);
+        }
+    });
+
     onMount(async () => {
         settings = await loadSettings();
         fontSize = settings.font_size;
         applyMiniModeTransparency(settings.mini_mode_transparency);
-    
-        checkWindowSize(); // now settings is guaranteed to be loaded first
+
+        checkWindowSize();
         window.addEventListener('resize', handleWindowResize);
-    
+
         return () => {
             window.removeEventListener('resize', handleWindowResize);
             clearTimeout(resizeDebounceHandle);
@@ -257,17 +266,17 @@
             } else {
                 tooltipSpan = hoveredSpan;
                 tooltipVisible = true;
-    
+
                 const charRect = event.currentTarget.getBoundingClientRect();
-    
+
                 if (miniMode) {
                     showTooltipAt(charRect.left, charRect.bottom + 6, hoveredSpan);
                 } else {
                     const containerRect = sentenceWindowEl.getBoundingClientRect();
                     const rawX = charRect.left - containerRect.left;
-                    const tooltipWidth = 420; // matches .lookup-tooltip's max-width
+                    const tooltipWidth = 420;
                     const maxX = containerRect.width - tooltipWidth - 16;
-    
+
                     tooltipX = Math.max(8, Math.min(rawX, maxX));
                     tooltipY = charRect.bottom - containerRect.top + 6;
                 }
@@ -276,18 +285,11 @@
         }
     }
 
-    // Any click that isn't the one above (i.e. it wasn't stopped) reaches
-    // here and closes an open tooltip — clicking elsewhere, including a
-    // different word, dismisses it.
     function handleWindowClick() {
         tooltipVisible = false;
         if (miniMode) hideTooltip();
     }
 
-    // mouseleave (unlike mouseout) only fires when the pointer truly
-    // leaves the whole element, not when moving between child <span>s, so
-    // this only clears the highlight when the cursor leaves the sentence
-    // entirely. The tooltip is intentionally untouched here.
     function handleSentenceLeave() {
         hoveredSpan = null;
         cycleSkip = 0;
@@ -297,9 +299,6 @@
         return hoveredSpan !== null && index >= hoveredSpan.start && index < hoveredSpan.end;
     }
 
-    // Only the first/last character of a multi-char match get rounded
-    // corners, so the highlight reads as one continuous shape instead of
-    // a rounded pill per character.
     function isSpanStart(index) {
         return isInHoveredSpan(index) && index === hoveredSpan.start;
     }
@@ -307,20 +306,46 @@
     function isSpanEnd(index) {
         return isInHoveredSpan(index) && index === hoveredSpan.end - 1;
     }
-    
+
+    // Scrolling inside the sentence window navigates history instead of
+    // scrolling the page: up goes further back (bounded by history_span),
+    // down comes back toward the current sentence.
+    function handleSentenceWheel(e) {
+        if (!settings?.history_enabled) return;
+        if (historyEntries.length === 0 && historyIndex === 0) return;
+        e.preventDefault();
+
+        if (e.deltaY < 0) {
+            const maxIndex = Math.min(historyEntries.length, settings.history_span ?? 50);
+            const newIndex = Math.min(historyIndex + 1, maxIndex);
+            if (newIndex !== historyIndex) {
+                historyIndex = newIndex;
+                hoveredSpan = null;
+                tooltipVisible = false;
+                cycleSkip = 0;
+            }
+        } else if (e.deltaY > 0) {
+            const newIndex = Math.max(historyIndex - 1, 0);
+            if (newIndex !== historyIndex) {
+                historyIndex = newIndex;
+                hoveredSpan = null;
+                tooltipVisible = false;
+                cycleSkip = 0;
+            }
+        }
+    }
+
     $effect(() => {
         if (sessionRunning) {
             startClipboardListener(handleClipboardChange);
         } else {
             stopClipboardListener();
         }
-    
+
         return () => {
             stopClipboardListener();
         };
     });
-
-    
 </script>
 
 <svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
@@ -343,7 +368,7 @@
                         <span class="tag-pill" style="--tag-color: {media.color}">#{media.tag}</span>
                     {/if}
                 </div>
-            
+
                 <div class="media-meta">
                     <span class="status">
                         <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
@@ -353,10 +378,15 @@
             </div>
         </div>
 
-        <div class="sentence-window" bind:this={sentenceWindowEl}>
-            {#if currentChars.length > 0}
-                <p class="sentence-text" onmouseleave={handleSentenceLeave} style={`--font-size: ${fontSize}px`}>
-                    {#each currentChars as char, i}
+        <div class="sentence-window" bind:this={sentenceWindowEl} onwheel={handleSentenceWheel}>
+            {#if displayedChars.length > 0}
+                <p
+                    class="sentence-text"
+                    class:history-text={viewingHistory}
+                    onmouseleave={handleSentenceLeave}
+                    style={`--font-size: ${fontSize}px`}
+                >
+                    {#each displayedChars as char, i}
                         <span
                             class="char-token"
                             class:hovered={isInHoveredSpan(i)}
@@ -405,7 +435,6 @@
             {:else}
                 <p class="sentence-placeholder">Waiting for a sentence…</p>
             {/if}
-
         </div>
     {:else}
         <p>Loading…</p>
@@ -422,28 +451,10 @@
 </div>
 <nav class="side-nav" aria-label="App navigation">
   <div class="nav-actions">
-      <ActionButton
-          icon={ICONS.back}
-          variant="primary"
-          size="small"
-          onAction={() => history.back()}
-      />
-      <ActionButton
-          icon={ICONS.edit}
-          variant="secondary"
-          size="small"
-          onAction={() => (showEditModal = true)}
-      />
-      <ActionButton
-          icon={ICONS.stats}
-          variant="secondary"
-          size="small"
-      />
-      <ActionButton
-          icon={ICONS.book}
-          variant="secondary"
-          size="small"
-      />
+      <ActionButton icon={ICONS.back} variant="primary" size="small" onAction={() => history.back()} />
+      <ActionButton icon={ICONS.edit} variant="secondary" size="small" onAction={() => (showEditModal = true)} />
+      <ActionButton icon={ICONS.stats} variant="secondary" size="small" />
+      <ActionButton icon={ICONS.book} variant="secondary" size="small" />
       <ActionButton
                 icon={sessionRunning ? ICONS.pause : ICONS.play}
                 variant="primary"
@@ -457,6 +468,7 @@
       {/if}
   </div>
 </nav>
+
 <style>
     .page.home {
         display: flex;
@@ -468,7 +480,7 @@
         padding-top: 2rem;
         padding-right: calc(1rem + 48px + 1.5rem);
         padding-left: calc(1rem + 48px + 1.5rem);
-        padding-bottom: 2rem; /* breathing room at the bottom of the scroll */
+        padding-bottom: 2rem;
         max-height: 100vh;
         overflow-y: auto;
     }
@@ -477,10 +489,10 @@
         font-size: 0.75rem;
         font-weight: 600;
         color: var(--theme-textSecondary, #b3b3b3);
-        font-variant-numeric: tabular-nums; /* keeps digit widths consistent so it doesn't jitter as numbers change */
+        font-variant-numeric: tabular-nums;
         text-align: center;
     }
-    
+
     .title-row {
         display: flex;
         align-items: center;
@@ -494,9 +506,9 @@
         align-items: flex-start;
         width: 100%;
         max-width: 800px;
-        margin-top:1rem;
+        margin-top: 1rem;
     }
-    
+
     .cover {
         flex-shrink: 0;
         aspect-ratio: 2 / 3;
@@ -505,20 +517,20 @@
         overflow: hidden;
         background: var(--surface1, #313244);
     }
-    
+
     .cover img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         display: block;
     }
-    
+
     .cover-placeholder {
         width: 100%;
         height: 100%;
         background: linear-gradient(135deg, var(--surface1, #313244), var(--surface0, #1e1e2e));
     }
-    
+
     .media-info {
         display: flex;
         flex-direction: column;
@@ -527,20 +539,20 @@
         gap: 0.3rem;
         padding-top: 0.4rem;
     }
-    
+
     .media-title {
         font-size: 1.6rem;
         font-weight: 700;
         margin: 0;
     }
-    
+
     .media-meta {
         display: flex;
         align-items: center;
         gap: 0.6rem;
         flex-wrap: wrap;
     }
-    
+
     .status {
         display: flex;
         align-items: center;
@@ -549,7 +561,7 @@
         color: var(--theme-textSecondary, #b3b3b3);
         text-transform: capitalize;
     }
-    
+
     .status-dot {
         width: 8px;
         height: 8px;
@@ -557,7 +569,7 @@
         background: var(--dot-color, var(--theme-textSecondary, #b3b3b3));
         flex-shrink: 0;
     }
-    
+
     .tag-pill {
         font-size: 0.8rem;
         font-weight: 600;
@@ -567,7 +579,7 @@
         background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);
         border: 1px solid color-mix(in srgb, var(--tag-color, #89b4fa) 40%, transparent);
     }
-    
+
     .sentence-window {
         position: relative;
         width: 100%;
@@ -593,8 +605,18 @@
         text-align: left;
         margin: 0;
         width: 100%;
+        transition: color 0.15s ease;
     }
-    
+
+    /* History sentences render bright yellow, unconditionally, regardless
+       of theme — this is a deliberate fixed color, not a --theme-* variable,
+       since it needs to read as "you're looking at the past" the same way
+       no matter which of the app's themes is active. Higher specificity
+       than .sentence-text alone guarantees it wins regardless of rule order. */
+    .sentence-text.history-text {
+        color: #ffe14d;
+    }
+
     .sentence-placeholder {
         color: var(--theme-textSecondary, #b3b3b3);
         font-size: 1rem;
@@ -637,27 +659,23 @@
     }
 
     :global(body.mini-mode) .side-nav,
-    :global(body.mini-mode) .logo,
-    :global(body.mini-mode) .side-nav,
     :global(body.mini-mode) .logo {
         opacity: 0 !important;
         pointer-events: none !important;
     }
-    
+
     :global(body.mini-mode) .media-header {
         display: none !important;
     }
+
     :global(body.mini-mode) .page.home {
         padding: 0;
         max-height: 100vh;
         overflow: hidden;
         gap: 0;
-    }
-    
-    :global(body.mini-mode) .page.home {
         background: transparent !important;
     }
-    
+
     :global(body.mini-mode) .sentence-window {
         width: 100vw;
         height: 100vh;
@@ -673,5 +691,4 @@
             transparent
         );
     }
-
 </style>
