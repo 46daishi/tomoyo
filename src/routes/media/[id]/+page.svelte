@@ -164,7 +164,9 @@
     }
 
     function handleWindowKeydown(event) {
-        if (event.key === 'Shift' && !event.repeat) {
+        if (!settings?.cycle_key) return;
+        if (event.code === settings.cycle_key && !event.repeat) {
+            event.preventDefault();
             handleCycleShorter();
         }
     }

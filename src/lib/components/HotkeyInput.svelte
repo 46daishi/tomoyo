@@ -1,6 +1,9 @@
 <script>
-    let { value = $bindable('') } = $props();
+    import { createEventDispatcher } from 'svelte';
+
+    let { value = '' } = $props();
     let capturing = $state(false);
+    const dispatch = createEventDispatcher();
 
     function startCapture() {
         capturing = true;
@@ -8,8 +11,8 @@
 
     function handleKeydown(e) {
         e.preventDefault();
-        value = e.code; // e.g. "ShiftLeft", "KeyA", "F4"
         capturing = false;
+        dispatch('change', e.code);
     }
 
     function handleBlur() {
