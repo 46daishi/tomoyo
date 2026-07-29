@@ -1,0 +1,125 @@
+<script>
+    import { coverSrc } from '$lib/db';
+    import { STATUS_COLORS } from '$lib/constants.js';
+
+    let { media } = $props();
+</script>
+
+<div class="media-header">
+    <div class="cover">
+        {#if media.cover_path}
+            <img src={coverSrc(media.cover_path)} alt={media.title} />
+        {:else}
+            <div class="cover-placeholder"></div>
+        {/if}
+    </div>
+
+    <div class="media-info">
+        <div class="title-row">
+            <h1 class="media-title">{media.title}</h1>
+            {#if media.tag}
+                <span class="tag-pill" style="--tag-color: {media.color}">#{media.tag}</span>
+            {/if}
+        </div>
+
+        <div class="media-meta">
+            <span class="status">
+                <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
+                {media.status}
+            </span>
+        </div>
+    </div>
+</div>
+
+<style>
+    .title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+    }
+
+    .media-header {
+        display: flex;
+        gap: 1.5rem;
+        align-items: flex-start;
+        width: 100%;
+        max-width: 800px;
+        margin-top: 1rem;
+    }
+
+    .cover {
+        flex-shrink: 0;
+        aspect-ratio: 2 / 3;
+        width: 130px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--surface1, #313244);
+    }
+
+    .cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .cover-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--surface1, #313244), var(--surface0, #1e1e2e));
+    }
+
+    .media-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+        gap: 0.3rem;
+        padding-top: 0.4rem;
+    }
+
+    .media-title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .media-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+    }
+
+    .status {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        text-transform: capitalize;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--dot-color, var(--theme-textSecondary, #b3b3b3));
+        flex-shrink: 0;
+    }
+
+    .tag-pill {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.01em 0.7em;
+        border-radius: 100px;
+        color: var(--tag-color, #89b4fa);
+        background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--tag-color, #89b4fa) 40%, transparent);
+    }
+
+    :global(body.mini-mode) .media-header {
+        display: none !important;
+    }
+</style>
