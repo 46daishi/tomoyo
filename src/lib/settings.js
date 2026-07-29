@@ -82,7 +82,14 @@ export const SETTINGS_SCHEMA = [
         id: 'lookup',
         label: 'Lookup',
         options: [
-            { key: 'lookup_mode', label: 'Lookup trigger', type: 'select', options: LOOKUP_MODE_OPTIONS },
+          { key: 'lookup_mode', label: 'Lookup trigger', type: 'select', options: LOOKUP_MODE_OPTIONS },
+          {
+              key: 'lookup_hotkey',
+              label: 'Hold to look up',
+              type: 'hotkey',
+              subRow: true,
+              showIf: (s) => s.lookup_mode === 'hotkey',
+          },
             { key: 'lookup_limit_enabled', label: 'Limit lookups per hour', type: 'checkbox' },
             {
                 key: 'lookup_limit_per_hour',

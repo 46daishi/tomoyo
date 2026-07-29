@@ -14,6 +14,7 @@ pub struct AppSettings {
 
     // ── Lookup ──
     pub lookup_mode: String, // "click" | "hover" | "hotkey"
+    pub lookup_hotkey: String,
     pub cycle_key: String,
     pub lookup_limit_enabled: bool,
     pub lookup_limit_per_hour: u32,
@@ -48,6 +49,7 @@ impl Default for AppSettings {
             discord_rpc_enabled: false,
 
             lookup_mode: "click".into(),
+            lookup_hotkey: "AltLeft".into(),
             cycle_key: "ShiftLeft".into(),
             lookup_limit_enabled: false,
             lookup_limit_per_hour: 30,

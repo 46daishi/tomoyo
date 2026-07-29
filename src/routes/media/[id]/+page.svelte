@@ -76,9 +76,6 @@
     let currentText = $state('');
 
     // ── History ──
-    // historyEntries[0] is the most recent past sentence, historyEntries[1]
-    // the one before that, etc. historyIndex === 0 means "showing the
-    // current sentence"; historyIndex === n means "n sentences back".
     let historyEntries = $state([]);
     let historyIndex = $state(0);
 
@@ -88,59 +85,104 @@
     let displayedChars = $derived([...displayedText]);
     let viewingHistory = $derived(historyIndex > 0);
 
-    // The most recently resolved MatchSpan `{ start, end, surface, entries,
-    // deconjugated_from }`, or null if nothing is currently hovered — this
-    // only drives the highlight, and clears the instant the pointer leaves
-    // the text.
     let hoveredSpan = $state(null);
-
-    // The span the tooltip is showing, captured at the moment it's opened.
-    // Deliberately separate from hoveredSpan so the tooltip keeps showing
-    // its word's info even after the mouse moves off the text — only an
-    // explicit click (see handleWindowClick) closes it.
     let tooltipSpan = $state(null);
     let tooltipVisible = $state(false);
+    let tooltipEl;
 
-    // How many longest-first candidates to skip at the currently hovered
-    // position (see lookupAtPosition's `skip` param). Reset to 0 whenever
-    // hover moves to a genuinely new position — cycling is relative to
-    // whatever word is currently under the pointer.
     let cycleSkip = 0;
-
-    // Guards against out-of-order results if lookups overlap while the
-    // mouse moves quickly across characters.
     let hoverRequestId = 0;
+
+    // Whether the configured lookup_hotkey is currently held down —
+    // only relevant when lookup_mode === 'hotkey'.
+    let hotkeyHeld = $state(false);
 
     async function handleClipboardChange(text) {
         if (!isMostlyJapanese(text)) return;
 
-        // Push the sentence that was current a moment ago into history,
-        // before it gets overwritten — this is what "scrolling up 1
-        // sentence at a time" walks back through.
         if (settings?.history_enabled && currentText) {
             const span = settings.history_span ?? 50;
             historyEntries = [currentText, ...historyEntries].slice(0, span);
         }
 
         currentText = text;
-        historyIndex = 0; // a new clipboard sentence always returns to "current"
+        historyIndex = 0;
         hoveredSpan = null;
         tooltipSpan = null;
         tooltipVisible = false;
         cycleSkip = 0;
     }
 
-    async function handleCharHover(index) {
+    // Opens (or repositions, in mini mode) the tooltip for a given span,
+    // shared by click mode, hover mode, and hotkey mode alike.
+    function openTooltipForSpan(span, event) {
+        tooltipSpan = span;
+        tooltipVisible = true;
+
+        const charRect = event.currentTarget.getBoundingClientRect();
+
+        if (miniMode) {
+            showTooltipAt(charRect.left, charRect.bottom + 6, span);
+        } else {
+            const containerRect = sentenceWindowEl.getBoundingClientRect();
+            const rawX = charRect.left - containerRect.left;
+            const tooltipWidth = 420;
+            const maxX = containerRect.width - tooltipWidth - 16;
+
+            tooltipX = Math.max(8, Math.min(rawX, maxX));
+            tooltipY = charRect.bottom - containerRect.top + 6;
+        }
+    }
+
+    function closeHoverTooltip() {
+        tooltipVisible = false;
+        if (miniMode) hideTooltip();
+    }
+
+    function positionTooltipUnderChar(charEl) {
+        if (!charEl || !sentenceWindowEl) return;
+    
+        const charRect = charEl.getBoundingClientRect();
+        const containerRect = sentenceWindowEl.getBoundingClientRect();
+    
+        const rawX = charRect.left - containerRect.left;
+        const tooltipWidth = tooltipEl?.offsetWidth ?? 420;
+        const maxX = containerRect.width - tooltipWidth - 16;
+    
+        tooltipX = Math.max(8, Math.min(rawX, maxX));
+        tooltipY = charRect.bottom - containerRect.top + 8;
+    }
+    
+    async function handleCharHover(index, event) {
+        const charEl = event.currentTarget;
+        lastHoverEl = charEl;
+    
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
             return;
         }
-
+    
         cycleSkip = 0;
         const requestId = ++hoverRequestId;
         const result = await lookupAtPosition(displayedText, index);
         if (requestId !== hoverRequestId) return;
-
+    
         hoveredSpan = result;
+        if (!result) return;
+    
+        // Hover mode still auto-opens on resolve, same as before. Hotkey
+        // mode does NOT — it only opens on an explicit keydown, handled
+        // separately in handleGlobalKeydown.
+        if (settings?.lookup_mode === 'hover') {
+            tooltipSpan = result;
+            tooltipVisible = true;
+    
+            if (miniMode) {
+                const rect = charEl.getBoundingClientRect();
+                showTooltipAt(rect.left, rect.bottom + 6, result);
+            } else {
+                positionTooltipUnderChar(charEl);
+            }
+        }
     }
 
     async function handleCycleShorter() {
@@ -163,11 +205,47 @@
         }
     }
 
-    function handleWindowKeydown(event) {
-        if (!settings?.cycle_key) return;
-        if (event.code === settings.cycle_key && !event.repeat) {
+    function isSameSpan(a, b) {
+        return !!a && !!b && a.start === b.start && a.end === b.end && a.surface === b.surface;
+    }
+
+    function handleGlobalKeydown(event) {
+        if (
+            settings?.lookup_mode === 'hotkey' &&
+            settings?.lookup_hotkey &&
+            event.code === settings.lookup_hotkey &&
+            !event.repeat
+        ) {
+            hotkeyHeld = true;
+    
+            if (hoveredSpan && lastHoverEl) {
+                if (tooltipVisible && isSameSpan(tooltipSpan, hoveredSpan)) {
+                    // already open for this word — the hotkey now closes it
+                    tooltipVisible = false;
+                    if (miniMode) hideTooltip();
+                } else {
+                    tooltipSpan = hoveredSpan;
+                    tooltipVisible = true;
+    
+                    if (miniMode) {
+                        const rect = lastHoverEl.getBoundingClientRect();
+                        showTooltipAt(rect.left, rect.bottom + 6, hoveredSpan);
+                    } else {
+                        positionTooltipUnderChar(lastHoverEl);
+                    }
+                }
+            }
+        }
+    
+        if (settings?.cycle_key && event.code === settings.cycle_key && !event.repeat) {
             event.preventDefault();
             handleCycleShorter();
+        }
+    }
+
+    function handleGlobalKeyup(event) {
+        if (settings?.lookup_mode === 'hotkey' && settings?.lookup_hotkey && event.code === settings.lookup_hotkey) {
+            hotkeyHeld = false;
         }
     }
 
@@ -215,6 +293,7 @@
     let settings = $state(null);
     let fontSize;
     let fontFamily;
+    let lastHoverEl;
 
     function checkWindowSize() {
         const h = window.innerHeight;
@@ -235,8 +314,6 @@
         document.documentElement.style.setProperty('--mini-color-weight', `${colorWeight}%`);
     }
 
-    // Keep stored history within whatever span the user currently has set,
-    // even if they shrink it live from the settings page mid-session.
     $effect(() => {
         if (settings?.history_span != null && historyEntries.length > settings.history_span) {
             historyEntries = historyEntries.slice(0, settings.history_span);
@@ -264,25 +341,21 @@
 
     function handleCharClick(index, event) {
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
-            if (tooltipVisible && tooltipSpan === hoveredSpan) {
-                tooltipVisible = false;
-                if (miniMode) hideTooltip();
-            } else {
-                tooltipSpan = hoveredSpan;
-                tooltipVisible = true;
+            const clickModeActive = !settings?.lookup_mode || settings.lookup_mode === 'click';
 
-                const charRect = event.currentTarget.getBoundingClientRect();
-
-                if (miniMode) {
-                    showTooltipAt(charRect.left, charRect.bottom + 6, hoveredSpan);
+            if (clickModeActive) {
+                if (tooltipVisible && tooltipSpan === hoveredSpan) {
+                    tooltipVisible = false;
+                    if (miniMode) hideTooltip();
                 } else {
-                    const containerRect = sentenceWindowEl.getBoundingClientRect();
-                    const rawX = charRect.left - containerRect.left;
-                    const tooltipWidth = 420;
-                    const maxX = containerRect.width - tooltipWidth - 16;
-
-                    tooltipX = Math.max(8, Math.min(rawX, maxX));
-                    tooltipY = charRect.bottom - containerRect.top + 6;
+                    openTooltipForSpan(hoveredSpan, event);
+                }
+            } else {
+                // hover/hotkey modes: a click just closes an already-open
+                // tooltip for this word, rather than being what opens it
+                if (tooltipVisible && tooltipSpan === hoveredSpan) {
+                    tooltipVisible = false;
+                    if (miniMode) hideTooltip();
                 }
             }
             event.stopPropagation();
@@ -294,9 +367,25 @@
         if (miniMode) hideTooltip();
     }
 
-    function handleSentenceLeave() {
+    function isRelatedTargetInSentenceArea(relatedTarget) {
+        if (!relatedTarget?.closest) return false;
+        return relatedTarget.closest('.char-token') || relatedTarget.closest('.lookup-tooltip');
+    }
+
+    function handleSentenceLeave(event) {
         hoveredSpan = null;
         cycleSkip = 0;
+        lastHoverEl = null;
+    
+        if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(event.relatedTarget)) {
+            closeHoverTooltip();
+        }
+    }
+
+    function handleTooltipLeave(event) {
+        if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(event.relatedTarget)) {
+            closeHoverTooltip();
+        }
     }
 
     function isInHoveredSpan(index) {
@@ -311,9 +400,6 @@
         return isInHoveredSpan(index) && index === hoveredSpan.end - 1;
     }
 
-    // Scrolling inside the sentence window navigates history instead of
-    // scrolling the page: up goes further back (bounded by history_span),
-    // down comes back toward the current sentence.
     function handleSentenceWheel(e) {
         if (!settings?.history_enabled) return;
         if (historyEntries.length === 0 && historyIndex === 0) return;
@@ -352,7 +438,7 @@
     });
 </script>
 
-<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
+<svelte:window onclick={handleWindowClick} onkeydown={handleGlobalKeydown} onkeyup={handleGlobalKeyup} />
 
 <main class="page home">
     {#if media}
@@ -397,7 +483,7 @@
                             class:span-start={isSpanStart(i) && settings?.word_highlight_enabled}
                             class:span-end={isSpanEnd(i) && settings?.word_highlight_enabled}
                             class:no-match={isInHoveredSpan(i) && hoveredSpan.entries.length === 0 && settings?.word_highlight_enabled}
-                            onmouseenter={() => handleCharHover(i)}
+                            onmouseenter={(event) => handleCharHover(i, event)}
                             onclick={(event) => handleCharClick(i, event)}
                         >{char}</span>
                     {/each}
@@ -410,6 +496,7 @@
                             transition:fly={{ y: 6, duration: 120 }}
                             onclick={(event) => event.stopPropagation()}
                             onwheel={(event) => event.stopPropagation()}
+                            onmouseleave={handleTooltipLeave}
                     >
                         <div class="tooltip-surface">
                             {tooltipSpan.surface}
@@ -613,11 +700,6 @@
         transition: color 0.15s ease;
     }
 
-    /* History sentences render bright yellow, unconditionally, regardless
-       of theme — this is a deliberate fixed color, not a --theme-* variable,
-       since it needs to read as "you're looking at the past" the same way
-       no matter which of the app's themes is active. Higher specificity
-       than .sentence-text alone guarantees it wins regardless of rule order. */
     .sentence-text.history-text {
         color: #ffe14d;
     }
