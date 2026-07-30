@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors } from '$lib/dictionary.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -13,6 +13,7 @@
     let searchQuery = $state('');
     let words = $state([]);
     let mediaOptions = $state([{ value: '', label: 'All media' }]);
+    let tagColors = $state({});
 
     async function loadMediaOptions() {
         const db = await getDb();
@@ -21,6 +22,10 @@
             { value: '', label: 'All media' },
             ...rows.map((m) => ({ value: String(m.id), label: m.title })),
         ];
+    }
+
+    async function loadTagColors() {
+        tagColors = await getMediaTagColors();
     }
 
     async function loadWords() {
@@ -33,6 +38,7 @@
 
     onMount(() => {
         loadMediaOptions();
+        loadTagColors();
     });
 
     let filteredWords = $derived(
@@ -84,7 +90,12 @@
                     <div class="word-meta">
                         {#if word.tags}
                             {#each word.tags.split(',') as tag}
-                                <span class="tag-pill">#{tag}</span>
+                                <span
+                                    class="tag-pill"
+                                    style={tagColors[tag] ? `--tag-color: ${tagColors[tag]}` : ''}
+                                >
+                                    #{tag}
+                                </span>
                             {/each}
                         {/if}
                         <span class="sentence-count">
@@ -173,9 +184,9 @@
     }
 
     .tag-pill {
-        font-size: 0.8rem;
+        font-size: 0.7rem;
         font-weight: 600;
-        padding: 0.01em 0.7em;
+        padding: 0.01em 0.6em;
         border-radius: 100px;
         color: var(--tag-color, #89b4fa);
         background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);

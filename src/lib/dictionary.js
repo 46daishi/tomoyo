@@ -83,3 +83,11 @@ export async function getWords({ mediaId = null } = {}) {
         [mediaId]
     );
 }
+
+// Maps a word_tags.tag value to the color of the media sharing that same tag,
+// e.g. word_tags.tag = 'test2' -> media.tag = 'test2' -> media.color.
+export async function getMediaTagColors() {
+    const db = await getDb();
+    const rows = await db.select('SELECT tag, color FROM media WHERE tag IS NOT NULL');
+    return Object.fromEntries(rows.map((r) => [r.tag, r.color]));
+}
