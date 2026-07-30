@@ -161,6 +161,7 @@
     icon={ICONS.book}
     variant="secondary"
     size="small"
+    onAction={() => goto(`/dictionary`)}
   />
   <ActionButton
     icon={ICONS.question}
