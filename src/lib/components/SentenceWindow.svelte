@@ -4,9 +4,10 @@
     import { showTooltipAt, hideTooltip } from '$lib/tooltipWindow.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
+    import { mineWord } from '$lib/dictionary.js';
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
 
-    let { settings, miniMode, session, mediaId } = $props();
+    let { settings, miniMode, session, mediaId, mediaTag } = $props();
 
     let currentText = $state('');
     let historyEntries = $state([]);
@@ -241,6 +242,22 @@
         }
     }
 
+    async function handleMineWord(span, entry) {
+        if (!span || !entry) return;
+    
+        await mineWord({
+            spelling: entry.spellings[0] ?? span.surface,
+            reading: entry.readings[0] ?? '',
+            definitions: entry.definitions,
+            wordType: entry.pos.join(', '),
+            tag: mediaTag ?? 'mined',
+            sentenceText: displayedText,
+            highlightStart: span.start,
+            highlightEnd: span.end,
+            mediaId,
+        });
+    }
+
     $effect(() => {
         if (settings?.history_span != null && historyEntries.length > settings.history_span) {
             historyEntries = historyEntries.slice(0, settings.history_span);
@@ -281,6 +298,7 @@
                 {settings}
                 {tooltipX}
                 {tooltipY}
+                onMine={(entry) => handleMineWord(tooltipSpan, entry)}
                 onMouseLeave={(e) => {
                     if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {
                         closeHoverTooltip();

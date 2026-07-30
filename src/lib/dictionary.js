@@ -70,3 +70,18 @@ export async function getWordWithDetails(wordId) {
         sentences,
     };
 }
+
+export async function getWords({ mediaId = null } = {}) {
+    const db = await getDb();
+    return db.select(
+        `SELECT w.*, GROUP_CONCAT(DISTINCT wt.tag) as tags,
+                COUNT(DISTINCT ws.id) as sentence_count
+         FROM words w
+         LEFT JOIN word_tags wt ON wt.word_id = w.id
+         LEFT JOIN word_sentences ws ON ws.word_id = w.id
+         WHERE ($1 IS NULL OR ws.media_id = $1)
+         GROUP BY w.id
+         ORDER BY w.created_at DESC`,
+        [mediaId]
+    );
+}

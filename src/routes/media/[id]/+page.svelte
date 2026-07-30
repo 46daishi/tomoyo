@@ -5,6 +5,7 @@
     import { getDb } from '$lib/db';
     import { setMediaTitle } from '$lib/stores/presence.svelte.js';
     import { loadSettings } from '$lib/settings.js';
+    import { goto } from '$app/navigation';
 
     import { initMiniMode } from '$lib/miniMode.js';
     import { createSessionStore } from '$lib/stores/session.svelte.js';
@@ -58,7 +59,7 @@
             <MediaHeader {media} />
         {/if}
 
-        <SentenceViewer {settings} {miniMode} {session} {mediaId} />
+        <SentenceViewer {settings} {miniMode} {session} {mediaId} mediaTag={media?.tag ?? media?.title} />
 
         <MediaFormModal
             bind:show={showEditModal}
@@ -90,6 +91,7 @@
     icon={ICONS.book} 
     variant="secondary" 
     size="small" 
+    onAction={() => goto(`/dictionary?media=${mediaId}`)}
   />
   <ActionButton
     icon={session.running ? ICONS.pause : ICONS.play}
