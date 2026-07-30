@@ -246,6 +246,7 @@
         if (!span || !entry) return;
     
         await mineWord({
+            dictId: entry.id,
             spelling: entry.spellings[0] ?? span.surface,
             reading: entry.readings[0] ?? '',
             definitions: entry.definitions,

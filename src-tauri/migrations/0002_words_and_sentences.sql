@@ -1,8 +1,8 @@
 CREATE TABLE words (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     spelling TEXT NOT NULL,
     reading TEXT NOT NULL,
-    definitions TEXT NOT NULL,      -- JSON array of strings
+    definitions TEXT NOT NULL,
     word_type TEXT,
     notes TEXT,
     created_at INTEGER NOT NULL DEFAULT (unixepoch()),

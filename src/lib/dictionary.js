@@ -1,6 +1,7 @@
 import { getDb } from '$lib/db';
 
 export async function mineWord({
+    dictId,           // entry.id from the tokenizer/JMdict lookup
     spelling,
     reading,
     definitions,
@@ -14,21 +15,18 @@ export async function mineWord({
 }) {
     const db = await getDb();
 
-    const existing = await db.select(
-        'SELECT id FROM words WHERE spelling = $1 AND reading = $2',
-        [spelling, reading]
-    );
+    const existing = await db.select('SELECT id FROM words WHERE id = $1', [dictId]);
 
     let wordId;
 
     if (existing.length > 0) {
         wordId = existing[0].id;
     } else {
-        const result = await db.execute(
-            'INSERT INTO words (spelling, reading, definitions, word_type) VALUES ($1, $2, $3, $4)',
-            [spelling, reading, JSON.stringify(definitions), wordType]
+        await db.execute(
+            'INSERT INTO words (id, spelling, reading, definitions, word_type) VALUES ($1, $2, $3, $4, $5)',
+            [dictId, spelling, reading, JSON.stringify(definitions), wordType]
         );
-        wordId = result.lastInsertId;
+        wordId = dictId;
     }
 
     await db.execute(

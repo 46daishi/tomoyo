@@ -336,6 +336,12 @@ pub fn run() {
             sql: include_str!("../migrations/0004_sessions_last_updated.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "lookup_events_new",
+            sql: include_str!("../migrations/0005_lookup_events_new.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

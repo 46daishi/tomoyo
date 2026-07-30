@@ -173,12 +173,13 @@
     }
 
     .tag-pill {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         font-weight: 600;
-        padding: 0.15em 0.6em;
+        padding: 0.01em 0.7em;
         border-radius: 100px;
-        color: var(--theme-primary, #36b7bd);
-        background: color-mix(in srgb, var(--theme-primary, #36b7bd) 15%, transparent);
+        color: var(--tag-color, #89b4fa);
+        background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--tag-color, #89b4fa) 40%, transparent);
     }
 
     .sentence-count {
