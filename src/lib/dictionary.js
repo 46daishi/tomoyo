@@ -91,3 +91,15 @@ export async function getMediaTagColors() {
     const rows = await db.select('SELECT tag, color FROM media WHERE tag IS NOT NULL');
     return Object.fromEntries(rows.map((r) => [r.tag, r.color]));
 }
+
+export async function getSentencesForWord(wordId) {
+    const db = await getDb();
+    return db.select(
+        `SELECT id, sentence_text, translation, MIN(created_at) as created_at
+         FROM word_sentences 
+         WHERE word_id = $1 
+         GROUP BY sentence_text
+         ORDER BY created_at DESC`,
+        [wordId]
+    );
+}

@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord } from '$lib/dictionary.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -14,6 +14,8 @@
     let words = $state([]);
     let mediaOptions = $state([{ value: '', label: 'All media' }]);
     let tagColors = $state({});
+    let expandedWords = $state(new Set());
+    let sentencesByWord = $state({});
 
     async function loadMediaOptions() {
         const db = await getDb();
@@ -26,6 +28,22 @@
 
     async function loadTagColors() {
         tagColors = await getMediaTagColors();
+    }
+
+    async function toggleExpand(wordId) {
+        const next = new Set(expandedWords);
+        if (next.has(wordId)) {
+            next.delete(wordId);
+            expandedWords = next;
+            return;
+        }
+        next.add(wordId);
+        expandedWords = next;
+
+        if (!sentencesByWord[wordId]) {
+            const sentences = await getSentencesForWord(wordId);
+            sentencesByWord = { ...sentencesByWord, [wordId]: sentences };
+        }
     }
 
     async function loadWords() {
@@ -98,10 +116,35 @@
                                 </span>
                             {/each}
                         {/if}
-                        <span class="sentence-count">
+                        <button 
+                            type="button" 
+                            class="sentence-count" 
+                            onclick={() => toggleExpand(word.id)}
+                        >
                             {word.sentence_count} sentence{word.sentence_count === 1 ? '' : 's'}
-                        </span>
+                        </button>
                     </div>
+
+                    {#if expandedWords.has(word.id)}
+                        <div class="sentences-panel">
+                            {#if !sentencesByWord[word.id]}
+                                <div class="sentences-loading">Loading sentences...</div>
+                            {:else if sentencesByWord[word.id].length === 0}
+                                <div class="sentences-empty">No sentences found.</div>
+                            {:else}
+                                <ul class="sentences-list">
+                                    {#each sentencesByWord[word.id] as sentence (sentence.id ?? sentence.sentence_text)}
+                                        <li class="sentence-item">
+                                            <p class="sentence-text">{sentence.sentence_text}</p>
+                                            {#if sentence.translation}
+                                                <p class="sentence-translation">{sentence.translation}</p>
+                                            {/if}
+                                        </li>
+                                    {/each}
+                                </ul>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
             {/each}
         </div>
@@ -187,16 +230,70 @@
         font-size: 0.7rem;
         font-weight: 600;
         padding: 0.01em 0.6em;
-        border-radius: 100px;
+        border-radius: 50px;
         color: var(--tag-color, #89b4fa);
         background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);
         border: 1px solid color-mix(in srgb, var(--tag-color, #89b4fa) 40%, transparent);
     }
 
     .sentence-count {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
         font-size: 0.78rem;
         color: var(--theme-textSecondary, #b3b3b3);
         margin-left: auto;
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        transition: color 0.15s ease;
+    }
+
+    .sentence-count:hover {
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .sentences-panel {
+        margin-top: 0.85rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid color-mix(in srgb, var(--theme-border, #404040) 50%, transparent);
+    }
+
+    .sentences-loading,
+    .sentences-empty {
+        font-size: 0.82rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-style: italic;
+    }
+
+    .sentences-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .sentence-item {
+        background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 30%, transparent);
+        border: 1px solid color-mix(in srgb, var(--theme-border, #404040) 40%, transparent);
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+    }
+
+    .sentence-text {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--theme-text, #f6f6f6);
+        font-family: "Noto Sans JP", Inter, sans-serif;
+    }
+
+    .sentence-translation {
+        margin: 0.25rem 0 0 0;
+        font-size: 0.8rem;
+        color: var(--theme-textSecondary, #b3b3b3);
     }
 
     .empty-notice {
