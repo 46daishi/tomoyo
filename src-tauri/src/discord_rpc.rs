@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use tauri::State;
 
 pub struct DiscordState {
-    pub(crate) client: Mutex<Option<DiscordIpcClient>>, // 👈 Marked pub(crate)
+    pub(crate) client: Mutex<Option<DiscordIpcClient>>,
 }
 
 impl DiscordState {
@@ -16,22 +16,33 @@ impl DiscordState {
     pub fn disconnect(&self) -> Result<(), String> {
         let mut client_lock = self.client.lock().unwrap();
         if let Some(mut client) = client_lock.take() {
-            // 1. Tell Discord to remove the active presence overlay
-            let _ = client.clear_activity(); // 👈 Essential step!
-            
-            // 2. Close the IPC connection socket cleanly
+            let _ = client.clear_activity();
             let _ = client.close();
         }
         Ok(())
     }
 }
 
+impl Drop for DiscordState {
+    fn drop(&mut self) {
+        let _ = self.disconnect();
+    }
+}
+
 #[tauri::command]
 pub fn connect_discord(state: State<DiscordState>, client_id: String) -> Result<(), String> {
+    let mut lock = state.client.lock().unwrap();
+    
+    // Sever old socket before binding a new one
+    if let Some(mut old_client) = lock.take() {
+        let _ = old_client.clear_activity();
+        let _ = old_client.close();
+    }
+
     let mut client = DiscordIpcClient::new(&client_id);
     client.connect().map_err(|e| e.to_string())?;
 
-    *state.client.lock().unwrap() = Some(client);
+    *lock = Some(client);
     Ok(())
 }
 

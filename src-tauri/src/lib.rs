@@ -16,6 +16,7 @@ use zstd::Decoder;
 use serde::Deserialize;
 use std::collections::HashSet;
 use discord_rpc::DiscordState;
+use discord_rich_presence::{DiscordIpc};
 
 #[derive(Serialize)]
 struct TokenOut {
@@ -351,12 +352,14 @@ pub fn run() {
             
                 main_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { .. } = event {
-                        if let Some(discord_state) = app_handle.try_state::<DiscordState>() {
-                                    let _ = discord_state.disconnect();
+                        if let Some(discord_state) = app_handle.try_state::<discord_rpc::DiscordState>() {
+                            let _ = discord_state.disconnect();
                         }
+                        
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         app_handle.exit(0);
                     }
-            });
+                });
 
             // ── Tokenizer (Vibrato) — still used by tokenize_text for
             // per-word reading/POS/base-form breakdown. It is not used by

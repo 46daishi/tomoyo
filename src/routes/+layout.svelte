@@ -2,6 +2,7 @@
     import "../app.css";
     import { onMount, onDestroy } from "svelte";
     import { page } from "$app/stores";
+    import { afterNavigate } from "$app/navigation";
     import { initializeTheme } from "$lib/stores/themes.js";
     import { discordRPC } from "$lib/rpc.js";
     import { discordEnabled } from "$lib/stores/discordSettings.js";
@@ -14,8 +15,6 @@
     } from "$lib/defaults/discord.js";
 
     let { children } = $props();
-
-    // Guard flag to prevent effects from running during initial async setup
     let isInitialized = $state(false);
 
     /** @param {string} path */
@@ -37,7 +36,6 @@
 
     /** @param {string} path */
     async function setPresence(path) {
-        // Guard against updating when disabled or not connected yet
         if (!$discordEnabled || !discordRPC.connected) return;
 
         try {
@@ -68,16 +66,11 @@
     onMount(async () => {
         initializeTheme();
 
-        // 1. Fetch settings first
+        // 1. Fetch settings and update store
         const settings = await loadSettings();
         discordEnabled.set(settings.discord_rpc_enabled);
 
-        // 2. Connect synchronously if enabled on boot
-        if (settings.discord_rpc_enabled) {
-            await enableDiscord($page.url.pathname);
-        }
-
-        // 3. Enable reactive effects AFTER initial connection setup is complete
+        // 2. Mark initialized so reactive effect takes over (prevents duplicate call)
         isInitialized = true;
     });
 
@@ -87,27 +80,28 @@
         }
     });
 
-    // Handle toggling Discord RPC on/off (e.g. from Settings UI)
+    // Update presence on page navigation
+    afterNavigate((navigation) => {
+        if (!isInitialized) return;
+        const targetPath = navigation.to?.url.pathname ?? $page.url.pathname;
+        if ($discordEnabled && discordRPC.connected) {
+            setPresence(targetPath);
+        }
+    });
+
+    // Single reactive driver for toggles, startup, and title changes
     $effect(() => {
         if (!isInitialized) return;
 
         const enabled = $discordEnabled;
+        const _title = presenceState.mediaTitle;
+        const currentPath = $page.url.pathname;
 
         if (enabled && !discordRPC.connected) {
-            enableDiscord($page.url.pathname);
+            enableDiscord(currentPath);
         } else if (!enabled && discordRPC.connected) {
             discordRPC.disconnect().catch(console.warn);
-        }
-    });
-
-    // Update presence reactively when route or media title changes
-    $effect(() => {
-        if (!isInitialized) return;
-
-        const currentPath = $page.url.pathname;
-        const _title = presenceState.mediaTitle; // Explicit reactive dependency
-
-        if ($discordEnabled && discordRPC.connected) {
+        } else if (enabled && discordRPC.connected) {
             setPresence(currentPath);
         }
     });
