@@ -3,11 +3,11 @@
     import { lookupAtPosition } from '$lib/lookup.js';
     import { showTooltipAt, hideTooltip } from '$lib/tooltipWindow.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
+    import { logLookupEvent } from '$lib/lookupEvents.js';
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
 
-    let { settings, miniMode, session } = $props();
+    let { settings, miniMode, session, mediaId } = $props();
 
-    // Sentence & History State
     let currentText = $state('');
     let historyEntries = $state([]);
     let historyIndex = $state(0);
@@ -18,7 +18,6 @@
     let displayedChars = $derived([...displayedText]);
     let viewingHistory = $derived(historyIndex > 0);
 
-    // Hover & Tooltip State
     let hoveredSpan = $state(null);
     let tooltipSpan = $state(null);
     let tooltipVisible = $state(false);
@@ -33,21 +32,22 @@
 
     async function handleClipboardChange(text) {
         if (!isMostlyJapanese(text)) return;
-
+    
         if (settings?.history_enabled && currentText) {
             const span = settings.history_span ?? 50;
             historyEntries = [currentText, ...historyEntries].slice(0, span);
         }
-
+    
         currentText = text;
         historyIndex = 0;
         hoveredSpan = null;
         tooltipSpan = null;
         tooltipVisible = false;
         cycleSkip = 0;
+    
+        session?.recordSentence(text.length);
     }
 
-    // Automatically manage clipboard listener when session state changes or component unmounts
     $effect(() => {
         if (session?.running) {
             startClipboardListener(handleClipboardChange);
@@ -75,17 +75,21 @@
         };
     }
 
-    function openTooltipForSpan(span, event) {
+    function openTooltipAndLog(span, charEl) {
         tooltipSpan = span;
         tooltipVisible = true;
-
+    
+        logLookupEvent({
+            mediaId,
+            wordId: span.entries[0]?.id ?? null,
+            surfaceText: span.surface,
+        });
+    
         if (miniMode) {
-            const charRect = event.currentTarget.getBoundingClientRect();
-            showTooltipAt(charRect.left, charRect.bottom + 6, span);
+            const rect = charEl.getBoundingClientRect();
+            showTooltipAt(rect.left, rect.bottom + 6, span);
         } else {
-            const coords = calculateTooltipCoords(event.currentTarget);
-            tooltipX = coords.x;
-            tooltipY = coords.y;
+            positionTooltipUnderChar(charEl);
         }
     }
 
@@ -115,15 +119,7 @@
         if (!result) return;
 
         if (settings?.lookup_mode === 'hover') {
-            tooltipSpan = result;
-            tooltipVisible = true;
-
-            if (miniMode) {
-                const rect = charEl.getBoundingClientRect();
-                showTooltipAt(rect.left, rect.bottom + 6, result);
-            } else {
-                positionTooltipUnderChar(charEl);
-            }
+            openTooltipAndLog(result, charEl);
         }
     }
 
@@ -169,15 +165,7 @@
                     tooltipVisible = false;
                     if (miniMode) hideTooltip();
                 } else {
-                    tooltipSpan = hoveredSpan;
-                    tooltipVisible = true;
-
-                    if (miniMode) {
-                        const rect = lastHoverEl.getBoundingClientRect();
-                        showTooltipAt(rect.left, rect.bottom + 6, hoveredSpan);
-                    } else {
-                        positionTooltipUnderChar(lastHoverEl);
-                    }
+                    openTooltipAndLog(hoveredSpan, lastHoverEl);
                 }
             }
         }
@@ -197,15 +185,15 @@
     function handleCharClick(index, event) {
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
             const clickModeActive = !settings?.lookup_mode || settings.lookup_mode === 'click';
-
+    
             if (clickModeActive) {
-                if (tooltipVisible && tooltipSpan === hoveredSpan) {
+                if (tooltipVisible && isSameSpan(tooltipSpan, hoveredSpan)) {
                     tooltipVisible = false;
                     if (miniMode) hideTooltip();
                 } else {
-                    openTooltipForSpan(hoveredSpan, event);
+                    openTooltipAndLog(hoveredSpan, event.currentTarget);
                 }
-            } else if (tooltipVisible && tooltipSpan === hoveredSpan) {
+            } else if (tooltipVisible && isSameSpan(tooltipSpan, hoveredSpan)) {
                 tooltipVisible = false;
                 if (miniMode) hideTooltip();
             }

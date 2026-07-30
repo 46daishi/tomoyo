@@ -25,7 +25,7 @@
     let media = $state(null);
 
     // Initialize session store
-    const session = createSessionStore();
+    const session = createSessionStore(mediaId);
 
     async function loadMedia(id) {
         const db = await getDb();
@@ -52,19 +52,21 @@
     });
 </script>
 
-<main class="page home">
-    {#if media}
-        <MediaHeader {media} />
-    {/if}
+{#key mediaId}
+    <main class="page home">
+        {#if media}
+            <MediaHeader {media} />
+        {/if}
 
-    <SentenceViewer {settings} {miniMode} {session} />
+        <SentenceViewer {settings} {miniMode} {session} {mediaId} />
 
-    <MediaFormModal
-        bind:show={showEditModal}
-        {media}
-        onSaved={() => loadMedia(mediaId)}
-    />
-</main>
+        <MediaFormModal
+            bind:show={showEditModal}
+            {media}
+            onSaved={() => loadMedia(mediaId)}
+        />
+    </main>
+{/key}
 
 <SideNav>
   <ActionButton 

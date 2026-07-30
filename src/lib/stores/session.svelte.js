@@ -1,19 +1,31 @@
-export function createSessionStore() {
+import { startSession, endSession, recordSentenceRead } from '$lib/sessions.js';
+
+export function createSessionStore(mediaId) {
     let running = $state(false);
     let seconds = $state(0);
     let timerHandle = null;
+    let sessionId = null;
 
-    function toggle() {
+    async function toggle() {
         if (running) {
             clearInterval(timerHandle);
             timerHandle = null;
             running = false;
             seconds = 0;
+            await endSession(sessionId);
+            sessionId = null;
         } else {
             running = true;
+            sessionId = await startSession(mediaId);
             timerHandle = setInterval(() => {
                 seconds += 1;
             }, 1000);
+        }
+    }
+
+    async function recordSentence(mojiCount) {
+        if (sessionId) {
+            await recordSentenceRead(sessionId, mojiCount);
         }
     }
 
@@ -34,6 +46,7 @@ export function createSessionStore() {
         get seconds() { return seconds; },
         get formattedTime() { return formatTime(seconds); },
         toggle,
+        recordSentence,
         destroy
     };
 }

@@ -318,6 +318,18 @@ pub fn run() {
             sql: include_str!("../migrations/0001_media.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 2,
+            description: "words_and_sentences",
+            sql: include_str!("../migrations/0002_words_and_sentences.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "events_and_sessions",
+            sql: include_str!("../migrations/0003_events_and_sessions.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
