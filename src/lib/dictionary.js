@@ -57,7 +57,7 @@ export async function getWordWithDetails(wordId) {
 
     const tags = await db.select('SELECT tag FROM word_tags WHERE word_id = $1', [wordId]);
     const sentences = await db.select(
-        'SELECT * FROM word_sentences WHERE word_id = $1 ORDER BY created_at DESC',
+        'SELECT * FROM word_sentences WHERE word_id = $1 GROUP BY sentence_text ORDER BY created_at DESC',
         [wordId]
     );
 
