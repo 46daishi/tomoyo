@@ -330,6 +330,12 @@ pub fn run() {
             sql: include_str!("../migrations/0003_events_and_sessions.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "sessions_last_updated",
+            sql: include_str!("../migrations/0004_sessions_last_updated.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

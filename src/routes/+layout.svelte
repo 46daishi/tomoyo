@@ -8,6 +8,7 @@
     import { discordEnabled } from "$lib/stores/discordSettings.js";
     import { loadSettings } from "$lib/settings.js";
     import { presenceState } from "$lib/stores/presence.svelte.js";
+    import { recoverDanglingSessions } from '$lib/sessions.js';
     import {
         PRESENCE_DEFAULTS,
         PRESENCE_DETAILS,
@@ -65,6 +66,7 @@
 
     onMount(async () => {
         initializeTheme();
+        await recoverDanglingSessions();
 
         // 1. Fetch settings and update store
         const settings = await loadSettings();

@@ -1,0 +1,1 @@
+ALTER TABLE sessions ADD COLUMN last_updated_at INTEGER NOT NULL DEFAULT (unixepoch());

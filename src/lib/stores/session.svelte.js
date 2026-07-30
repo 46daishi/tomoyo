@@ -37,8 +37,11 @@ export function createSessionStore(mediaId) {
         return `${pad(h)}:${pad(m)}:${pad(s)}`;
     }
 
-    function destroy() {
+    async function destroy() {
         if (timerHandle) clearInterval(timerHandle);
+        if (running && sessionId) {
+            await endSession(sessionId);
+        }
     }
 
     return {
