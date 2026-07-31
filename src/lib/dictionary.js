@@ -57,7 +57,7 @@ export async function getWordWithDetails(wordId) {
 
     const tags = await db.select('SELECT tag FROM word_tags WHERE word_id = $1', [wordId]);
     const sentences = await db.select(
-        'SELECT * FROM word_sentences WHERE word_id = $1 GROUP BY sentence_text ORDER BY created_at DESC',
+        'SELECT * FROM word_sentences WHERE word_id = $1 ORDER BY created_at DESC',
         [wordId]
     );
 
@@ -72,8 +72,9 @@ export async function getWordWithDetails(wordId) {
 export async function getWords({ mediaId = null } = {}) {
     const db = await getDb();
     return db.select(
-        `SELECT w.*, GROUP_CONCAT(DISTINCT wt.tag) as tags,
-                COUNT(DISTINCT ws.id) as sentence_count
+        `SELECT w.*, 
+                GROUP_CONCAT(DISTINCT wt.tag) as tags,
+                COUNT(DISTINCT ws.sentence_text) as sentence_count
          FROM words w
          LEFT JOIN word_tags wt ON wt.word_id = w.id
          LEFT JOIN word_sentences ws ON ws.word_id = w.id
