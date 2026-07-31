@@ -23,6 +23,7 @@
     let tooltipVisible = $state(false);
     let tooltipX = $state(0);
     let tooltipY = $state(0);
+    let tooltipMaxHeight = $state(300);
     let hotkeyHeld = $state(false);
 
     let cycleSkip = 0;
@@ -69,31 +70,31 @@
     });
 
     function calculateTooltipCoords(targetEl) {
-        if (!targetEl || !sentenceWindowEl) return { x: 0, y: 0 };
-
+        if (!targetEl || !sentenceWindowEl) return { x: 0, y: 0, maxHeight: 300 };
+    
         const charRect = targetEl.getBoundingClientRect();
         const containerRect = sentenceWindowEl.getBoundingClientRect();
-
+    
         const tooltipWidth = miniMode ? 260 : 420;
-        const estimatedTooltipHeight = miniMode ? 160 : 220;
-
+    
         const rawX = charRect.left - containerRect.left;
         const maxX = containerRect.width - tooltipWidth - 12;
         const x = Math.max(8, Math.min(rawX, maxX));
-
-        const spaceBelow = containerRect.height - (charRect.bottom - containerRect.top);
-        const y =
-            spaceBelow < estimatedTooltipHeight
-                ? Math.max(8, charRect.top - containerRect.top - estimatedTooltipHeight - 6)
-                : charRect.bottom - containerRect.top + 6;
-
-        return { x, y };
+    
+        const y = charRect.bottom - containerRect.top + 6;
+    
+        const bottomMargin = 16;
+        const availableHeight = window.innerHeight - charRect.bottom - 6 - bottomMargin;
+        const maxHeight = Math.max(80, availableHeight);
+    
+        return { x, y, maxHeight };
     }
 
     function positionTooltipUnderChar(charEl) {
         const coords = calculateTooltipCoords(charEl);
         tooltipX = coords.x;
         tooltipY = coords.y;
+        tooltipMaxHeight = coords.maxHeight;
     }
 
     function openTooltipAndLog(span, charEl) {
@@ -304,6 +305,7 @@
                 {settings}
                 {tooltipX}
                 {tooltipY}
+                {tooltipMaxHeight}
                 onMine={(entry) => handleMineWord(tooltipSpan, entry)}
                 onMouseLeave={(e) => {
                     if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {
@@ -332,7 +334,9 @@
         justify-content: center;
         padding: 2rem 2.5rem;
         box-sizing: border-box;
+        container-type: inline-size; /* enables cqw units below, scoped to this element's own width */
     }
+    
 
     .sentence-text {
         font-family: var(--font-family, "Noto Sans JP"), Inter, sans-serif;

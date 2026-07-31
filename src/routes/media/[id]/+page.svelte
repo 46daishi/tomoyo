@@ -120,6 +120,7 @@
         padding-bottom: 2rem;
         max-height: 100vh;
         overflow-y: auto;
+        overflow:hidden;
     }
 
     :global(body.mini-mode) .page.home {

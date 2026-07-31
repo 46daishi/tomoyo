@@ -399,8 +399,10 @@ body {
 .lookup-tooltip {
     position: absolute;
     text-align: left;
-    min-width: 300px;
-    max-width: 600px;
+    min-width: clamp(220px, 40cqw, 320px);
+    max-width: clamp(320px, 55cqw, 420px);
+    overflow-y: auto;
+    padding: 0.9rem 1.6rem 0.9rem 1.1rem; /* extra right padding creates room between content and scrollbar */
     background: color-mix(
         in srgb,
         color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 100%) 95%,
@@ -408,10 +410,13 @@ body {
     );
     border: 1px solid var(--theme-border, #404040);
     border-radius: 10px;
-    padding: 0.9rem 1.1rem;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     z-index: 10;
     font-family: "Noto Sans JP", Inter, sans-serif;
+}
+
+.lookup-tooltip.static-position {
+    position: static;
 }
 
 .tooltip-surface {
@@ -434,8 +439,24 @@ body {
     align-items: flex-start; /* in case any ancestor sets align-items: center via flex */
     gap: 0.6rem;
     max-height: 300px;
-    overflow-y: auto;
     text-align: left;
+}
+
+.lookup-tooltip::-webkit-scrollbar {
+    width: 6px;
+}
+
+.lookup-tooltip::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.lookup-tooltip::-webkit-scrollbar-thumb {
+    background: var(--theme-border, #404040);
+    border-radius: 3px;
+}
+
+.lookup-tooltip::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-textSecondary, #b3b3b3);
 }
 
 .tooltip-entries li {

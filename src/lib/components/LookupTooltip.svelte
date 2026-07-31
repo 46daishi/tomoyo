@@ -3,12 +3,18 @@
     import ActionButton from '$lib/components/ActionButton.svelte';
     import { ICONS } from '$lib/icons';
 
-    let { tooltipSpan, settings, tooltipX, tooltipY, onMouseLeave, onMine } = $props();
+    let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine } = $props();
+    
+    let positionStyle = $derived(
+        (tooltipX !== null && tooltipY !== null ? `left: ${tooltipX}px; top: ${tooltipY}px;` : '') +
+        (tooltipMaxHeight !== null ? ` max-height: ${tooltipMaxHeight}px;` : '')
+    );
 </script>
 
 <div
     class="lookup-tooltip"
-    style="left: {tooltipX}px; top: {tooltipY}px;"
+    class:static-position={tooltipX === null}
+    style={positionStyle}
     transition:fly={{ y: 6, duration: 120 }}
     onclick={(event) => event.stopPropagation()}
     onwheel={(event) => event.stopPropagation()}
