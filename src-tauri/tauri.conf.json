@@ -15,19 +15,6 @@
               "label": "main",
               "title": "Tomoyo",
               "transparent": true
-          },
-          {
-              "label": "tooltip",
-              "url": "/tooltip",
-              "width": 500,
-              "height": 300,
-              "decorations": false,
-              "transparent": true,
-              "alwaysOnTop": true,
-              "skipTaskbar": true,
-              "visible": false,
-              "resizable": false,
-              "shadow": false
           }
       ],
       "security": {

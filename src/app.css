@@ -491,3 +491,39 @@ body.mini-mode,
 body.mini-mode #svelte {
     background: transparent !important;
 }
+
+body.mini-mode .side-nav,
+body.mini-mode .logo
+{
+    opacity:0;
+    pointer-events: none;
+}
+
+body.mini-mode .lookup-tooltip {
+    min-width: clamp(160px, 40vw, 260px);
+    max-width: clamp(200px, 60vw, 320px);
+    padding: clamp(0.4rem, 2vh, 0.75rem) clamp(0.5rem, 3vw, 1rem);
+}
+
+body.mini-mode .tooltip-surface {
+    font-size: clamp(0.85rem, 4vh, 1.1rem);
+    margin-bottom: clamp(0.3rem, 1.5vh, 0.5rem);
+    padding-bottom: clamp(0.3rem, 1.5vh, 0.5rem);
+}
+
+body.mini-mode .entry-readings {
+    font-size: clamp(0.85rem, 3.5vh, 1.1rem);
+}
+
+body.mini-mode .entry-reading-kana {
+    font-size: clamp(0.7rem, 2.5vh, 0.85rem);
+}
+
+body.mini-mode .entry-definitions {
+    font-size: clamp(0.7rem, 2.5vh, 0.85rem);
+}
+
+body.mini-mode .tooltip-entries {
+    max-height: clamp(80px, 40vh, 160px);
+    gap: clamp(0.3rem, 1.5vh, 0.5rem);
+}

@@ -1,7 +1,6 @@
 <script>
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
     import { lookupAtPosition } from '$lib/lookup.js';
-    import { showTooltipAt, hideTooltip } from '$lib/tooltipWindow.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
     import { mineWord } from '$lib/dictionary.js';
@@ -33,19 +32,19 @@
 
     async function handleClipboardChange(text) {
         if (!isMostlyJapanese(text)) return;
-    
+
         if (settings?.history_enabled && currentText) {
             const span = settings.history_span ?? 50;
             historyEntries = [currentText, ...historyEntries].slice(0, span);
         }
-    
+
         currentText = text;
         historyIndex = 0;
         hoveredSpan = null;
         tooltipSpan = null;
         tooltipVisible = false;
         cycleSkip = 0;
-    
+
         session?.recordSentence(text.length);
     }
 
@@ -61,48 +60,57 @@
         };
     });
 
+    // Close any open tooltip whenever mini mode toggles — the whole
+    // sentence window changes shape/size, so a previously positioned
+    // tooltip would otherwise be left stranded at stale coordinates.
+    $effect(() => {
+        miniMode; // tracked dependency
+        tooltipVisible = false;
+    });
+
     function calculateTooltipCoords(targetEl) {
         if (!targetEl || !sentenceWindowEl) return { x: 0, y: 0 };
 
         const charRect = targetEl.getBoundingClientRect();
         const containerRect = sentenceWindowEl.getBoundingClientRect();
+
+        const tooltipWidth = miniMode ? 260 : 420;
+        const estimatedTooltipHeight = miniMode ? 160 : 220;
+
         const rawX = charRect.left - containerRect.left;
-        const tooltipWidth = 420;
-        const maxX = containerRect.width - tooltipWidth - 16;
+        const maxX = containerRect.width - tooltipWidth - 12;
+        const x = Math.max(8, Math.min(rawX, maxX));
 
-        return {
-            x: Math.max(8, Math.min(rawX, maxX)),
-            y: charRect.bottom - containerRect.top + 6
-        };
-    }
+        const spaceBelow = containerRect.height - (charRect.bottom - containerRect.top);
+        const y =
+            spaceBelow < estimatedTooltipHeight
+                ? Math.max(8, charRect.top - containerRect.top - estimatedTooltipHeight - 6)
+                : charRect.bottom - containerRect.top + 6;
 
-    function openTooltipAndLog(span, charEl) {
-        tooltipSpan = span;
-        tooltipVisible = true;
-    
-        logLookupEvent({
-            mediaId,
-            wordId: span.entries[0]?.id ?? null,
-            surfaceText: span.surface,
-        });
-    
-        if (miniMode) {
-            const rect = charEl.getBoundingClientRect();
-            showTooltipAt(rect.left, rect.bottom + 6, span);
-        } else {
-            positionTooltipUnderChar(charEl);
-        }
-    }
-
-    function closeHoverTooltip() {
-        tooltipVisible = false;
-        if (miniMode) hideTooltip();
+        return { x, y };
     }
 
     function positionTooltipUnderChar(charEl) {
         const coords = calculateTooltipCoords(charEl);
         tooltipX = coords.x;
         tooltipY = coords.y;
+    }
+
+    function openTooltipAndLog(span, charEl) {
+        tooltipSpan = span;
+        tooltipVisible = true;
+
+        logLookupEvent({
+            mediaId,
+            wordId: span.entries[0]?.id ?? null,
+            surfaceText: span.surface,
+        });
+
+        positionTooltipUnderChar(charEl);
+    }
+
+    function closeHoverTooltip() {
+        tooltipVisible = false;
     }
 
     async function handleCharHover(index, event) {
@@ -164,7 +172,6 @@
             if (hoveredSpan && lastHoverEl && lastHoverEl.isConnected) {
                 if (tooltipVisible && isSameSpan(tooltipSpan, hoveredSpan)) {
                     tooltipVisible = false;
-                    if (miniMode) hideTooltip();
                 } else {
                     openTooltipAndLog(hoveredSpan, lastHoverEl);
                 }
@@ -186,17 +193,15 @@
     function handleCharClick(index, event) {
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
             const clickModeActive = !settings?.lookup_mode || settings.lookup_mode === 'click';
-    
+
             if (clickModeActive) {
                 if (tooltipVisible && isSameSpan(tooltipSpan, hoveredSpan)) {
                     tooltipVisible = false;
-                    if (miniMode) hideTooltip();
                 } else {
                     openTooltipAndLog(hoveredSpan, event.currentTarget);
                 }
             } else if (tooltipVisible && isSameSpan(tooltipSpan, hoveredSpan)) {
                 tooltipVisible = false;
-                if (miniMode) hideTooltip();
             }
             event.stopPropagation();
         }
@@ -244,7 +249,7 @@
 
     async function handleMineWord(span, entry) {
         if (!span || !entry) return;
-    
+
         await mineWord({
             dictId: entry.id,
             spelling: entry.spellings[0] ?? span.surface,
@@ -266,10 +271,10 @@
     });
 </script>
 
-<svelte:window 
-    onclick={() => { tooltipVisible = false; if (miniMode) hideTooltip(); }} 
-    onkeydown={handleGlobalKeydown} 
-    onkeyup={handleGlobalKeyup} 
+<svelte:window
+    onclick={() => { tooltipVisible = false; }}
+    onkeydown={handleGlobalKeydown}
+    onkeyup={handleGlobalKeyup}
 />
 
 <div class="sentence-window" bind:this={sentenceWindowEl} onwheel={handleSentenceWheel}>
@@ -293,7 +298,7 @@
             {/each}
         </p>
 
-        {#if tooltipVisible && tooltipSpan && !miniMode}
+        {#if tooltipVisible && tooltipSpan}
             <LookupTooltip
                 {tooltipSpan}
                 {settings}

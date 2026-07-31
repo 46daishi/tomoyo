@@ -1,5 +1,4 @@
 import { writable } from "svelte/store";
-import { emit } from '@tauri-apps/api/event';
 
 /** @type {Record<string, { label: string, colors: Record<string, string> }>} */
 export const themes = {
@@ -373,8 +372,6 @@ export const currentTheme = writable("tomoyo");
  
      currentTheme.set(themeKey);
      localStorage.setItem("tomoyo-theme", themeKey);
- 
-     emit('theme-changed', theme.colors).catch(() => {}); // tooltip window may not exist yet — ignore failures
  }
 
 /** Read persisted theme and apply it. Call once in the root layout's onMount. */

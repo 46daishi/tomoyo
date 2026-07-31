@@ -1,5 +1,3 @@
-import { hideTooltip } from './tooltipWindow.js';
-
 export function initMiniMode(settings, onMiniModeChange) {
     let miniMode = false;
     let resizeDebounceHandle = null;
@@ -18,11 +16,10 @@ export function initMiniMode(settings, onMiniModeChange) {
         const h = window.innerHeight;
         const enterHeight = settings?.mini_mode_enter_height ?? 200;
         const exitHeight = settings?.mini_mode_exit_height ?? 300;
-    
+
         if (!miniMode && h <= enterHeight) {
             miniMode = true;
             applyMiniModeClasses(true);
-            hideTooltip();
             onMiniModeChange(true);
         } else if (miniMode && h >= exitHeight) {
             miniMode = false;
