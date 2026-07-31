@@ -15,6 +15,7 @@ export const PRESENCE_DETAILS = {
   immersionDetails: "Immersing",
   statsDetails: "Viewing Stats",
   settingsDetails: "Editing Settings",
+  dictionaryDetails: "Browsing the dictionary"
 };
 
 export const PRESENCE_DEFAULTS = {

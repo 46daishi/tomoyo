@@ -32,6 +32,12 @@
                 details: PRESENCE_DETAILS.settingsDetails,
             };
         }
+        if (path.startsWith("/dictionary")){
+          return {
+            details: PRESENCE_DETAILS.dictionaryDetails,
+            smallImage: PRESENCE_ICONS.dictionaryIcon,
+          }
+        }
         return {};
     }
 
