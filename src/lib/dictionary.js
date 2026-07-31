@@ -42,6 +42,32 @@ export async function mineWord({
     return wordId;
 }
 
+// Reports how a candidate mine action relates to what's already stored:
+// - 'new'       -> the word isn't in the dictionary at all yet
+// - 'same'      -> the word exists AND was already mined from this exact
+//                  sentence + media (mining again would be a pure duplicate)
+// - 'different' -> the word exists, but not from this sentence + media
+//                  (mining would add a new example, which is still useful)
+export async function getWordMineStatus({ dictId, sentenceText, mediaId = null }) {
+    const db = await getDb();
+
+    const existing = await db.select('SELECT id FROM words WHERE id = $1', [dictId]);
+    if (existing.length === 0) {
+        return 'new';
+    }
+
+    const matching = await db.select(
+        `SELECT 1 FROM word_sentences
+         WHERE word_id = $1
+           AND sentence_text = $2
+           AND ((media_id IS NULL AND $3 IS NULL) OR media_id = $3)
+         LIMIT 1`,
+        [dictId, sentenceText, mediaId]
+    );
+
+    return matching.length > 0 ? 'same' : 'different';
+}
+
 export async function addSentenceEntry({ sentenceText, tag = null, translation = null, mediaId = null }) {
     const db = await getDb();
     await db.execute(

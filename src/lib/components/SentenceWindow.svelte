@@ -3,7 +3,7 @@
     import { lookupAtPosition } from '$lib/lookup.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
-    import { mineWord } from '$lib/dictionary.js';
+    import { mineWord, getWordMineStatus } from '$lib/dictionary.js';
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
 
     let { settings, miniMode, session, mediaId, mediaTag } = $props();
@@ -30,6 +30,10 @@
     let hoverRequestId = 0;
     let lastHoverEl = null;
     let sentenceWindowEl = $state(null);
+
+    // entry.id -> 'new' | 'different' | 'same', for the currently open tooltip's entries
+    let mineStatuses = $state({});
+    let mineStatusRequestId = 0;
 
     async function handleClipboardChange(text) {
         if (!isMostlyJapanese(text)) return;
@@ -97,6 +101,24 @@
         tooltipMaxHeight = coords.maxHeight;
     }
 
+    async function refreshMineStatuses(span) {
+        if (!span) return;
+
+        const entries = [...span.entries, ...(settings?.show_related_entries ? span.related_entries : [])];
+        const requestId = ++mineStatusRequestId;
+
+        const results = await Promise.all(
+            entries.map((entry) =>
+                getWordMineStatus({ dictId: entry.id, sentenceText: displayedText, mediaId }).then(
+                    (status) => [entry.id, status]
+                )
+            )
+        );
+
+        if (requestId !== mineStatusRequestId) return;
+        mineStatuses = Object.fromEntries(results);
+    }
+
     function openTooltipAndLog(span, charEl) {
         tooltipSpan = span;
         tooltipVisible = true;
@@ -108,6 +130,7 @@
         });
 
         positionTooltipUnderChar(charEl);
+        refreshMineStatuses(span);
     }
 
     function closeHoverTooltip() {
@@ -154,6 +177,7 @@
 
         if (result && tooltipVisible) {
             tooltipSpan = result;
+            refreshMineStatuses(result);
         }
     }
 
@@ -263,6 +287,8 @@
             highlightEnd: span.end,
             mediaId,
         });
+
+        mineStatuses = { ...mineStatuses, [entry.id]: 'same' };
     }
 
     $effect(() => {
@@ -306,6 +332,7 @@
                 {tooltipX}
                 {tooltipY}
                 {tooltipMaxHeight}
+                {mineStatuses}
                 onMine={(entry) => handleMineWord(tooltipSpan, entry)}
                 onMouseLeave={(e) => {
                     if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {

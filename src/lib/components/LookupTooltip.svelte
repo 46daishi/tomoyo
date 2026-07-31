@@ -3,12 +3,23 @@
     import ActionButton from '$lib/components/ActionButton.svelte';
     import { ICONS } from '$lib/icons';
 
-    let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine } = $props();
+    let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {} } = $props();
     
     let positionStyle = $derived(
         (tooltipX !== null && tooltipY !== null ? `left: ${tooltipX}px; top: ${tooltipY}px;` : '') +
         (tooltipMaxHeight !== null ? ` max-height: ${tooltipMaxHeight}px;` : '')
     );
+
+    // Maps an entry's mine status to how its action button should look:
+    // not mined yet -> primary "add" button
+    // mined from a different sentence/media -> secondary, still clickable (adds another example)
+    // already mined from this exact sentence/media -> secondary + disabled (nothing new to add)
+    function mineButtonState(entryId) {
+        const status = mineStatuses[entryId];
+        if (status === 'same') return { variant: 'secondary', disabled: true };
+        if (status === 'different') return { variant: 'secondary', disabled: false };
+        return { variant: 'primary', disabled: false };
+    }
 </script>
 
 <div
@@ -30,6 +41,7 @@
     {#if tooltipSpan.entries.length > 0 || (tooltipSpan.related_entries.length > 0 && settings?.show_related_entries)}
         <ul class="tooltip-entries">
             {#each [...tooltipSpan.entries, ...(settings?.show_related_entries ? tooltipSpan.related_entries : [])] as entry}
+                {@const btnState = mineButtonState(entry.id)}
                 <li>
                     <div class="entry-row">
                         <div class="entry-body">
@@ -44,9 +56,10 @@
                         </div>
                         <ActionButton
                             icon={ICONS.plus}
-                            variant="primary"
+                            variant={btnState.variant}
+                            disabled={btnState.disabled}
                             size="mini"
-                            onAction={() => onMine(entry)}
+                            onAction={() => !btnState.disabled && onMine(entry)}
                         />
                     </div>
                 </li>
