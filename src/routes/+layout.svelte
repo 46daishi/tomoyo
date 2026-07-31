@@ -56,18 +56,28 @@
         }
     }
 
+    let connectPromise = null;
+    
+    async function ensureConnected() {
+        if (discordRPC.connected) return;
+    
+        if (!connectPromise) {
+            connectPromise = discordRPC
+                .connect()
+                .catch((e) => {
+                    console.warn("Discord RPC connect failed:", e);
+                })
+                .finally(() => {
+                    connectPromise = null;
+                });
+        }
+    
+        await connectPromise;
+    }
+    
     async function enableDiscord(path) {
-        if (discordRPC.connected) {
-            await setPresence(path);
-            return;
-        }
-
-        try {
-            await discordRPC.connect();
-            await setPresence(path);
-        } catch (e) {
-            console.warn("Discord RPC connect failed:", e);
-        }
+        await ensureConnected();
+        await setPresence(path);
     }
 
     onMount(async () => {
@@ -90,27 +100,23 @@
 
     // Update presence on page navigation
     afterNavigate((navigation) => {
-        if (!isInitialized) return;
+        if (!isInitialized || !$discordEnabled) return;
         const targetPath = navigation.to?.url.pathname ?? $page.url.pathname;
-        if ($discordEnabled && discordRPC.connected) {
-            setPresence(targetPath);
-        }
+        enableDiscord(targetPath);
     });
 
     // Single reactive driver for toggles, startup, and title changes
     $effect(() => {
         if (!isInitialized) return;
-
+    
         const enabled = $discordEnabled;
         const _title = presenceState.mediaTitle;
         const currentPath = $page.url.pathname;
-
-        if (enabled && !discordRPC.connected) {
+    
+        if (enabled) {
             enableDiscord(currentPath);
-        } else if (!enabled && discordRPC.connected) {
+        } else if (discordRPC.connected) {
             discordRPC.disconnect().catch(console.warn);
-        } else if (enabled && discordRPC.connected) {
-            setPresence(currentPath);
         }
     });
 </script>
