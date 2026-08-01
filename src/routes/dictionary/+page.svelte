@@ -256,8 +256,9 @@
         </button>
     </div>
 
-    {#if activeTab === 'words'}
-        {#if filteredWords.length === 0}
+    <div class="dict-content">
+        {#if activeTab === 'words'}
+            {#if filteredWords.length === 0}
             <p class="empty-notice">No words found.</p>
         {:else}
             <div class="word-list">
@@ -375,12 +376,42 @@
             TBD.
         </p>
     {/if}
+    </div>
 </main>
 
 <style>
     .dictionary-page {
         padding: 2rem;
         box-sizing: border-box;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .dict-content {
+        flex: 1;
+        min-height: 0;
+        overflow-y: scroll;
+        padding-right: 2.5rem;
+    }
+
+    .dict-content::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .dict-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .dict-content::-webkit-scrollbar-thumb {
+        background: var(--theme-border, #404040);
+        border-radius: 3px;
+    }
+
+    .dict-content::-webkit-scrollbar-thumb:hover {
+        background: var(--theme-textSecondary, #b3b3b3);
     }
 
     .dict-header {
@@ -388,6 +419,7 @@
         align-items: center;
         gap: 1rem;
         margin-bottom: 1.5rem;
+        flex-shrink: 0;
     }
 
     .dict-header h1 {
@@ -400,6 +432,7 @@
         gap: 0.75rem;
         margin-bottom: 1.5rem;
         max-width: 1200px;
+        flex-shrink: 0;
     }
 
     .dict-toolbar .modal-input {
@@ -433,6 +466,7 @@
         margin-bottom: 1.5rem;
         max-width: 1200px;
         border-bottom: 1px solid var(--theme-border, #404040);
+        flex-shrink: 0;
     }
 
     .tab-btn {
@@ -471,12 +505,13 @@
         border-radius: 12px;
         padding: 1rem 1.25rem;
         transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        will-change: transform;
+        transform: translateZ(0);
     }
 
     .word-card:hover {
         transform: translateY(-3px);
         box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
-        border-color: color-mix(in srgb, var(--theme-primary, #36b7bd) 45%, var(--theme-border, #404040));
     }
 
     .status-bar {
