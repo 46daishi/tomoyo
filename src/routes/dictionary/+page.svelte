@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus } from '$lib/dictionary.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -88,6 +88,23 @@
         loadTagColors();
     });
 
+    const STATUS_LEVELS = [
+        { label: 'New', color: '#6c7086' },
+        { label: 'Recognized', color: '#89b4fa' },
+        { label: 'Familiar', color: '#cba6f7' },
+        { label: 'Learned', color: '#a6e3a1' },
+        { label: 'Known', color: '#40a02b' },
+    ];
+
+    async function cycleWordStatus(word, event) {
+        const current = word.status ?? 0;
+        const direction = event.shiftKey ? -1 : 1;
+        const next = (current + direction + STATUS_LEVELS.length) % STATUS_LEVELS.length;
+
+        word.status = next; // optimistic — avoids waiting on a refetch
+        await updateWordStatus({ wordId: word.id, status: next });
+    }
+
     const FREQUENCY_TIER_COLORS = {
         red: '#FF4F4F',
         orange: '#FFA14F',
@@ -99,21 +116,27 @@
     // Ranked by percentile among words with at least one lookup — based on
     // `words` (media-filtered) rather than `filteredWords`, so typing in the
     // search box doesn't shift anyone's color as the visible set shrinks.
+    //
+    // Cutoffs are computed as counts (ceil of each fraction), each floored
+    // at the previous cutoff, so the top word is always red even with a
+    // small pool — a strict percentile fraction (rank / total) can exceed
+    // 0.1 for every word when total is small (e.g. 1/1 = 1.0), which would
+    // leave red unused entirely.
     let lookupFrequencyMeta = $derived.by(() => {
         const ranked = words
             .map((w) => ({ id: w.id, count: lookupCounts[w.id] ?? 0 }))
             .filter((w) => w.count > 0)
             .sort((a, b) => b.count - a.count);
- 
+
         const total = ranked.length;
         const meta = {};
         if (total === 0) return meta;
- 
+
         const redCutoff = Math.max(1, Math.ceil(total * 0.1));
         const orangeCutoff = Math.max(redCutoff, Math.ceil(total * 0.3));
         const yellowCutoff = Math.max(orangeCutoff, Math.ceil(total * 0.5));
         const greenCutoff = Math.max(yellowCutoff, Math.ceil(total * 0.75));
- 
+
         ranked.forEach((w, index) => {
             const rank = index + 1;
             let tier;
@@ -122,13 +145,12 @@
             else if (rank <= yellowCutoff) tier = 'yellow';
             else if (rank <= greenCutoff) tier = 'green';
             else tier = 'blue';
- 
+
             meta[w.id] = { count: w.count, color: FREQUENCY_TIER_COLORS[tier] };
         });
- 
+
         return meta;
     });
-
 
     let filteredWords = $derived(
         searchQuery.trim()
@@ -197,6 +219,13 @@
             <div class="word-list">
                 {#each filteredWords as word (word.id)}
                     <div class="word-card">
+                        <button
+                            type="button"
+                            class="status-bar"
+                            style={`--status-color: ${STATUS_LEVELS[word.status ?? 0].color}`}
+                            title={`Status: ${STATUS_LEVELS[word.status ?? 0].label} — click to advance, shift+click to go back`}
+                            onclick={(e) => cycleWordStatus(word, e)}
+                        ></button>
                         {#if lookupFrequencyMeta[word.id]}
                             <div
                                 class="lookup-badge"
@@ -382,6 +411,27 @@
     .word-card:hover {
         transform: translateY(-3px);
         box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+        border-color: color-mix(in srgb, var(--theme-primary, #36b7bd) 45%, var(--theme-border, #404040));
+    }
+
+    .status-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 8px;
+        border: none;
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+        background: var(--status-color, #6c7086);
+        border-top-left-radius: 12px;
+        border-bottom-left-radius: 12px;
+        transition: width 0.15s ease;
+    }
+
+    .status-bar:hover {
+        width: 12px;
     }
 
     .word-main {

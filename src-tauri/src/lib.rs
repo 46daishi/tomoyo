@@ -342,6 +342,12 @@ pub fn run() {
             sql: include_str!("../migrations/0005_lookup_events_new.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "word_status",
+            sql: include_str!("../migrations/0006_word_status.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

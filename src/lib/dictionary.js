@@ -104,6 +104,17 @@ export async function getLookupCounts({ mediaId = null } = {}) {
     return Object.fromEntries(rows.map((r) => [r.word_id, r.count]));
 }
 
+// Status levels: 0 New, 1 Recognized, 2 Familiar, 3 Learned, 4 Known.
+// status_updated_at is refreshed on every change so a future review
+// feature can use "time at current status" for scheduling.
+export async function updateWordStatus({ wordId, status }) {
+    const db = await getDb();
+    await db.execute(
+        'UPDATE words SET status = $1, status_updated_at = unixepoch() WHERE id = $2',
+        [status, wordId]
+    );
+}
+
 export async function getWordWithDetails(wordId) {
     const db = await getDb();
     const [word] = await db.select('SELECT * FROM words WHERE id = $1', [wordId]);
