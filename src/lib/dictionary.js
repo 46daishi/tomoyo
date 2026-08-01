@@ -130,3 +130,36 @@ export async function getSentencesForWord(wordId) {
         [wordId]
     );
 }
+
+// All mined sentences (from word_sentences, which is where mining actually
+// writes — the standalone `sentences` table is unused). word_sentences has
+// no tag column of its own, so tags come from the mined word(s) attached to
+// each sentence via word_tags, same as how word cards get their tags.
+//
+// A word can be mined more than once under different media, so word_tags
+// can hold tags from several media for the same word — meaning a sentence
+// can display a tag for a media that isn't its own word_sentences.media_id.
+// The media filter has to match that same "any of its tags belongs to this
+// media" logic (via each tag's owning media, matched by media.tag), not
+// just the row's own media_id, or a sentence with a visible tag for the
+// selected media could still be filtered out.
+export async function getAllSentences({ mediaId = null } = {}) {
+    const db = await getDb();
+    return db.select(
+        `SELECT ws.id, ws.sentence_text, ws.translation, ws.media_id, ws.created_at,
+                GROUP_CONCAT(DISTINCT wt.tag) as tags
+         FROM word_sentences ws
+         LEFT JOIN word_tags wt ON wt.word_id = ws.word_id
+         WHERE $1 IS NULL OR EXISTS (
+             SELECT 1
+             FROM word_sentences ws2
+             LEFT JOIN word_tags wt2 ON wt2.word_id = ws2.word_id
+             LEFT JOIN media m2 ON m2.tag = wt2.tag
+             WHERE ws2.sentence_text = ws.sentence_text
+               AND (ws2.media_id = $1 OR m2.id = $1)
+         )
+         GROUP BY ws.sentence_text
+         ORDER BY ws.created_at DESC`,
+        [mediaId]
+    );
+}

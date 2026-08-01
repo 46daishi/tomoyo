@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences } from '$lib/dictionary.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -55,8 +55,8 @@
     }
 
     async function loadSentences() {
-        const db = await getDb();
-        allSentences = await db.select('SELECT * FROM word_sentences GROUP BY sentence_text ORDER BY created_at DESC');
+        const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
+        allSentences = await getAllSentences({ mediaId });
         sentencesLoaded = true;
     }
 
@@ -65,7 +65,7 @@
     });
 
     $effect(() => {
-        if (activeTab === 'sentences' && !sentencesLoaded) {
+        if (activeTab === 'sentences') {
             loadSentences();
         }
     });
@@ -203,18 +203,20 @@
             <div class="word-list">
                 {#each allSentences as sentence (sentence.id ?? sentence.sentence_text)}
                     <div class="word-card">
-                        <p class="sentence-text">{sentence.sentence_text}</p>
+                        <p class="sentence-text sentence-tab-text">{sentence.sentence_text}</p>
                         {#if sentence.translation}
                             <p class="sentence-translation">{sentence.translation}</p>
                         {/if}
-                        {#if sentence.tag}
+                        {#if sentence.tags}
                             <div class="word-meta">
-                                <span
-                                    class="tag-pill"
-                                    style={tagColors[sentence.tag] ? `--tag-color: ${tagColors[sentence.tag]}` : ''}
-                                >
-                                    #{sentence.tag}
-                                </span>
+                                {#each sentence.tags.split(',') as tag}
+                                    <span
+                                        class="tag-pill"
+                                        style={tagColors[tag] ? `--tag-color: ${tagColors[tag]}` : ''}
+                                    >
+                                        #{tag}
+                                    </span>
+                                {/each}
                             </div>
                         {/if}
                     </div>
@@ -401,6 +403,12 @@
         font-size: 1.1rem;
         color: var(--theme-text, #f6f6f6);
         font-family: "Noto Sans JP", Inter, sans-serif;
+    }
+
+    .sentence-tab-text {
+        font-size: 1.5rem;
+        font-weight: 600;
+        line-height: 2rem;
     }
 
     .sentence-translation {
