@@ -316,19 +316,19 @@
     }
 
     .word-spelling {
-        font-size: 1.2rem;
+        font-size: 1.4rem;
         font-weight: 700;
         font-family: "Noto Sans JP", Inter, sans-serif;
         color: var(--theme-text, #f6f6f6);
     }
 
     .word-reading {
-        font-size: 0.9rem;
+        font-size: 1rem;
         color: var(--theme-textSecondary, #b3b3b3);
     }
 
     .word-definitions {
-        font-size: 0.9rem;
+        font-size: 1rem;
         color: var(--theme-text, #f6f6f6);
         margin-top: 0.3rem;
     }
