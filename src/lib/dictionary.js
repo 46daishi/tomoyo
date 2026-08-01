@@ -76,6 +76,18 @@ export async function addSentenceEntry({ sentenceText, tag = null, translation =
     );
 }
 
+// Translation isn't stored per unique sentence — it's a column on
+// word_sentences, so the same sentence_text can have multiple rows (one per
+// mined word / media occurrence). Updating "a sentence's" translation means
+// updating it everywhere that sentence_text appears, so they don't drift.
+export async function updateSentenceTranslation({ sentenceText, translation }) {
+    const db = await getDb();
+    await db.execute(
+        'UPDATE word_sentences SET translation = $1 WHERE sentence_text = $2',
+        [translation, sentenceText]
+    );
+}
+
 export async function getWordWithDetails(wordId) {
     const db = await getDb();
     const [word] = await db.select('SELECT * FROM words WHERE id = $1', [wordId]);

@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation } from '$lib/dictionary.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -58,6 +58,12 @@
         const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
         allSentences = await getAllSentences({ mediaId });
         sentencesLoaded = true;
+    }
+
+    async function commitTranslation(sentence, value) {
+        const translation = value.trim() || null;
+        sentence.translation = translation;
+        await updateSentenceTranslation({ sentenceText: sentence.sentence_text, translation });
     }
 
     $effect(() => {
@@ -204,9 +210,19 @@
                 {#each allSentences as sentence (sentence.id ?? sentence.sentence_text)}
                     <div class="word-card">
                         <p class="sentence-text sentence-tab-text">{sentence.sentence_text}</p>
-                        {#if sentence.translation}
-                            <p class="sentence-translation">{sentence.translation}</p>
-                        {/if}
+                        <div class="translation-edit-row">
+                            <span class="translation-icon">{@html ICONS.translate}</span>
+                            <input
+                                class="translation-input"
+                                type="text"
+                                placeholder="Add a translation..."
+                                value={sentence.translation ?? ''}
+                                onblur={(e) => commitTranslation(sentence, e.target.value)}
+                                onkeydown={(e) => {
+                                    if (e.key === 'Enter') e.target.blur();
+                                }}
+                            />
+                        </div>
                         {#if sentence.tags}
                             <div class="word-meta">
                                 {#each sentence.tags.split(',') as tag}
@@ -415,6 +431,47 @@
         margin: 0.25rem 0 0 0;
         font-size: 0.8rem;
         color: var(--theme-textSecondary, #b3b3b3);
+    }
+
+    .translation-edit-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.6rem;
+        padding: 0.2rem 0.2rem;
+        border-radius: 8px;
+    }
+
+    .translation-icon {
+        font-family: "Symbols Nerd Font";
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        width: 1rem;
+        height: 1rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+    }
+
+    .translation-icon :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+
+    .translation-input {
+        flex: 1;
+        min-width: 0;
+        background: none;
+        border: none;
+        outline: none;
+        font: inherit;
+        font-size: 1rem;
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .translation-input::placeholder {
+        color: var(--theme-textSecondary, #b3b3b3);
+        opacity: 0.7;
     }
 
     .empty-notice {
