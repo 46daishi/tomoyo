@@ -5,6 +5,7 @@
     import { logLookupEvent } from '$lib/lookupEvents.js';
     import { mineWord, getWordMineStatus } from '$lib/dictionary.js';
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
+    import Toast from './Toast.svelte';
 
     let { settings, miniMode, session, mediaId, mediaTag } = $props();
 
@@ -272,6 +273,18 @@
         }
     }
 
+    let mineToastMessage = $state(null);
+    let mineToastTimeoutId = null;
+ 
+    function showMineToast(text) {
+        mineToastMessage = text;
+        clearTimeout(mineToastTimeoutId);
+        mineToastTimeoutId = setTimeout(() => {
+            mineToastMessage = null;
+        }, 2200);
+    }
+
+
     async function handleMineWord(span, entry) {
         if (!span || !entry) return;
 
@@ -289,6 +302,10 @@
         });
 
         mineStatuses = { ...mineStatuses, [entry.id]: 'same' };
+
+        const label = entry.spellings[0] ?? span.surface;
+        const reading = entry.readings[0];
+        showMineToast(reading && reading !== label ? `Mined ${label} (${reading})` : `Mined ${label}`);
     }
 
     $effect(() => {
@@ -345,6 +362,8 @@
         <p class="sentence-placeholder">Waiting for a sentence…</p>
     {/if}
 </div>
+
+<Toast message={mineToastMessage} />
 
 <style>
     .sentence-window {
