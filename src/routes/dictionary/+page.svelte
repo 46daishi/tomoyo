@@ -438,8 +438,8 @@
         color: var(--badge-color, #89dceb);
         background: color-mix(in srgb, var(--badge-color, #89dceb) 16%, transparent);
         border: 1px solid color-mix(in srgb, var(--badge-color, #89dceb) 40%, transparent);
-        border-radius: 50px;
-        padding: 0.15em 0.55em;
+        border-radius: 10px;
+        padding: 0em 0.65em;
     }
 
     .lookup-badge-icon {
