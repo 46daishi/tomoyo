@@ -32,4 +32,5 @@ export const ICONS = {
   expand: "\udb81\ude16",
   collapse: "\udb81\ude15",
   translate: "\udb81\uddca",
+  magnify: "\udb80\udf49",
 };

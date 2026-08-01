@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts } from '$lib/dictionary.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -12,6 +12,7 @@
     );
     let searchQuery = $state('');
     let words = $state([]);
+    let lookupCounts = $state({});
     let mediaOptions = $state([{ value: '', label: 'All media' }]);
     let tagColors = $state({});
     let expandedWords = $state(new Set());
@@ -51,7 +52,13 @@
     }
 
     async function loadWords() {
-        words = await getWords({ mediaId: mediaFilter });
+        const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
+        const [wordRows, counts] = await Promise.all([
+            getWords({ mediaId }),
+            getLookupCounts({ mediaId }),
+        ]);
+        words = wordRows;
+        lookupCounts = counts;
     }
 
     async function loadSentences() {
@@ -80,6 +87,48 @@
         loadMediaOptions();
         loadTagColors();
     });
+
+    const FREQUENCY_TIER_COLORS = {
+        red: '#FF4F4F',
+        orange: '#FFA14F',
+        yellow: '#FFED4F',
+        green: '#78FF4F',
+        blue: '#4FDCFF',
+    };
+
+    // Ranked by percentile among words with at least one lookup — based on
+    // `words` (media-filtered) rather than `filteredWords`, so typing in the
+    // search box doesn't shift anyone's color as the visible set shrinks.
+    let lookupFrequencyMeta = $derived.by(() => {
+        const ranked = words
+            .map((w) => ({ id: w.id, count: lookupCounts[w.id] ?? 0 }))
+            .filter((w) => w.count > 0)
+            .sort((a, b) => b.count - a.count);
+ 
+        const total = ranked.length;
+        const meta = {};
+        if (total === 0) return meta;
+ 
+        const redCutoff = Math.max(1, Math.ceil(total * 0.1));
+        const orangeCutoff = Math.max(redCutoff, Math.ceil(total * 0.3));
+        const yellowCutoff = Math.max(orangeCutoff, Math.ceil(total * 0.5));
+        const greenCutoff = Math.max(yellowCutoff, Math.ceil(total * 0.75));
+ 
+        ranked.forEach((w, index) => {
+            const rank = index + 1;
+            let tier;
+            if (rank <= redCutoff) tier = 'red';
+            else if (rank <= orangeCutoff) tier = 'orange';
+            else if (rank <= yellowCutoff) tier = 'yellow';
+            else if (rank <= greenCutoff) tier = 'green';
+            else tier = 'blue';
+ 
+            meta[w.id] = { count: w.count, color: FREQUENCY_TIER_COLORS[tier] };
+        });
+ 
+        return meta;
+    });
+
 
     let filteredWords = $derived(
         searchQuery.trim()
@@ -148,6 +197,15 @@
             <div class="word-list">
                 {#each filteredWords as word (word.id)}
                     <div class="word-card">
+                        {#if lookupFrequencyMeta[word.id]}
+                            <div
+                                class="lookup-badge"
+                                style={`--badge-color: ${lookupFrequencyMeta[word.id].color}`}
+                            >
+                                <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
+                                <span class="lookup-badge-count">{lookupFrequencyMeta[word.id].count}</span>
+                            </div>
+                        {/if}
                         <div class="word-main">
                             <span class="word-spelling">{word.spelling}</span>
                             <span class="word-reading">{word.reading}</span>
@@ -313,6 +371,7 @@
     }
 
     .word-card {
+        position: relative;
         background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 70%, #000);
         border: 1px solid var(--theme-border, #404040);
         border-radius: 12px;
@@ -365,6 +424,35 @@
         color: var(--tag-color, #89b4fa);
         background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);
         border: 1px solid color-mix(in srgb, var(--tag-color, #89b4fa) 40%, transparent);
+    }
+
+    .lookup-badge {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--badge-color, #89dceb);
+        background: color-mix(in srgb, var(--badge-color, #89dceb) 16%, transparent);
+        border: 1px solid color-mix(in srgb, var(--badge-color, #89dceb) 40%, transparent);
+        border-radius: 50px;
+        padding: 0.15em 0.55em;
+    }
+
+    .lookup-badge-icon {
+        font-family: "Symbols Nerd Font";
+        display: flex;
+        align-items: center;
+        width: 0.6rem;
+        height: 0.6rem;
+    }
+
+    .lookup-badge-icon :global(svg) {
+        width: 100%;
+        height: 100%;
     }
 
     .sentence-count {

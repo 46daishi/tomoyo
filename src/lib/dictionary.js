@@ -88,6 +88,22 @@ export async function updateSentenceTranslation({ sentenceText, translation }) {
     );
 }
 
+// Lookup counts per word (word_id in lookup_events), for the "looked up N
+// times" badge on word cards. Filterable by media so it stays consistent
+// with whatever the media filter is currently showing.
+export async function getLookupCounts({ mediaId = null } = {}) {
+    const db = await getDb();
+    const rows = await db.select(
+        `SELECT word_id, COUNT(*) as count
+         FROM lookup_events
+         WHERE word_id IS NOT NULL
+           AND ($1 IS NULL OR media_id = $1)
+         GROUP BY word_id`,
+        [mediaId]
+    );
+    return Object.fromEntries(rows.map((r) => [r.word_id, r.count]));
+}
+
 export async function getWordWithDetails(wordId) {
     const db = await getDb();
     const [word] = await db.select('SELECT * FROM words WHERE id = $1', [wordId]);
