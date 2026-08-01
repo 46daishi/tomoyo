@@ -11,6 +11,7 @@
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
     );
     let statusFilter = $state(null); // words tab only — null means all statuses
+    let sortBy = $state('date_mined'); // words tab only — 'date_mined' | 'lookups' | 'status'
     let searchQuery = $state('');
     let words = $state([]);
     let lookupCounts = $state({});
@@ -102,6 +103,12 @@
         ...STATUS_LEVELS.map((s, i) => ({ value: String(i), label: s.label })),
     ];
 
+    const sortOptions = [
+        { value: 'date_mined', label: 'Date mined' },
+        { value: 'lookups', label: 'Times looked up' },
+        { value: 'status', label: 'Status' },
+    ];
+
     async function cycleWordStatus(word, event) {
         const current = word.status ?? 0;
         const direction = event.shiftKey ? -1 : 1;
@@ -158,6 +165,12 @@
         return meta;
     });
 
+    const SORT_COMPARATORS = {
+        date_mined: (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
+        lookups: (a, b) => (lookupCounts[b.id] ?? 0) - (lookupCounts[a.id] ?? 0),
+        status: (a, b) => (b.status ?? 0) - (a.status ?? 0),
+    };
+
     let filteredWords = $derived(
         words
             .filter((w) =>
@@ -170,6 +183,7 @@
                     : true
             )
             .filter((w) => (statusFilter === null ? true : (w.status ?? 0) === statusFilter))
+            .sort(SORT_COMPARATORS[sortBy])
     );
 
     function handleMediaFilterChange(e) {
@@ -178,6 +192,10 @@
 
     function handleStatusFilterChange(e) {
         statusFilter = e.target.value ? Number(e.target.value) : null;
+    }
+
+    function handleSortChange(e) {
+        sortBy = e.target.value;
     }
 </script>
 
@@ -200,6 +218,14 @@
                 value={statusFilter === null ? '' : String(statusFilter)}
                 on:change={handleStatusFilterChange}
             />
+            <div class="sort-control">
+                <span class="sort-icon">{@html ICONS.sort}</span>
+                <SelectInput
+                    options={sortOptions}
+                    value={sortBy}
+                    on:change={handleSortChange}
+                />
+            </div>
         {/if}
     </div>
 
@@ -378,6 +404,27 @@
 
     .dict-toolbar .modal-input {
         flex: 1;
+    }
+
+    .sort-control {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .sort-icon {
+        font-family: "Symbols Nerd Font";
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        width: 1rem;
+        height: 1rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+    }
+
+    .sort-icon :global(svg) {
+        width: 100%;
+        height: 100%;
     }
 
     .dict-tabs {
