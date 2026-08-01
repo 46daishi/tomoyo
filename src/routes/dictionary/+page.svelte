@@ -10,6 +10,7 @@
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
     );
+    let statusFilter = $state(null); // words tab only — null means all statuses
     let searchQuery = $state('');
     let words = $state([]);
     let lookupCounts = $state({});
@@ -96,6 +97,11 @@
         { label: 'Known', color: '#40a02b' },
     ];
 
+    const statusOptions = [
+        { value: '', label: 'All statuses' },
+        ...STATUS_LEVELS.map((s, i) => ({ value: String(i), label: s.label })),
+    ];
+
     async function cycleWordStatus(word, event) {
         const current = word.status ?? 0;
         const direction = event.shiftKey ? -1 : 1;
@@ -153,20 +159,25 @@
     });
 
     let filteredWords = $derived(
-        searchQuery.trim()
-            ? words.filter(
-                  (w) =>
-                      w.spelling.includes(searchQuery) ||
+        words
+            .filter((w) =>
+                searchQuery.trim()
+                    ? w.spelling.includes(searchQuery) ||
                       w.reading.includes(searchQuery) ||
                       JSON.parse(w.definitions).some((d) =>
                           d.toLowerCase().includes(searchQuery.toLowerCase())
                       )
-              )
-            : words
+                    : true
+            )
+            .filter((w) => (statusFilter === null ? true : (w.status ?? 0) === statusFilter))
     );
 
     function handleMediaFilterChange(e) {
         mediaFilter = e.target.value ? Number(e.target.value) : null;
+    }
+
+    function handleStatusFilterChange(e) {
+        statusFilter = e.target.value ? Number(e.target.value) : null;
     }
 </script>
 
@@ -183,6 +194,13 @@
             value={mediaFilter ? String(mediaFilter) : ''}
             on:change={handleMediaFilterChange}
         />
+        {#if activeTab === 'words'}
+            <SelectInput
+                options={statusOptions}
+                value={statusFilter === null ? '' : String(statusFilter)}
+                on:change={handleStatusFilterChange}
+            />
+        {/if}
     </div>
 
     <div class="dict-tabs">
