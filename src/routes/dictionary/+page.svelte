@@ -5,6 +5,7 @@
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
+    import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
 
     let mediaFilter = $state(
@@ -109,13 +110,23 @@
         { value: 'status', label: 'Status' },
     ];
 
-    async function cycleWordStatus(word, event) {
-        const current = word.status ?? 0;
-        const direction = event.shiftKey ? -1 : 1;
-        const next = (current + direction + STATUS_LEVELS.length) % STATUS_LEVELS.length;
+    let statusMenuWordId = $state(null);
+    let statusMenuPos = $state({ x: 0, y: 0 });
 
-        word.status = next; // optimistic — avoids waiting on a refetch
-        await updateWordStatus({ wordId: word.id, status: next });
+    function openStatusMenu(word, event) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        statusMenuPos = { x: rect.right + 8, y: rect.top };
+        statusMenuWordId = word.id;
+    }
+
+    function closeStatusMenu() {
+        statusMenuWordId = null;
+    }
+
+    async function selectWordStatus(word, status) {
+        word.status = status; // optimistic — avoids waiting on a refetch
+        closeStatusMenu();
+        await updateWordStatus({ wordId: word.id, status });
     }
 
     const FREQUENCY_TIER_COLORS = {
@@ -268,9 +279,21 @@
                             type="button"
                             class="status-bar"
                             style={`--status-color: ${STATUS_LEVELS[word.status ?? 0].color}`}
-                            title={`Status: ${STATUS_LEVELS[word.status ?? 0].label} — click to advance, shift+click to go back`}
-                            onclick={(e) => cycleWordStatus(word, e)}
+                            title={`Status: ${STATUS_LEVELS[word.status ?? 0].label} — click to change`}
+                            aria-haspopup="menu"
+                            aria-expanded={statusMenuWordId === word.id}
+                            onclick={(e) => openStatusMenu(word, e)}
                         ></button>
+                        {#if statusMenuWordId === word.id}
+                            <StatusMenu
+                                x={statusMenuPos.x}
+                                y={statusMenuPos.y}
+                                levels={STATUS_LEVELS}
+                                current={word.status ?? 0}
+                                onSelect={(status) => selectWordStatus(word, status)}
+                                onClose={closeStatusMenu}
+                            />
+                        {/if}
                         {#if lookupFrequencyMeta[word.id]}
                             <div
                                 class="lookup-badge"
