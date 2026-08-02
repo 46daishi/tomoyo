@@ -1,7 +1,9 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags } from '$lib/dictionary.js';
+    import { getFrequentUnknownWords, getMediaTagsForWordIds } from '$lib/lookupEvents.js';
+    import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -24,6 +26,10 @@
     let activeTab = $state('words'); // 'words' | 'sentences' | 'frequent'
     let allSentences = $state([]);
     let sentencesLoaded = $state(false);
+
+    let frequentWords = $state([]);
+    let frequentLoaded = $state(false);
+    let frequentLimit = 50; // TODO: surface as a setting
 
     async function loadMediaOptions() {
         const db = await getDb();
@@ -70,6 +76,78 @@
         sentencesLoaded = true;
     }
 
+    // getFrequentUnknownWords only gives us surface_text + count (that's all
+    // lookup_events stores) — no spelling/reading/definitions, since those
+    // never get persisted for words that were never mined. To display them
+    // we re-run the same tokenizer lookup the sentence window itself uses,
+    // feeding the logged surface text back in as if it were its own
+    // one-word "sentence" at position 0. This reliably reproduces the same
+    // entry since surface_text is exactly the substring that already
+    // matched once.
+    async function loadFrequentWords() {
+        const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
+        const rows = await getFrequentUnknownWords(mediaId, 1, frequentLimit);
+
+        const resolved = (
+            await Promise.all(
+                rows.map(async (row) => {
+                    const span = await lookupAtPosition(row.surface_text, 0, 0);
+                    const entry = span?.entries?.[0] ?? null;
+                    return entry ? { surfaceText: row.surface_text, count: row.count, entry } : null;
+                })
+            )
+        ).filter(Boolean);
+
+        // Different surface forms (e.g. inflections like 食べた vs 食べる)
+        // can resolve to the same dictionary entry — merge those into a
+        // single card instead of showing the word twice, summing their
+        // lookup counts and keeping the most-looked-up surface form as
+        // the representative text (used for mining, search, etc).
+        const merged = new Map(); // entry.id -> { surfaceText, count, entry, _bestCount }
+        for (const item of resolved) {
+            const key = item.entry.id;
+            const existing = merged.get(key);
+            if (!existing) {
+                merged.set(key, { ...item, _bestCount: item.count });
+            } else {
+                existing.count += item.count;
+                if (item.count > existing._bestCount) {
+                    existing._bestCount = item.count;
+                    existing.surfaceText = item.surfaceText;
+                }
+            }
+        }
+        const mergedItems = Array.from(merged.values()).map(({ _bestCount, ...rest }) => rest);
+
+        // Tags depend on the resolved word_id, so this has to wait until
+        // entries are resolved and merged above — same word_id mining will use later.
+        const tagsByWordId = await getMediaTagsForWordIds(mergedItems.map((item) => item.entry.id));
+
+        frequentWords = mergedItems.map((item) => ({ ...item, tags: tagsByWordId[item.entry.id] ?? [] }));
+        frequentLoaded = true;
+    }
+
+    async function mineFrequentWord(item) {
+        const { entry, surfaceText, tags } = item;
+        await mineWordWithTags({
+            dictId: entry.id,
+            spelling: entry.spellings[0] ?? surfaceText,
+            reading: entry.readings[0] ?? '',
+            definitions: entry.definitions,
+            wordType: entry.pos.join(', '),
+            tags,
+        });
+
+        // It's mined now, so it no longer belongs in "frequently looked up
+        // but not in dictionary" — drop it rather than waiting on a refetch.
+        frequentWords = frequentWords.filter((w) => w !== item);
+
+        // The words tab's data (words + lookupCounts) is loaded independently
+        // and won't pick up this new row on its own — refresh it now so the
+        // word shows up there immediately instead of only after a remount.
+        await loadWords();
+    }
+
     async function commitTranslation(sentence, value) {
         const translation = value.trim() || null;
         sentence.translation = translation;
@@ -83,6 +161,12 @@
     $effect(() => {
         if (activeTab === 'sentences') {
             loadSentences();
+        }
+    });
+
+    $effect(() => {
+        if (activeTab === 'frequent') {
+            loadFrequentWords();
         }
     });
 
@@ -205,6 +289,20 @@
                       (s.translation ?? '').toLowerCase().includes(searchQuery.toLowerCase())
               )
             : allSentences
+    );
+
+    let filteredFrequentWords = $derived(
+        searchQuery.trim()
+            ? frequentWords.filter((w) => {
+                  const q = searchQuery.toLowerCase();
+                  return (
+                      w.surfaceText.includes(searchQuery) ||
+                      (w.entry.spellings?.[0] ?? '').includes(searchQuery) ||
+                      (w.entry.readings?.[0] ?? '').includes(searchQuery) ||
+                      (w.entry.definitions ?? []).some((d) => d.toLowerCase().includes(q))
+                  );
+              })
+            : frequentWords
     );
 
     function handleMediaFilterChange(e) {
@@ -407,9 +505,47 @@
             </div>
         {/if}
     {:else if activeTab === 'frequent'}
-        <p class="empty-notice">
-            TBD.
-        </p>
+        {#if !frequentLoaded}
+            <p class="empty-notice">Loading frequently looked up words...</p>
+        {:else if filteredFrequentWords.length === 0}
+            <p class="empty-notice">
+                {frequentWords.length === 0
+                    ? 'No frequently looked up words outside your dictionary yet.'
+                    : 'No results match your search.'}
+            </p>
+        {:else}
+            <div class="word-list word-grid">
+                {#each filteredFrequentWords as item (item.entry.id)}
+                    <div class="word-card">
+                        <div class="lookup-badge frequent-badge">
+                            <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
+                            <span class="lookup-badge-count">{item.count}</span>
+                        </div>
+                        <div class="word-main">
+                            <span class="word-spelling">{item.entry.spellings?.[0] ?? item.surfaceText}</span>
+                            <span class="word-reading">{item.entry.readings?.[0] ?? ''}</span>
+                        </div>
+                        <div class="entry-pos">{item.entry.pos?.join(', ') ?? ''}</div>
+                        <div class="word-definitions">
+                            {(item.entry.definitions ?? []).join('; ')}
+                        </div>
+                        <div class="word-meta">
+                            {#each item.tags as tag}
+                                <span
+                                    class="tag-pill"
+                                    style={tagColors[tag] ? `--tag-color: ${tagColors[tag]}` : ''}
+                                >
+                                    #{tag}
+                                </span>
+                            {/each}
+                            <button type="button" class="mine-btn" onclick={() => mineFrequentWord(item)}>
+                                Mine this word
+                            </button>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        {/if}
     {/if}
     </div>
 </main>
@@ -534,6 +670,26 @@
         max-width: 1200px;
     }
 
+    .word-list.word-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+        column-gap: 0.75rem;
+        row-gap: 2rem;
+    }
+
+    .word-grid .word-card {
+        height: 100%;
+        padding-bottom: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .word-grid .word-card .word-meta {
+        margin-top: auto;
+        padding-bottom: 1rem;
+    }
+
     .word-card {
         position: relative;
         background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 70%, #000);
@@ -650,6 +806,25 @@
 
     .sentence-count:hover {
         color: var(--theme-text, #f6f6f6);
+    }
+
+    .mine-btn {
+        background: color-mix(in srgb, var(--theme-primary, #36b7bd) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--theme-primary, #36b7bd) 40%, transparent);
+        color: var(--theme-primary, #36b7bd);
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        cursor: pointer;
+        margin-left: auto;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .mine-btn:hover {
+        background: var(--theme-primary, #36b7bd);
+        color: var(--theme-surface, #1e1e2e);
     }
 
     .sentences-panel {

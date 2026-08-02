@@ -24,3 +24,24 @@ export async function getFrequentUnknownWords(mediaId = null, minCount = 3, limi
     const params = mediaId ? [mediaId, minCount, limit] : [minCount, limit];
     return db.select(query, params);
 }
+
+export async function getMediaTagsForWordIds(wordIds) {
+    if (wordIds.length === 0) return {};
+
+    const wanted = new Set(wordIds);
+    const db = await getDb();
+    const rows = await db.select(
+        `SELECT le.word_id, GROUP_CONCAT(DISTINCT m.tag) as tags
+         FROM lookup_events le
+         JOIN media m ON m.id = le.media_id
+         WHERE m.tag IS NOT NULL AND le.word_id IS NOT NULL
+         GROUP BY le.word_id`
+    );
+
+    const map = {};
+    for (const row of rows) {
+        if (!wanted.has(row.word_id)) continue;
+        map[row.word_id] = row.tags ? row.tags.split(',') : [];
+    }
+    return map;
+}

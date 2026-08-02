@@ -42,6 +42,39 @@ export async function mineWord({
     return wordId;
 }
 
+// Same word-insert logic as mineWord, but for mining a word with no
+// example sentence context (e.g. from the "frequently looked up" tab,
+// where all we ever had was an isolated surface text, not a real
+// sentence) and with a set of tags instead of a single one — used to tag
+// a word with every media it was actually looked up under, rather than a
+// generic "mined" placeholder tag.
+export async function mineWordWithTags({ dictId, spelling, reading, definitions, wordType, tags = [] }) {
+    const db = await getDb();
+
+    const existing = await db.select('SELECT id FROM words WHERE id = $1', [dictId]);
+
+    let wordId;
+
+    if (existing.length > 0) {
+        wordId = existing[0].id;
+    } else {
+        await db.execute(
+            'INSERT INTO words (id, spelling, reading, definitions, word_type) VALUES ($1, $2, $3, $4, $5)',
+            [dictId, spelling, reading, JSON.stringify(definitions), wordType]
+        );
+        wordId = dictId;
+    }
+
+    for (const tag of tags) {
+        await db.execute(
+            'INSERT OR IGNORE INTO word_tags (word_id, tag) VALUES ($1, $2)',
+            [wordId, tag]
+        );
+    }
+
+    return wordId;
+}
+
 // Reports how a candidate mine action relates to what's already stored:
 // - 'new'       -> the word isn't in the dictionary at all yet
 // - 'same'      -> the word exists AND was already mined from this exact
