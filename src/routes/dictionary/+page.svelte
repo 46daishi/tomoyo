@@ -263,7 +263,7 @@
     const SORT_COMPARATORS = {
         date_mined: (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
         lookups: (a, b) => (lookupCounts[b.id] ?? 0) - (lookupCounts[a.id] ?? 0),
-        status: (a, b) => (b.status ?? 0) - (a.status ?? 0),
+        status: (a, b) => (a.status ?? 0) - (b.status ?? 0),
     };
 
     let filteredWords = $derived(
