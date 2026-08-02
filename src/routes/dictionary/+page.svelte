@@ -197,6 +197,16 @@
             .sort(SORT_COMPARATORS[sortBy])
     );
 
+    let filteredSentences = $derived(
+        searchQuery.trim()
+            ? allSentences.filter(
+                  (s) =>
+                      s.sentence_text.includes(searchQuery) ||
+                      (s.translation ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+              )
+            : allSentences
+    );
+
     function handleMediaFilterChange(e) {
         mediaFilter = e.target.value ? Number(e.target.value) : null;
     }
@@ -217,7 +227,7 @@
     </div>
 
     <div class="dict-toolbar">
-        <input class="modal-input" placeholder="Search words or definitions" bind:value={searchQuery} />
+        <input class="modal-input" placeholder="Search words, definitions, or sentences" bind:value={searchQuery} />
         <SelectInput
             options={mediaOptions}
             value={mediaFilter ? String(mediaFilter) : ''}
@@ -358,11 +368,13 @@
     {:else if activeTab === 'sentences'}
         {#if !sentencesLoaded}
             <p class="empty-notice">Loading sentences...</p>
-        {:else if allSentences.length === 0}
-            <p class="empty-notice">No sentences found.</p>
+        {:else if filteredSentences.length === 0}
+            <p class="empty-notice">
+                {allSentences.length === 0 ? 'No sentences found.' : 'No sentences match your search.'}
+            </p>
         {:else}
             <div class="word-list">
-                {#each allSentences as sentence (sentence.id ?? sentence.sentence_text)}
+                {#each filteredSentences as sentence (sentence.id ?? sentence.sentence_text)}
                     <div class="word-card">
                         <p class="sentence-text sentence-tab-text">{sentence.sentence_text}</p>
                         <div class="translation-edit-row">
