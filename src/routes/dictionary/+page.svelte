@@ -394,7 +394,8 @@
         flex: 1;
         min-height: 0;
         overflow-y: scroll;
-        padding-right: 2.5rem;
+        padding-right: 1rem;
+        padding-top: 0.2rem;
     }
 
     .dict-content::-webkit-scrollbar {
@@ -519,7 +520,7 @@
         top: 0;
         left: 0;
         bottom: 0;
-        width: 8px;
+        width: 7px;
         border: none;
         padding: 0;
         margin: 0;
@@ -531,7 +532,7 @@
     }
 
     .status-bar:hover {
-        width: 12px;
+        width: 10px;
     }
 
     .word-main {
@@ -569,11 +570,7 @@
     .tag-pill {
         font-size: 0.7rem;
         font-weight: 600;
-        padding: 0.01em 0.6em;
-        border-radius: 50px;
         color: var(--tag-color, #89b4fa);
-        background: color-mix(in srgb, var(--tag-color, #89b4fa) 18%, transparent);
-        border: 1px solid color-mix(in srgb, var(--tag-color, #89b4fa) 40%, transparent);
     }
 
     .lookup-badge {
@@ -586,9 +583,6 @@
         font-size: 0.72rem;
         font-weight: 700;
         color: var(--badge-color, #89dceb);
-        background: color-mix(in srgb, var(--badge-color, #89dceb) 16%, transparent);
-        border: 1px solid color-mix(in srgb, var(--badge-color, #89dceb) 40%, transparent);
-        border-radius: 10px;
         padding: 0em 0.65em;
     }
 
