@@ -2,7 +2,7 @@
     import { page } from '$app/state';
     import { onMount } from 'svelte';
     import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags } from '$lib/dictionary.js';
-    import { getFrequentUnknownWords, getMediaTagsForWordIds } from '$lib/lookupEvents.js';
+    import { getFrequentUnknownWords, getMediaTagsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
@@ -79,10 +79,10 @@
     }
 
     async function loadFrequentWords() {
-        frequentLimit = settings?.unknown_words_count || 10
-        const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
+        frequentLimit = settings?.unknown_words_count || 10;
+        const mediaId = mediaFilter;
         const rows = await getFrequentUnknownWords(mediaId, 1, frequentLimit);
-
+    
         const resolved = (
             await Promise.all(
                 rows.map(async (row) => {
@@ -92,15 +92,16 @@
                 })
             )
         ).filter(Boolean);
-
-        const merged = new Map(); // entry.id -> { surfaceText, count, entry, _bestCount }
+    
+        const merged = new Map(); // entry.id -> { surfaceText, count, entry, surfaceTexts }
         for (const item of resolved) {
             const key = item.entry.id;
             const existing = merged.get(key);
             if (!existing) {
-                merged.set(key, { ...item, _bestCount: item.count });
+                merged.set(key, { ...item, _bestCount: item.count, surfaceTexts: [item.surfaceText] });
             } else {
                 existing.count += item.count;
+                existing.surfaceTexts.push(item.surfaceText);
                 if (item.count > existing._bestCount) {
                     existing._bestCount = item.count;
                     existing.surfaceText = item.surfaceText;
@@ -108,12 +109,13 @@
             }
         }
         const mergedItems = Array.from(merged.values()).map(({ _bestCount, ...rest }) => rest);
-
+    
         const tagsByWordId = await getMediaTagsForWordIds(mergedItems.map((item) => item.entry.id));
-
+    
         frequentWords = mergedItems.map((item) => ({ ...item, tags: tagsByWordId[item.entry.id] ?? [] }));
         frequentLoaded = true;
     }
+
 
     async function mineFrequentWord(item) {
         const { entry, surfaceText, tags } = item;
@@ -125,10 +127,14 @@
             wordType: entry.pos.join(', '),
             tags,
         });
-
-        frequentWords = frequentWords.filter((w) => w !== item);
-
+    
         await loadWords();
+        await loadFrequentWords();
+    }
+
+    async function dismissFrequentWord(item) {
+        await dismissUnknownWords(item.surfaceTexts);
+        await loadFrequentWords();
     }
 
     async function commitTranslation(sentence, value) {
@@ -526,7 +532,15 @@
                                 </span>
                             {/each}
                             <button type="button" class="mine-btn" onclick={() => mineFrequentWord(item)}>
-                                Mine this word
+                                {ICONS.plus}
+                            </button>
+                            <button
+                                type="button"
+                                class="dismiss-btn"
+                                onclick={() => dismissFrequentWord(item)}
+                                title="Dismiss — stop tracking this word's lookups"
+                            >
+                                {ICONS.minus}
                             </button>
                         </div>
                     </div>
@@ -538,6 +552,11 @@
 </main>
 
 <style>
+    button.mine-btn,
+    button.dismiss-btn {
+        font-family: "Symbols Nerd Font";
+    }
+
     .dictionary-page {
         padding: 2rem;
         box-sizing: border-box;
@@ -812,6 +831,25 @@
     .mine-btn:hover {
         background: var(--theme-primary, #36b7bd);
         color: var(--theme-surface, #1e1e2e);
+    }
+
+    .dismiss-btn {
+        background: color-mix(in srgb, var(--theme-textSecondary, #b3b3b3) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--theme-textSecondary, #b3b3b3) 35%, transparent);
+        color: var(--theme-textSecondary, #b3b3b3);
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    
+    .dismiss-btn:hover {
+        background: color-mix(in srgb, var(--theme-textSecondary, #b3b3b3) 25%, transparent);
+        color: var(--theme-text, #f6f6f6);
+        border-color: var(--theme-textSecondary, #b3b3b3);
     }
 
     .sentences-panel {

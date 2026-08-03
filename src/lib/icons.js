@@ -26,6 +26,7 @@ export const ICONS = {
   mute: "\udb81\udfce",
   unmute: "\udb80\udecb",
   plus: "\uf067",
+  minus: "\uf068",
   reorder: "\udb80\udddb",
   book: "\uf02d",
   question: "\uf128",

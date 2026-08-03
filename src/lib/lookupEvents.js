@@ -14,12 +14,17 @@ export async function getFrequentUnknownWords(mediaId = null, minCount = 3, limi
         ? `SELECT le.surface_text, COUNT(*) as count
            FROM lookup_events le
            LEFT JOIN words w ON w.id = le.word_id
-           WHERE w.id IS NULL AND le.media_id = $1
+           LEFT JOIN dismissed_unknown_words d ON d.surface_text = le.surface_text
+           WHERE w.id IS NULL
+             AND (d.surface_text IS NULL OR le.looked_up_at > d.dismissed_at)
+             AND le.media_id = $1
            GROUP BY le.surface_text HAVING count >= $2 ORDER BY count DESC LIMIT $3`
         : `SELECT le.surface_text, COUNT(*) as count
            FROM lookup_events le
            LEFT JOIN words w ON w.id = le.word_id
+           LEFT JOIN dismissed_unknown_words d ON d.surface_text = le.surface_text
            WHERE w.id IS NULL
+             AND (d.surface_text IS NULL OR le.looked_up_at > d.dismissed_at)
            GROUP BY le.surface_text HAVING count >= $1 ORDER BY count DESC LIMIT $2`;
     const params = mediaId ? [mediaId, minCount, limit] : [minCount, limit];
     return db.select(query, params);
@@ -44,4 +49,17 @@ export async function getMediaTagsForWordIds(wordIds) {
         map[row.word_id] = row.tags ? row.tags.split(',') : [];
     }
     return map;
+}
+
+export async function dismissUnknownWords(surfaceTexts) {
+    if (!surfaceTexts || surfaceTexts.length === 0) return;
+    const db = await getDb();
+
+    for (const text of surfaceTexts) {
+        await db.execute(
+            `INSERT INTO dismissed_unknown_words (surface_text, dismissed_at) VALUES ($1, unixepoch())
+             ON CONFLICT(surface_text) DO UPDATE SET dismissed_at = unixepoch()`,
+            [text]
+        );
+    }
 }

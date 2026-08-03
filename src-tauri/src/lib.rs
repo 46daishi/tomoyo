@@ -348,6 +348,12 @@ pub fn run() {
             sql: include_str!("../migrations/0006_word_status.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "dismissed_unknown_words",
+            sql: include_str!("../migrations/0007_dismissed_unknown_words.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
