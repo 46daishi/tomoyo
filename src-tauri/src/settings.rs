@@ -21,11 +21,11 @@ pub struct AppSettings {
     pub word_highlight_enabled: bool,
     pub show_related_entries: bool,
     pub track_unknown_words: bool,
+    pub unknown_words_count: u32,
 
     // ── Input & History ──
     pub input_mode: String, // "clipboard" | "websocket"
     pub websocket_address: String,
-    pub jp_detection_threshold: f32,
     pub history_enabled: bool,
     pub history_span: u32,
 
@@ -38,6 +38,9 @@ pub struct AppSettings {
     // ── Review (placeholder) ──
     pub default_review_mode: String, // "normal" | "flashcard"
     pub difficulty_estimation_enabled: bool,
+
+    // ── Dictionary ──
+    pub default_dictionary_sort: String, // "date" | "status" | "lookup"
 }
 
 impl Default for AppSettings {
@@ -56,10 +59,10 @@ impl Default for AppSettings {
             word_highlight_enabled: true,
             show_related_entries: true,
             track_unknown_words: false,
+            unknown_words_count: 10,
 
             input_mode: "clipboard".into(),
             websocket_address: "ws://127.0.0.1:6677".into(),
-            jp_detection_threshold: 0.3,
             history_enabled: true,
             history_span: 10,
 
@@ -70,6 +73,8 @@ impl Default for AppSettings {
 
             default_review_mode: "normal".into(),
             difficulty_estimation_enabled: false,
+
+            default_dictionary_sort: "date".into()
         }
     }
 }

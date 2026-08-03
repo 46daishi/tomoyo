@@ -14,7 +14,7 @@
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
     );
     let statusFilter = $state(null); // words tab only — null means all statuses
-    let sortBy = $state('date_mined'); // words tab only — 'date_mined' | 'lookups' | 'status'
+    let sortBy = $state('date'); // words tab only — 'date' | 'lookup' | 'status'
     let searchQuery = $state('');
     let words = $state([]);
     let lookupCounts = $state({});
@@ -189,8 +189,8 @@
     ];
 
     const sortOptions = [
-        { value: 'date_mined', label: 'Date mined' },
-        { value: 'lookups', label: 'Times looked up' },
+        { value: 'date', label: 'Date mined' },
+        { value: 'lookup', label: 'Times looked up' },
         { value: 'status', label: 'Status' },
     ];
 
@@ -261,8 +261,8 @@
     });
 
     const SORT_COMPARATORS = {
-        date_mined: (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
-        lookups: (a, b) => (lookupCounts[b.id] ?? 0) - (lookupCounts[a.id] ?? 0),
+        date: (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
+        lookup: (a, b) => (lookupCounts[b.id] ?? 0) - (lookupCounts[a.id] ?? 0),
         status: (a, b) => (a.status ?? 0) - (b.status ?? 0),
     };
 

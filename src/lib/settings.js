@@ -39,6 +39,12 @@ export const REVIEW_MODE_OPTIONS = [
     { value: 'flashcard', label: 'Flashcard' },
 ];
 
+export const DICTIONARY_SORT_OPTIONS = [
+  { value: 'date', label: 'Date mined' },
+  { value: 'status', label: "Word status" },
+  { value: 'lookup', label: "Lookup frequency" },
+]
+
 // Each option: { key, label, type, subRow?, showIf?, ...type-specific fields }
 // type-specific fields:
 //   select      -> options
@@ -100,7 +106,6 @@ export const SETTINGS_SCHEMA = [
                 showIf: (s) => s.lookup_limit_enabled,
             },
             { key: 'show_related_entries', label: 'Show related entries in tooltip', type: 'checkbox' },
-            { key: 'track_unknown_words', label: 'Track commonly looked-up words not in dictionary', type: 'checkbox' },
         ],
   },
   {
@@ -111,7 +116,6 @@ export const SETTINGS_SCHEMA = [
           { key: 'font_size', label: 'Font size', type: 'slider', min: 12, max: 48, unit: 'px' },
           { key: 'cycle_key', label: 'Cycle key', type: 'hotkey' },
           { key: 'word_highlight_enabled', label: 'Highlight words on hover', type: 'checkbox' },
-      { key: 'show_related_entries', label: 'Show related entries in tooltip', type: 'checkbox' },
       { key: 'history_enabled', label: 'Enable history', type: 'checkbox' },
       {
           key: 'history_span',
@@ -150,9 +154,11 @@ export const SETTINGS_SCHEMA = [
   },
     {
         id: 'dictionaries',
-        label: 'Dictionaries',
-        options: [
-            { key: 'dict_placeholder', type: 'placeholder', text: 'Dictionary management is coming soon.', sub: 'JMdict is currently built in and always active.' },
+        label: 'Dictionary',
+      options: [
+        { key: 'default_dictionary_sort', label: 'Default sorting in dictionary', type: 'select', options: DICTIONARY_SORT_OPTIONS },
+        { key: 'track_unknown_words', label: 'Track commonly looked-up words not in dictionary', type: 'checkbox' },
+        { key: 'unknown_words_count', label: "Number of words to show", type: 'number', subRow: true, showIf: (s) => s.track_unknown_words },
         ],
     },
     {
@@ -161,14 +167,6 @@ export const SETTINGS_SCHEMA = [
         options: [
             { key: 'default_review_mode', label: 'Default review mode', type: 'select', options: REVIEW_MODE_OPTIONS },
             { key: 'difficulty_estimation_enabled', label: 'Estimate media difficulty from lookup frequency', type: 'checkbox' },
-            { key: 'review_placeholder', type: 'placeholder', sub: 'Full review/flashcard functionality is coming soon.' },
         ],
-  },
-  {
-      id: 'advanced',
-      label: 'Advanced',
-      options: [
-          { key: 'jp_detection_threshold', label: 'Japanese detection sensitivity', type: 'slider', min: 0.1, max: 0.9, step: 0.05, percent: true },
-      ],
   },
 ];
