@@ -9,10 +9,12 @@
     import SelectInput from '$lib/components/SelectInput.svelte';
     import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
+    import { loadSettings } from '$lib/settings';
 
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
     );
+    let settings = $state(null);
     let statusFilter = $state(null); // words tab only — null means all statuses
     let sortBy = $state('date'); // words tab only — 'date' | 'lookup' | 'status'
     let searchQuery = $state('');
@@ -29,7 +31,7 @@
 
     let frequentWords = $state([]);
     let frequentLoaded = $state(false);
-    let frequentLimit = 50; // TODO: surface as a setting
+    let frequentLimit = $state(10);
 
     async function loadMediaOptions() {
         const db = await getDb();
@@ -76,15 +78,8 @@
         sentencesLoaded = true;
     }
 
-    // getFrequentUnknownWords only gives us surface_text + count (that's all
-    // lookup_events stores) — no spelling/reading/definitions, since those
-    // never get persisted for words that were never mined. To display them
-    // we re-run the same tokenizer lookup the sentence window itself uses,
-    // feeding the logged surface text back in as if it were its own
-    // one-word "sentence" at position 0. This reliably reproduces the same
-    // entry since surface_text is exactly the substring that already
-    // matched once.
     async function loadFrequentWords() {
+        frequentLimit = settings?.unknown_words_count || 10
         const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
         const rows = await getFrequentUnknownWords(mediaId, 1, frequentLimit);
 
@@ -98,11 +93,6 @@
             )
         ).filter(Boolean);
 
-        // Different surface forms (e.g. inflections like 食べた vs 食べる)
-        // can resolve to the same dictionary entry — merge those into a
-        // single card instead of showing the word twice, summing their
-        // lookup counts and keeping the most-looked-up surface form as
-        // the representative text (used for mining, search, etc).
         const merged = new Map(); // entry.id -> { surfaceText, count, entry, _bestCount }
         for (const item of resolved) {
             const key = item.entry.id;
@@ -119,8 +109,6 @@
         }
         const mergedItems = Array.from(merged.values()).map(({ _bestCount, ...rest }) => rest);
 
-        // Tags depend on the resolved word_id, so this has to wait until
-        // entries are resolved and merged above — same word_id mining will use later.
         const tagsByWordId = await getMediaTagsForWordIds(mergedItems.map((item) => item.entry.id));
 
         frequentWords = mergedItems.map((item) => ({ ...item, tags: tagsByWordId[item.entry.id] ?? [] }));
@@ -138,13 +126,8 @@
             tags,
         });
 
-        // It's mined now, so it no longer belongs in "frequently looked up
-        // but not in dictionary" — drop it rather than waiting on a refetch.
         frequentWords = frequentWords.filter((w) => w !== item);
 
-        // The words tab's data (words + lookupCounts) is loaded independently
-        // and won't pick up this new row on its own — refresh it now so the
-        // word shows up there immediately instead of only after a remount.
         await loadWords();
     }
 
@@ -170,7 +153,9 @@
         }
     });
 
-    onMount(() => {
+    onMount(async () => {
+        settings = await loadSettings();
+        sortBy = settings?.default_dictionary_sort || 'date'
         loadMediaOptions();
         loadTagColors();
     });
@@ -365,14 +350,16 @@
         >
             Sentences
         </button>
-        <button
-            type="button"
-            class="tab-btn"
-            class:active={activeTab === 'frequent'}
-            onclick={() => (activeTab = 'frequent')}
-        >
-            Frequently looked up
-        </button>
+        {#if settings?.track_unknown_words}
+            <button
+                type="button"
+                class="tab-btn"
+                class:active={activeTab === 'frequent'}
+                onclick={() => (activeTab = 'frequent')}
+            >
+                Frequently looked up
+            </button>
+        {/if}
     </div>
 
     <div class="dict-content">

@@ -41,8 +41,8 @@ export const REVIEW_MODE_OPTIONS = [
 
 export const DICTIONARY_SORT_OPTIONS = [
   { value: 'date', label: 'Date mined' },
-  { value: 'status', label: "Word status" },
-  { value: 'lookup', label: "Lookup frequency" },
+  { value: 'status', label: "Status" },
+  { value: 'lookup', label: "Times looked up" },
 ]
 
 // Each option: { key, label, type, subRow?, showIf?, ...type-specific fields }
