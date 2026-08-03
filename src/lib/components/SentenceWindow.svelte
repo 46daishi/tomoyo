@@ -2,6 +2,7 @@
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
+    import { startWebsocketListener, stopWebsocketListener } from '$lib/websocketListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
     import { mineWord, getWordMineStatus } from '$lib/dictionary.js';
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
@@ -56,13 +57,19 @@
 
     $effect(() => {
         if (session?.running) {
-            startClipboardListener(handleClipboardChange);
+            if (settings?.input_mode === 'websocket') {
+                startWebsocketListener(settings.websocket_address, handleClipboardChange);
+            } else {
+                startClipboardListener(handleClipboardChange);
+            }
         } else {
             stopClipboardListener();
+            stopWebsocketListener();
         }
-
+    
         return () => {
             stopClipboardListener();
+            stopWebsocketListener();
         };
     });
 
