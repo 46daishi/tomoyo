@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
@@ -10,6 +10,7 @@
     import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
     import { loadSettings } from '$lib/settings';
+    import { confirm } from '@tauri-apps/plugin-dialog';
 
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
@@ -307,6 +308,17 @@
     function handleSortChange(e) {
         sortBy = e.target.value;
     }
+
+    async function handleDeleteSentence(sentence) {
+        const yes = await confirm(
+            'Delete this sentence? This removes it as an example everywhere it appears — mined words themselves are not affected.',
+            { title: 'Delete sentence', kind: 'warning' }
+        );
+        if (!yes) return;
+    
+        await deleteSentence(sentence.sentence_text);
+        await loadSentences();
+    }
 </script>
 
 <main class="page dictionary-page">
@@ -466,7 +478,7 @@
         {:else}
             <div class="word-list">
                 {#each filteredSentences as sentence (sentence.id ?? sentence.sentence_text)}
-                    <div class="word-card">
+                    <div class="word-card sentence-card">
                         <p class="sentence-text sentence-tab-text">{sentence.sentence_text}</p>
                         <div class="translation-edit-row">
                             <span class="translation-icon">{@html ICONS.translate}</span>
@@ -484,15 +496,21 @@
                         {#if sentence.tags}
                             <div class="word-meta">
                                 {#each sentence.tags.split(',') as tag}
-                                    <span
-                                        class="tag-pill"
-                                        style={tagColors[tag] ? `--tag-color: ${tagColors[tag]}` : ''}
-                                    >
+                                    <span class="tag-pill" style={tagColors[tag] ? `--tag-color: ${tagColors[tag]}` : ''}>
                                         #{tag}
                                     </span>
                                 {/each}
                             </div>
                         {/if}
+                
+                        <button
+                            type="button"
+                            class="sentence-delete-btn"
+                            onclick={() => handleDeleteSentence(sentence)}
+                            title="Delete sentence"
+                        >
+                            {@html ICONS.trash}
+                        </button>
                     </div>
                 {/each}
             </div>
@@ -945,5 +963,37 @@
         color: var(--theme-textSecondary, #b3b3b3);
         text-align: center;
         margin-top: 2rem;
+    }
+
+    .sentence-delete-btn {
+        font-family: "Symbols Nerd Font";
+        position: absolute;
+        top: 0.75rem;
+        right: 0.9rem;
+        background: none;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.1rem;
+        height: 1.1rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s ease, color 0.15s ease;
+    }
+    
+    .sentence-delete-btn :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .sentence-card:hover .sentence-delete-btn {
+        opacity: 1;
+    }
+    
+    .sentence-delete-btn:hover {
+        color: #f38ba8;
     }
 </style>

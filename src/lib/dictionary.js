@@ -203,11 +203,6 @@ export async function getSentencesForWord(wordId) {
     );
 }
 
-// All mined sentences (from word_sentences, which is where mining actually
-// writes — the standalone `sentences` table is unused). word_sentences has
-// no tag column of its own, so tags come from the mined word(s) attached to
-// each sentence via word_tags, same as how word cards get their tags.
-//
 // A word can be mined more than once under different media, so word_tags
 // can hold tags from several media for the same word — meaning a sentence
 // can display a tag for a media that isn't its own word_sentences.media_id.
@@ -234,4 +229,10 @@ export async function getAllSentences({ mediaId = null } = {}) {
          ORDER BY ws.created_at DESC`,
         [mediaId]
     );
+}
+
+export async function deleteSentence(sentenceText) {
+    const db = await getDb();
+    await db.execute('DELETE FROM word_sentences WHERE sentence_text = $1', [sentenceText]);
+    await db.execute('DELETE FROM sentences WHERE sentence_text = $1', [sentenceText]); // harmless no-op if unused, cheap safety net
 }
