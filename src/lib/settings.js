@@ -71,7 +71,6 @@ export const SETTINGS_SCHEMA = [
               subRow: true,
               showIf: (s) => s.input_mode === 'websocket',
           },
-            { key: 'resume_last_session', label: 'Resume last session on startup', type: 'checkbox' },
           { key: 'discord_rpc_enabled', label: 'Discord Rich Presence', type: 'checkbox' },
             {
                 key: 'data_actions',
@@ -166,7 +165,6 @@ export const SETTINGS_SCHEMA = [
         label: 'Review',
         options: [
             { key: 'default_review_mode', label: 'Default review mode', type: 'select', options: REVIEW_MODE_OPTIONS },
-            { key: 'difficulty_estimation_enabled', label: 'Estimate media difficulty from lookup frequency', type: 'checkbox' },
         ],
   },
 ];

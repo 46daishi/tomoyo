@@ -9,7 +9,6 @@ pub struct AppSettings {
     // ── General ──
     pub font_family: String,
     pub font_size: u32,
-    pub resume_last_session: bool,
     pub discord_rpc_enabled: bool,
 
     // ── Lookup ──
@@ -37,7 +36,6 @@ pub struct AppSettings {
 
     // ── Review (placeholder) ──
     pub default_review_mode: String, // "normal" | "flashcard"
-    pub difficulty_estimation_enabled: bool,
 
     // ── Dictionary ──
     pub default_dictionary_sort: String, // "date" | "status" | "lookup"
@@ -48,7 +46,6 @@ impl Default for AppSettings {
         Self {
             font_family: "Noto Sans JP".into(),
             font_size: 32,
-            resume_last_session: false,
             discord_rpc_enabled: false,
 
             lookup_mode: "click".into(),
@@ -72,7 +69,6 @@ impl Default for AppSettings {
             mini_mode_transparency: 0.5,
 
             default_review_mode: "normal".into(),
-            difficulty_estimation_enabled: false,
 
             default_dictionary_sort: "date".into()
         }
