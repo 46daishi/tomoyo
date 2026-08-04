@@ -176,13 +176,18 @@ export async function getWords({ mediaId = null } = {}) {
          FROM words w
          LEFT JOIN word_tags wt ON wt.word_id = w.id
          LEFT JOIN word_sentences ws ON ws.word_id = w.id
-         WHERE ($1 IS NULL OR ws.media_id = $1)
+         WHERE $1 IS NULL OR EXISTS (
+             SELECT 1 FROM word_sentences ws2 WHERE ws2.word_id = w.id AND ws2.media_id = $1
+         ) OR EXISTS (
+             SELECT 1 FROM word_tags wt2
+             JOIN media m2 ON m2.tag = wt2.tag
+             WHERE wt2.word_id = w.id AND m2.id = $1
+         )
          GROUP BY w.id
          ORDER BY w.created_at DESC`,
         [mediaId]
     );
 }
-
 // Maps a word_tags.tag value to the color of the media sharing that same tag,
 // e.g. word_tags.tag = 'test2' -> media.tag = 'test2' -> media.color.
 export async function getMediaTagColors() {
