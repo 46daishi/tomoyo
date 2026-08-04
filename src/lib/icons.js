@@ -35,4 +35,5 @@ export const ICONS = {
   translate: "\udb81\uddca",
   magnify: "\udb80\udf49",
   sort: "\uf0dc",
+  note: "\uf044",
 };

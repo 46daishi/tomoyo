@@ -258,3 +258,11 @@ export async function deleteWord({ wordId, mediaId = null }) {
         );
     }
 }
+
+export async function updateWordNotes({ wordId, notes }) {
+    const db = await getDb();
+    await db.execute(
+        'UPDATE words SET notes = $1 WHERE id = $2',
+        [notes, wordId]
+    );
+}

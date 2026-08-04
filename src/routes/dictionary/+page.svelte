@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
@@ -331,6 +331,12 @@
         await deleteWord({ wordId: word.id, mediaId: mediaFilter });
         await loadWords();
     }
+
+    async function commitWordNotes(word, value) {
+        const notes = value.trim() || null;
+        word.notes = notes; // optimistic, same pattern as commitTranslation/selectWordStatus
+        await updateWordNotes({ wordId: word.id, notes });
+    }
 </script>
 
 <main class="page dictionary-page">
@@ -441,6 +447,19 @@
                         <div class="entry-pos">{word.word_type}</div>
                         <div class="word-definitions">
                             {JSON.parse(word.definitions).join('; ')}
+                        </div>
+                        <div class="notes-edit-row">
+                            <span class="notes-icon">{@html ICONS.note}</span>
+                            <input
+                                class="notes-input"
+                                type="text"
+                                placeholder="..."
+                                value={word.notes ?? ''}
+                                onblur={(e) => commitWordNotes(word, e.target.value)}
+                                onkeydown={(e) => {
+                                    if (e.key === 'Enter') e.target.blur();
+                                }}
+                            />
                         </div>
                         <div class="word-meta">
                             {#if word.tags}
@@ -796,7 +815,6 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        margin-top: 0.6rem;
         flex-wrap: wrap;
     }
 
@@ -1044,5 +1062,45 @@
     
     .word-delete-btn:hover {
         color: #f38ba8;
+    }
+
+    .notes-edit-row {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem 0.2rem;
+        border-radius: 8px;
+    }
+    
+    .notes-icon {
+        font-family: "Symbols Nerd Font";
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        width: 0.85rem;
+        height: 0.85rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+    }
+    
+    .notes-icon :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .notes-input {
+        flex: 1;
+        min-width: 0;
+        background: none;
+        border: none;
+        outline: none;
+        font: inherit;
+        font-size: 0.8rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+    }
+    
+    .notes-input::placeholder {
+        color: var(--theme-textSecondary, #b3b3b3);
+        opacity: 0.6;
     }
 </style>
