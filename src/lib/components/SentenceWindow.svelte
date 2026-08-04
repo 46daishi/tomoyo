@@ -37,6 +37,23 @@
     let mineStatuses = $state({});
     let mineStatusRequestId = 0;
 
+    let lookupsRemaining = $state(null); // null = not tracking (limit disabled or no session)
+    let lastHourBucket = -1;
+
+    $effect(() => {
+      if (!session?.running || !settings?.lookup_limit_enabled) {
+              lookupsRemaining = null;
+              lastHourBucket = -1;
+              return;
+          }
+      
+          const hourBucket = Math.floor(session.seconds / 3600);
+          if (hourBucket !== lastHourBucket) {
+              lastHourBucket = hourBucket;
+              lookupsRemaining = settings.lookup_limit_per_hour ?? 30;
+          }
+    })
+
     async function handleClipboardChange(text) {
         if (!isMostlyJapanese(text)) return;
 
@@ -128,8 +145,16 @@
     }
 
     function openTooltipAndLog(span, charEl) {
+        if (lookupsRemaining !== null && lookupsRemaining <= 0) {
+              return;
+        }
+      
         tooltipSpan = span;
         tooltipVisible = true;
+
+        if (lookupsRemaining !== null) {
+            lookupsRemaining -= 1;
+        }
 
         logLookupEvent({
             mediaId,
@@ -367,6 +392,11 @@
     {:else}
         <p class="sentence-placeholder">Waiting for a sentence…</p>
     {/if}
+    {#if lookupsRemaining !== null}
+        <div class="lookup-limit-badge" class:depleted={lookupsRemaining <= 0}>
+            {lookupsRemaining}
+        </div>
+    {/if}
 </div>
 
 <Toast message={mineToastMessage} />
@@ -454,5 +484,27 @@
             color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 20%) var(--mini-color-weight, 70%),
             transparent
         );
+    }
+
+    .lookup-limit-badge {
+        position: absolute;
+        bottom: 0.75rem;
+        right: 0.9rem;
+        min-width: 1.6rem;
+        height: 1.6rem;
+        border-radius: 999px;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.75rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 4;
+        font-variant-numeric: tabular-nums;
+        transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    
+    .lookup-limit-badge.depleted {
+        color: #f38ba8;
     }
 </style>
