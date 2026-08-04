@@ -236,3 +236,25 @@ export async function deleteSentence(sentenceText) {
     await db.execute('DELETE FROM word_sentences WHERE sentence_text = $1', [sentenceText]);
     await db.execute('DELETE FROM sentences WHERE sentence_text = $1', [sentenceText]); // harmless no-op if unused, cheap safety net
 }
+
+export async function deleteWord({ wordId, mediaId = null }) {
+    const db = await getDb();
+
+    if (mediaId === null) {
+        await db.execute('DELETE FROM words WHERE id = $1', [wordId]);
+        return;
+    }
+
+    await db.execute(
+        'DELETE FROM word_sentences WHERE word_id = $1 AND media_id = $2',
+        [wordId, mediaId]
+    );
+
+    const [media] = await db.select('SELECT tag FROM media WHERE id = $1', [mediaId]);
+    if (media?.tag) {
+        await db.execute(
+            'DELETE FROM word_tags WHERE word_id = $1 AND tag = $2',
+            [wordId, media.tag]
+        );
+    }
+}

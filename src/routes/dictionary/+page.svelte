@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
@@ -319,6 +319,18 @@
         await deleteSentence(sentence.sentence_text);
         await loadSentences();
     }
+
+    async function handleDeleteWord(word) {
+        const message = mediaFilter
+            ? `Remove "${word.spelling}" from this media? Its sentences and tag from this media will be deleted, but the word stays in your dictionary if it has other sources.`
+            : `Delete "${word.spelling}" completely? This removes it from your dictionary entirely, across all media.`;
+    
+        const yes = await confirm(message, { title: 'Delete word', kind: 'warning' });
+        if (!yes) return;
+    
+        await deleteWord({ wordId: word.id, mediaId: mediaFilter });
+        await loadWords();
+    }
 </script>
 
 <main class="page dictionary-page">
@@ -408,17 +420,23 @@
                             />
                         {/if}
                         {#if lookupFrequencyMeta[word.id]}
-                            <div
-                                class="lookup-badge"
-                                style={`--badge-color: ${lookupFrequencyMeta[word.id].color}`}
-                            >
-                                <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
+                            <div class="lookup-badge" style={`--badge-color: ${lookupFrequencyMeta[word.id].color}`}>
                                 <span class="lookup-badge-count">{lookupFrequencyMeta[word.id].count}</span>
+                                <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
                             </div>
                         {/if}
+                        
                         <div class="word-main">
                             <span class="word-spelling">{word.spelling}</span>
                             <span class="word-reading">{word.reading}</span>
+                            <button
+                                type="button"
+                                class="word-delete-btn"
+                                onclick={() => handleDeleteWord(word)}
+                                title="Delete word"
+                            >
+                                {@html ICONS.trash}
+                            </button>
                         </div>
                         <div class="entry-pos">{word.word_type}</div>
                         <div class="word-definitions">
@@ -529,8 +547,8 @@
                 {#each filteredFrequentWords as item (item.entry.id)}
                     <div class="word-card">
                         <div class="lookup-badge frequent-badge">
-                            <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
                             <span class="lookup-badge-count">{item.count}</span>
+                            <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
                         </div>
                         <div class="word-main">
                             <span class="word-spelling">{item.entry.spellings?.[0] ?? item.surfaceText}</span>
@@ -794,8 +812,8 @@
         right: 0.9rem;
         display: flex;
         align-items: center;
-        gap: 0.3rem;
-        font-size: 0.72rem;
+        gap: 0.4rem;
+        font-size: 0.85rem;
         font-weight: 700;
         color: var(--badge-color, #89dceb);
         padding: 0em 0.65em;
@@ -968,7 +986,7 @@
     .sentence-delete-btn {
         font-family: "Symbols Nerd Font";
         position: absolute;
-        top: 0.75rem;
+        bottom: 1.2rem;
         right: 0.9rem;
         background: none;
         border: none;
@@ -994,6 +1012,37 @@
     }
     
     .sentence-delete-btn:hover {
+        color: #f38ba8;
+    }
+
+    .word-delete-btn {
+        font-family: "Symbols Nerd Font";
+        background: none;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        width: 1rem;
+        height: 1rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        cursor: pointer;
+        opacity: 0;
+        transform: translateY(-1px);
+        transition: opacity 0.15s ease, color 0.15s ease;
+    }
+    
+    .word-delete-btn :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .word-card:hover .word-delete-btn {
+        opacity: 1;
+    }
+    
+    .word-delete-btn:hover {
         color: #f38ba8;
     }
 </style>
