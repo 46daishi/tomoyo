@@ -115,6 +115,7 @@ export const SETTINGS_SCHEMA = [
           { key: 'font_size', label: 'Font size', type: 'slider', min: 12, max: 48, unit: 'px' },
           { key: 'cycle_key', label: 'Cycle key', type: 'hotkey' },
           { key: 'word_highlight_enabled', label: 'Highlight words on hover', type: 'checkbox' },
+          { key: 'highlight_known_words', label: 'Highlight (underline) known words', type: 'checkbox'},
       { key: 'history_enabled', label: 'Enable history', type: 'checkbox' },
       {
           key: 'history_span',

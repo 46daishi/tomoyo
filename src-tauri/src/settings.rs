@@ -22,6 +22,8 @@ pub struct AppSettings {
     pub track_unknown_words: bool,
     pub unknown_words_count: u32,
 
+    pub highlight_known_words: bool,
+
     // ── Input & History ──
     pub input_mode: String, // "clipboard" | "websocket"
     pub websocket_address: String,
@@ -58,6 +60,8 @@ impl Default for AppSettings {
             show_related_entries: true,
             track_unknown_words: false,
             unknown_words_count: 10,
+
+            highlight_known_words: false,
 
             input_mode: "clipboard".into(),
             websocket_address: "ws://127.0.0.1:6677".into(),

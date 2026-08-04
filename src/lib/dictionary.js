@@ -268,3 +268,9 @@ export async function clearDictionaryData({ mediaId = null }) {
     `);
     await db.execute('DELETE FROM lookup_events WHERE media_id = $1', [mediaId]);
 }
+
+export async function getKnownWordsMap() {
+    const db = await getDb();
+    const rows = await db.select('SELECT id, status FROM words');
+    return new Map(rows.map((r) => [r.id, r.status]));
+}

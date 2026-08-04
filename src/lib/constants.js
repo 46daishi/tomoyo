@@ -16,3 +16,11 @@ export const FILTER_OPTIONS = [
 ];
 
 export const STATUS_OPTIONS = FILTER_OPTIONS.filter((o) => o.value !== 'all');
+
+export const STATUS_LEVELS = [
+    { label: 'New', color: '#6c7086' },
+    { label: 'Recognized', color: '#89b4fa' },
+    { label: 'Familiar', color: '#cba6f7' },
+    { label: 'Learned', color: '#a6e3a1' },
+    { label: 'Known', color: '#40a02b' },
+];

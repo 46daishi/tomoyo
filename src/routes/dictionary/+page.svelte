@@ -11,6 +11,7 @@
     import { ICONS } from '$lib/icons';
     import { loadSettings } from '$lib/settings';
     import { confirm } from '@tauri-apps/plugin-dialog';
+    import { STATUS_LEVELS } from '$lib/constants';
 
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
@@ -171,14 +172,6 @@
         loadMediaOptions();
         loadTagColors();
     });
-
-    const STATUS_LEVELS = [
-        { label: 'New', color: '#6c7086' },
-        { label: 'Recognized', color: '#89b4fa' },
-        { label: 'Familiar', color: '#cba6f7' },
-        { label: 'Learned', color: '#a6e3a1' },
-        { label: 'Known', color: '#40a02b' },
-    ];
 
     const statusOptions = [
         { value: '', label: 'All statuses' },

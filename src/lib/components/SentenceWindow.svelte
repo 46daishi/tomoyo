@@ -1,12 +1,17 @@
 <script>
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
-    import { lookupAtPosition } from '$lib/lookup.js';
+    import { lookupAtPosition, findKnownWordSpans } from '$lib/lookup.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { startWebsocketListener, stopWebsocketListener } from '$lib/websocketListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
-    import { mineWord, getWordMineStatus } from '$lib/dictionary.js';
+    import { mineWord, getWordMineStatus, getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
+    import { onMount } from 'svelte';
+    
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
     import Toast from './Toast.svelte';
+    import StatusMenu from './StatusMenu.svelte';
+
+    import { STATUS_LEVELS } from '$lib/constants';
 
     let { settings, miniMode, session, mediaId, mediaTag } = $props();
 
@@ -39,6 +44,11 @@
 
     let lookupsRemaining = $state(null); // null = not tracking (limit disabled or no session)
     let lastHourBucket = -1;
+
+    
+    let knownWordsMap = $state(new Map());
+    let knownSpans = $state([]);
+    let statusMenu = $state(null); // { x, y, wordId, current } | null
 
     $effect(() => {
       if (!session?.running || !settings?.lookup_limit_enabled) {
@@ -249,6 +259,17 @@
     }
 
     function handleCharClick(index, event) {
+      const knownSpan = getKnownSpanAt(index);
+          if (knownSpan) {
+              const rect = event.currentTarget.getBoundingClientRect();
+              const clickedNearBottom = event.clientY - rect.top > rect.height - 6;
+              if (clickedNearBottom) {
+                  event.stopPropagation();
+                  openStatusMenuFor(knownSpan, event);
+                  return;
+              }
+          }
+          
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) {
             const clickModeActive = !settings?.lookup_mode || settings.lookup_mode === 'click';
 
@@ -337,6 +358,9 @@
         const label = entry.spellings[0] ?? span.surface;
         const reading = entry.readings[0];
         showMineToast(reading && reading !== label ? `Mined ${label} (${reading})` : `Mined ${label}`);
+
+        await loadKnownWords();
+        await rescanKnownWords();
     }
 
     $effect(() => {
@@ -344,6 +368,51 @@
             historyEntries = historyEntries.slice(0, settings.history_span);
         }
     });
+
+    async function loadKnownWords() {
+        knownWordsMap = await getKnownWordsMap();
+    }
+    
+    async function rescanKnownWords() {
+        if (!settings?.highlight_known_words || !displayedText) {
+            knownSpans = [];
+            return;
+        }
+        knownSpans = await findKnownWordSpans(displayedText, knownWordsMap);
+    }
+    
+    $effect(() => {
+        displayedText;
+        settings?.highlight_known_words;
+        rescanKnownWords();
+    });
+    
+    onMount(() => {
+        loadKnownWords();
+    });
+    
+    function getKnownSpanAt(index) {
+        return knownSpans.find((s) => index >= s.start && index < s.end) ?? null;
+    }
+    
+    function openStatusMenuFor(span, event) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        statusMenu = { x: rect.left, y: rect.bottom + 4, wordId: span.wordId, current: span.status };
+    }
+    
+    async function handleStatusSelect(newStatus) {
+        if (!statusMenu) return;
+        await updateWordStatus({ wordId: statusMenu.wordId, status: newStatus });
+        knownWordsMap.set(statusMenu.wordId, newStatus);
+        knownSpans = knownSpans.map((s) =>
+            s.wordId === statusMenu.wordId ? { ...s, status: newStatus } : s
+        );
+        statusMenu = null;
+    }
+    
+    function closeStatusMenu() {
+        statusMenu = null;
+    }
 </script>
 
 <svelte:window
@@ -366,9 +435,11 @@
                     class:hovered={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end && settings?.word_highlight_enabled}
                     class:span-start={hoveredSpan && i === hoveredSpan.start && settings?.word_highlight_enabled}
                     class:span-end={hoveredSpan && i === hoveredSpan.end - 1 && settings?.word_highlight_enabled}
+                    class:known-word={getKnownSpanAt(i) !== null}
                     class:no-match={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end && hoveredSpan.entries.length === 0 && settings?.word_highlight_enabled}
                     onmouseenter={(event) => handleCharHover(i, event)}
                     onclick={(event) => handleCharClick(i, event)}
+                    style={getKnownSpanAt(i) ? `--status-color: ${STATUS_LEVELS[getKnownSpanAt(i).status]?.color ?? ''}` : ''}
                 >{char}</span>
             {/each}
         </p>
@@ -396,6 +467,17 @@
         <div class="lookup-limit-badge" class:depleted={lookupsRemaining <= 0}>
             {lookupsRemaining}
         </div>
+    {/if}
+
+    {#if statusMenu}
+        <StatusMenu
+            x={statusMenu.x}
+            y={statusMenu.y}
+            levels={STATUS_LEVELS}
+            current={statusMenu.current}
+            onSelect={handleStatusSelect}
+            onClose={closeStatusMenu}
+        />
     {/if}
 </div>
 
@@ -506,5 +588,10 @@
     
     .lookup-limit-badge.depleted {
         color: #f38ba8;
+    }
+
+    .char-token.known-word {
+        border-bottom: 2px solid var(--status-color, transparent);
+        padding-bottom: 1px;
     }
 </style>
