@@ -119,14 +119,14 @@
 
 
     async function mineFrequentWord(item) {
-        const { entry, surfaceText, tags } = item;
+        const { entry, surfaceText, mediaIds } = item;
         await mineWordWithTags({
             dictId: entry.id,
             spelling: entry.spellings[0] ?? surfaceText,
             reading: entry.readings[0] ?? '',
             definitions: entry.definitions,
             wordType: entry.pos.join(', '),
-            tags,
+            mediaIds: mediaIds
         });
     
         await loadWords();

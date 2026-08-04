@@ -354,6 +354,18 @@ pub fn run() {
             sql: include_str!("../migrations/0007_dismissed_unknown_words.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "only_media_tag",
+            sql: include_str!("../migrations/0008_only_media_tag.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 9,
+            description: "tag_rewrite",
+            sql: include_str!("../migrations/0009_tag_rewrite.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

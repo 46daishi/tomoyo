@@ -301,7 +301,6 @@
             reading: entry.readings[0] ?? '',
             definitions: entry.definitions,
             wordType: entry.pos.join(', '),
-            tag: mediaTag ?? 'mined',
             sentenceText: displayedText,
             highlightStart: span.start,
             highlightEnd: span.end,

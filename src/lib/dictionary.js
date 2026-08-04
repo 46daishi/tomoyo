@@ -1,22 +1,12 @@
 import { getDb } from '$lib/db';
 
 export async function mineWord({
-    dictId,           // entry.id from the tokenizer/JMdict lookup
-    spelling,
-    reading,
-    definitions,
-    wordType,
-    tag,
-    sentenceText,
-    highlightStart,
-    highlightEnd,
-    mediaId = null,
-    translation = null,
+    dictId, spelling, reading, definitions, wordType,
+    mediaId = null, sentenceText, highlightStart, highlightEnd, translation = null,
 }) {
     const db = await getDb();
 
     const existing = await db.select('SELECT id FROM words WHERE id = $1', [dictId]);
-
     let wordId;
 
     if (existing.length > 0) {
@@ -29,10 +19,12 @@ export async function mineWord({
         wordId = dictId;
     }
 
-    await db.execute(
-        'INSERT OR IGNORE INTO word_tags (word_id, tag) VALUES ($1, $2)',
-        [wordId, tag]
-    );
+    if (mediaId !== null) {
+        await db.execute(
+            'INSERT OR IGNORE INTO word_tags (word_id, media_id) VALUES ($1, $2)',
+            [wordId, mediaId]
+        );
+    }
 
     await db.execute(
         'INSERT INTO word_sentences (word_id, sentence_text, highlight_start, highlight_end, media_id, translation) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -42,17 +34,10 @@ export async function mineWord({
     return wordId;
 }
 
-// Same word-insert logic as mineWord, but for mining a word with no
-// example sentence context (e.g. from the "frequently looked up" tab,
-// where all we ever had was an isolated surface text, not a real
-// sentence) and with a set of tags instead of a single one — used to tag
-// a word with every media it was actually looked up under, rather than a
-// generic "mined" placeholder tag.
-export async function mineWordWithTags({ dictId, spelling, reading, definitions, wordType, tags = [] }) {
+export async function mineWordWithTags({ dictId, spelling, reading, definitions, wordType, mediaIds = [] }) {
     const db = await getDb();
 
     const existing = await db.select('SELECT id FROM words WHERE id = $1', [dictId]);
-
     let wordId;
 
     if (existing.length > 0) {
@@ -65,22 +50,16 @@ export async function mineWordWithTags({ dictId, spelling, reading, definitions,
         wordId = dictId;
     }
 
-    for (const tag of tags) {
+    for (const mediaId of mediaIds) {
         await db.execute(
-            'INSERT OR IGNORE INTO word_tags (word_id, tag) VALUES ($1, $2)',
-            [wordId, tag]
+            'INSERT OR IGNORE INTO word_tags (word_id, media_id) VALUES ($1, $2)',
+            [wordId, mediaId]
         );
     }
 
     return wordId;
 }
 
-// Reports how a candidate mine action relates to what's already stored:
-// - 'new'       -> the word isn't in the dictionary at all yet
-// - 'same'      -> the word exists AND was already mined from this exact
-//                  sentence + media (mining again would be a pure duplicate)
-// - 'different' -> the word exists, but not from this sentence + media
-//                  (mining would add a new example, which is still useful)
 export async function getWordMineStatus({ dictId, sentenceText, mediaId = null }) {
     const db = await getDb();
 
@@ -153,7 +132,13 @@ export async function getWordWithDetails(wordId) {
     const [word] = await db.select('SELECT * FROM words WHERE id = $1', [wordId]);
     if (!word) return null;
 
-    const tags = await db.select('SELECT tag FROM word_tags WHERE word_id = $1', [wordId]);
+    const tags = await db.select(
+        `SELECT COALESCE(m.tag, m.title) as tag
+         FROM word_tags wt
+         JOIN media m ON m.id = wt.media_id
+         WHERE wt.word_id = $1`,
+        [wordId]
+    );
     const sentences = await db.select(
         'SELECT * FROM word_sentences WHERE word_id = $1 ORDER BY created_at DESC',
         [wordId]
@@ -170,26 +155,20 @@ export async function getWordWithDetails(wordId) {
 export async function getWords({ mediaId = null } = {}) {
     const db = await getDb();
     return db.select(
-        `SELECT w.*, 
-                GROUP_CONCAT(DISTINCT wt.tag) as tags,
+        `SELECT w.*,
+                GROUP_CONCAT(DISTINCT COALESCE(m.tag, m.title)) as tags,
                 COUNT(DISTINCT ws.sentence_text) as sentence_count
          FROM words w
          LEFT JOIN word_tags wt ON wt.word_id = w.id
+         LEFT JOIN media m ON m.id = wt.media_id
          LEFT JOIN word_sentences ws ON ws.word_id = w.id
-         WHERE $1 IS NULL OR EXISTS (
-             SELECT 1 FROM word_sentences ws2 WHERE ws2.word_id = w.id AND ws2.media_id = $1
-         ) OR EXISTS (
-             SELECT 1 FROM word_tags wt2
-             JOIN media m2 ON m2.tag = wt2.tag
-             WHERE wt2.word_id = w.id AND m2.id = $1
-         )
+         WHERE $1 IS NULL OR wt.media_id = $1 OR ws.media_id = $1
          GROUP BY w.id
          ORDER BY w.created_at DESC`,
         [mediaId]
     );
 }
-// Maps a word_tags.tag value to the color of the media sharing that same tag,
-// e.g. word_tags.tag = 'test2' -> media.tag = 'test2' -> media.color.
+
 export async function getMediaTagColors() {
     const db = await getDb();
     const rows = await db.select('SELECT tag, color FROM media WHERE tag IS NOT NULL');
@@ -219,16 +198,16 @@ export async function getAllSentences({ mediaId = null } = {}) {
     const db = await getDb();
     return db.select(
         `SELECT ws.id, ws.sentence_text, ws.translation, ws.media_id, ws.created_at,
-                GROUP_CONCAT(DISTINCT wt.tag) as tags
+                GROUP_CONCAT(DISTINCT COALESCE(m.tag, m.title)) as tags
          FROM word_sentences ws
          LEFT JOIN word_tags wt ON wt.word_id = ws.word_id
+         LEFT JOIN media m ON m.id = wt.media_id
          WHERE $1 IS NULL OR EXISTS (
              SELECT 1
              FROM word_sentences ws2
              LEFT JOIN word_tags wt2 ON wt2.word_id = ws2.word_id
-             LEFT JOIN media m2 ON m2.tag = wt2.tag
              WHERE ws2.sentence_text = ws.sentence_text
-               AND (ws2.media_id = $1 OR m2.id = $1)
+               AND (ws2.media_id = $1 OR wt2.media_id = $1)
          )
          GROUP BY ws.sentence_text
          ORDER BY ws.created_at DESC`,
@@ -250,34 +229,15 @@ export async function deleteWord({ wordId, mediaId = null }) {
         return;
     }
 
-    const sentenceDelete = await db.execute(
-        'DELETE FROM word_sentences WHERE word_id = $1 AND media_id = $2',
-        [wordId, mediaId]
-    );
-    console.log('sentences deleted:', sentenceDelete.rowsAffected);
-
-    const [media] = await db.select('SELECT tag, title FROM media WHERE id = $1', [mediaId]);
-    const effectiveTag = media?.tag ?? media?.title;
-    console.log('effectiveTag:', effectiveTag);
-
-    if (effectiveTag) {
-        const tagDelete = await db.execute(
-            'DELETE FROM word_tags WHERE word_id = $1 AND tag = $2',
-            [wordId, effectiveTag]
-        );
-        console.log('tags deleted:', tagDelete.rowsAffected);
-    }
+    await db.execute('DELETE FROM word_sentences WHERE word_id = $1 AND media_id = $2', [wordId, mediaId]);
+    await db.execute('DELETE FROM word_tags WHERE word_id = $1 AND media_id = $2', [wordId, mediaId]);
 
     const [remaining] = await db.select(
-        `SELECT
-            (SELECT COUNT(*) FROM word_tags WHERE word_id = $1) as tag_count,
-            (SELECT COUNT(*) FROM word_sentences WHERE word_id = $1) as sentence_count`,
+        `SELECT (SELECT COUNT(*) FROM word_tags WHERE word_id = $1) as tag_count,
+                (SELECT COUNT(*) FROM word_sentences WHERE word_id = $1) as sentence_count`,
         [wordId]
     );
-    console.log('remaining after delete:', remaining);
-
     if ((remaining?.tag_count ?? 0) + (remaining?.sentence_count ?? 0) === 0) {
-        console.log('deleting word row, id:', wordId);
         await db.execute('DELETE FROM words WHERE id = $1', [wordId]);
     }
 }
@@ -299,20 +259,12 @@ export async function clearDictionaryData({ mediaId = null }) {
         return;
     }
 
-    const [media] = await db.select('SELECT tag, title FROM media WHERE id = $1', [mediaId]);
-    const effectiveTag = media?.tag ?? media?.title;
-
     await db.execute('DELETE FROM word_sentences WHERE media_id = $1', [mediaId]);
-
-    if (effectiveTag) {
-        await db.execute('DELETE FROM word_tags WHERE tag = $1', [effectiveTag]);
-    }
-
+    await db.execute('DELETE FROM word_tags WHERE media_id = $1', [mediaId]);
     await db.execute(`
         DELETE FROM words
-        WHERE id NOT IN (SELECT DISTINCT word_id FROM word_sentences)
-          AND id NOT IN (SELECT DISTINCT word_id FROM word_tags)
+        WHERE id NOT IN (SELECT DISTINCT word_id FROM word_tags)
+          AND id NOT IN (SELECT DISTINCT word_id FROM word_sentences)
     `);
-
     await db.execute('DELETE FROM lookup_events WHERE media_id = $1', [mediaId]);
 }
