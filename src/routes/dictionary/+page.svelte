@@ -322,7 +322,7 @@
 
     async function handleDeleteWord(word) {
         const message = mediaFilter
-            ? `Remove "${word.spelling}" from this media? Its sentences and tag from this media will be deleted, but the word stays in your dictionary if it has other sources.`
+            ? `Remove "${word.spelling}" from this media? If this is its only source, it will be deleted entirely — otherwise it stays in your dictionary under its other sources.`
             : `Delete "${word.spelling}" completely? This removes it from your dictionary entirely, across all media.`;
     
         const yes = await confirm(message, { title: 'Delete word', kind: 'warning' });

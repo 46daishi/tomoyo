@@ -234,7 +234,7 @@ export async function getAllSentences({ mediaId = null } = {}) {
 export async function deleteSentence(sentenceText) {
     const db = await getDb();
     await db.execute('DELETE FROM word_sentences WHERE sentence_text = $1', [sentenceText]);
-    await db.execute('DELETE FROM sentences WHERE sentence_text = $1', [sentenceText]); // harmless no-op if unused, cheap safety net
+    await db.execute('DELETE FROM sentences WHERE sentence_text = $1', [sentenceText]);
 }
 
 export async function deleteWord({ wordId, mediaId = null }) {
@@ -245,17 +245,35 @@ export async function deleteWord({ wordId, mediaId = null }) {
         return;
     }
 
-    await db.execute(
+    const sentenceDelete = await db.execute(
         'DELETE FROM word_sentences WHERE word_id = $1 AND media_id = $2',
         [wordId, mediaId]
     );
+    console.log('sentences deleted:', sentenceDelete.rowsAffected);
 
-    const [media] = await db.select('SELECT tag FROM media WHERE id = $1', [mediaId]);
-    if (media?.tag) {
-        await db.execute(
+    const [media] = await db.select('SELECT tag, title FROM media WHERE id = $1', [mediaId]);
+    const effectiveTag = media?.tag ?? media?.title;
+    console.log('effectiveTag:', effectiveTag);
+
+    if (effectiveTag) {
+        const tagDelete = await db.execute(
             'DELETE FROM word_tags WHERE word_id = $1 AND tag = $2',
-            [wordId, media.tag]
+            [wordId, effectiveTag]
         );
+        console.log('tags deleted:', tagDelete.rowsAffected);
+    }
+
+    const [remaining] = await db.select(
+        `SELECT
+            (SELECT COUNT(*) FROM word_tags WHERE word_id = $1) as tag_count,
+            (SELECT COUNT(*) FROM word_sentences WHERE word_id = $1) as sentence_count`,
+        [wordId]
+    );
+    console.log('remaining after delete:', remaining);
+
+    if ((remaining?.tag_count ?? 0) + (remaining?.sentence_count ?? 0) === 0) {
+        console.log('deleting word row, id:', wordId);
+        await db.execute('DELETE FROM words WHERE id = $1', [wordId]);
     }
 }
 
