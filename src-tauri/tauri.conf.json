@@ -13,7 +13,7 @@
       "windows": [
           {
               "label": "main",
-              "title": "Tomoyo",
+              "title": "tomoyo",
               "transparent": true
           }
       ],
