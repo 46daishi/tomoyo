@@ -289,3 +289,30 @@ export async function updateWordNotes({ wordId, notes }) {
         [notes, wordId]
     );
 }
+
+export async function clearDictionaryData({ mediaId = null }) {
+    const db = await getDb();
+
+    if (mediaId === null) {
+        await db.execute('DELETE FROM words');
+        await db.execute('DELETE FROM lookup_events');
+        return;
+    }
+
+    const [media] = await db.select('SELECT tag, title FROM media WHERE id = $1', [mediaId]);
+    const effectiveTag = media?.tag ?? media?.title;
+
+    await db.execute('DELETE FROM word_sentences WHERE media_id = $1', [mediaId]);
+
+    if (effectiveTag) {
+        await db.execute('DELETE FROM word_tags WHERE tag = $1', [effectiveTag]);
+    }
+
+    await db.execute(`
+        DELETE FROM words
+        WHERE id NOT IN (SELECT DISTINCT word_id FROM word_sentences)
+          AND id NOT IN (SELECT DISTINCT word_id FROM word_tags)
+    `);
+
+    await db.execute('DELETE FROM lookup_events WHERE media_id = $1', [mediaId]);
+}

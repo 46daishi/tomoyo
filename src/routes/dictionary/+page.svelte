@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, clearDictionaryData } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
@@ -337,6 +337,23 @@
         word.notes = notes; // optimistic, same pattern as commitTranslation/selectWordStatus
         await updateWordNotes({ wordId: word.id, notes });
     }
+
+    async function handleClearDictionary() {
+        const scopeLabel = mediaFilter
+            ? mediaOptions.find((m) => m.value === String(mediaFilter))?.label ?? 'this media'
+            : 'all media';
+    
+        const wordCount = filteredWords.length;
+    
+        const yes = await confirm(
+            `Delete all ${wordCount} word${wordCount === 1 ? '' : 's'} and their lookup history for ${scopeLabel}? This cannot be undone.`,
+            { title: 'Clear dictionary', kind: 'warning' }
+        );
+        if (!yes) return;
+    
+        await clearDictionaryData({ mediaId: mediaFilter });
+        await loadWords();
+    }
 </script>
 
 <main class="page dictionary-page">
@@ -367,6 +384,12 @@
                 />
             </div>
         {/if}
+        <ActionButton
+                icon={ICONS.trash}
+                variant="danger"
+                size="tiny"
+                onAction={handleClearDictionary}
+            />
     </div>
 
     <div class="dict-tabs">

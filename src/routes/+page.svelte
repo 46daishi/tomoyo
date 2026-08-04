@@ -9,6 +9,7 @@
     import { getDb, coverSrc } from '$lib/db';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_COLORS, FILTER_OPTIONS, STATUS_OPTIONS } from '$lib/constants.js';
+    import { clearDictionaryData } from "$lib/dictionary";
 
     let mediaList = $state([]);
     let statusFilter = $state('all');
@@ -39,21 +40,23 @@
         showModal = true;
     }
 
-    function openEditModal(media, e) {
-        if (e) e.stopPropagation();
+    function openEditModal(media) {
         editingMedia = media;
         showModal = true;
     }
-
-    async function handleDelete(media, e) {
-        if (e) e.stopPropagation();
+    
+    async function handleDelete(media) {
         const yes = await confirm(
-            `Delete "${media.title}"? This cannot be undone.`,
+            `Delete "${media.title}"? This also permanently erases all reading stats, lookup history, and mined dictionary entries tied to it. This cannot be undone.`,
             { title: 'Delete media', kind: 'warning' }
         );
         if (!yes) return;
-
+    
         const db = await getDb();
+    
+        await db.execute('DELETE FROM sessions WHERE media_id = $1', [media.id]);
+        await clearDictionaryData({ mediaId: media.id });
+    
         await db.execute('DELETE FROM media WHERE id = $1', [media.id]);
         await loadMedia();
     }
@@ -103,18 +106,18 @@
                         <div class="cover-placeholder"></div>
                     {/if}
 
-                    <div class="cover-actions">
+                    <div class="cover-actions" onclick={(e) => e.stopPropagation()}>
                         <ActionButton
                             icon={ICONS.edit}
                             variant="primary"
                             size="mini"
-                            onAction={(e) => openEditModal(media, e)}
+                            onAction={() => openEditModal(media)}
                         />
                         <ActionButton
                             icon={ICONS.trash}
                             variant="danger"
                             size="mini"
-                            onAction={(e) => handleDelete(media, e)}
+                            onAction={() => handleDelete(media)}
                         />
                     </div>
                 </div>
