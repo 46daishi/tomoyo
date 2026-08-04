@@ -158,6 +158,7 @@ export const SETTINGS_SCHEMA = [
         { key: 'default_dictionary_sort', label: 'Default sorting in dictionary', type: 'select', options: DICTIONARY_SORT_OPTIONS },
         { key: 'track_unknown_words', label: 'Track commonly looked-up words not in dictionary', type: 'checkbox' },
         { key: 'unknown_words_count', label: "Number of words to show", type: 'number', subRow: true, showIf: (s) => s.track_unknown_words },
+        { key: 'word_sentence_count', label: "Number of sentences to display under a word", type: 'number' }
         ],
     },
     {

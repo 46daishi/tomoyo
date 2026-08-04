@@ -63,6 +63,11 @@
         }
     }
 
+    function viewFullSentences(word) {
+        searchQuery = word.spelling;
+        activeTab = 'sentences';
+    }
+
     async function loadWords() {
         const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
         const [wordRows, counts] = await Promise.all([
@@ -282,6 +287,8 @@
               )
             : allSentences
     );
+
+    let sentenceLimit = $derived(settings?.word_sentence_count || 5);
 
     let filteredFrequentWords = $derived(
         searchQuery.trim()
@@ -512,7 +519,7 @@
                                     <div class="sentences-empty">No sentences found.</div>
                                 {:else}
                                     <ul class="sentences-list">
-                                        {#each sentencesByWord[word.id] as sentence (sentence.id ?? sentence.sentence_text)}
+                                        {#each sentencesByWord[word.id].slice(0, sentenceLimit) as sentence (sentence.id ?? sentence.sentence_text)}
                                             <li class="sentence-item">
                                                 <p class="sentence-text">{sentence.sentence_text}</p>
                                                 {#if sentence.translation}
@@ -521,6 +528,15 @@
                                             </li>
                                         {/each}
                                     </ul>
+                                    {#if sentencesByWord[word.id].length > sentenceLimit}
+                                        <button
+                                            type="button"
+                                            class="view-full-sentences-btn"
+                                            onclick={() => viewFullSentences(word)}
+                                        >
+                                            View all
+                                        </button>
+                                    {/if}
                                 {/if}
                             </div>
                         {/if}
@@ -888,6 +904,24 @@
     }
 
     .sentence-count:hover {
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .view-full-sentences-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        font-size: 0.78rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        margin-top: 0.5rem;
+        transition: color 0.15s ease;
+    }
+
+    .view-full-sentences-btn:hover {
         color: var(--theme-text, #f6f6f6);
     }
 

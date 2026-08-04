@@ -39,6 +39,7 @@ pub struct AppSettings {
 
     // ── Dictionary ──
     pub default_dictionary_sort: String, // "date" | "status" | "lookup"
+    pub word_sentence_count: u32,
 }
 
 impl Default for AppSettings {
@@ -70,7 +71,8 @@ impl Default for AppSettings {
 
             default_review_mode: "normal".into(),
 
-            default_dictionary_sort: "date".into()
+            default_dictionary_sort: "date".into(),
+            word_sentence_count: 5,
         }
     }
 }
