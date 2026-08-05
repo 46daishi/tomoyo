@@ -36,4 +36,6 @@ export const ICONS = {
   magnify: "\udb80\udf49",
   sort: "\uf0dc",
   note: "\uf044",
+  hourglass: "\uf254",
+  calendar: "\uf073",
 };

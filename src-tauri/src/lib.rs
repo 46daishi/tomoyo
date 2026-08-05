@@ -366,6 +366,12 @@ pub fn run() {
             sql: include_str!("../migrations/0009_tag_rewrite.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 10,
+            description: "reviews",
+            sql: include_str!("../migrations/0010_reviews.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

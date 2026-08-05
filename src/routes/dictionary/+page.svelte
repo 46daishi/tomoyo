@@ -12,6 +12,7 @@
     import { loadSettings } from '$lib/settings';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_LEVELS } from '$lib/constants';
+    import { getReviewStats } from '$lib/reviewStats.js';
 
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
@@ -27,13 +28,49 @@
     let expandedWords = $state(new Set());
     let sentencesByWord = $state({});
 
-    let activeTab = $state('words'); // 'words' | 'sentences' | 'frequent'
+    let activeTab = $state('words'); // 'words' | 'sentences' | 'frequent' | 'review'
     let allSentences = $state([]);
     let sentencesLoaded = $state(false);
 
     let frequentWords = $state([]);
     let frequentLoaded = $state(false);
     let frequentLimit = $state(10);
+
+    const STAT_COLORS = {
+        wordCount: '#36b7bd',
+        sentenceCount: '#89b4fa',
+        wordTime: '#36b7bd',
+        sentenceTime: '#89b4fa',
+        lastReview: '#cba6f7',
+        currentStreak: '#fab387',
+        longestStreak: '#f38ba8',
+    };
+
+    function emptyReviewStats() {
+        return {
+            wordReviewCount: 0,
+            sentenceReviewCount: 0,
+            wordTimeSeconds: 0,
+            sentenceTimeSeconds: 0,
+            lastReviewDate: null,
+            currentStreak: 0,
+            longestStreak: 0,
+        };
+    }
+    
+    let reviewStats = $state(emptyReviewStats());
+
+    let reviewTotals = $derived.by(() => {
+        const totalReviews = reviewStats.wordReviewCount + reviewStats.sentenceReviewCount;
+        const wordReviewPct = totalReviews > 0 ? (reviewStats.wordReviewCount / totalReviews) * 100 : 0;
+        const sentenceReviewPct = totalReviews > 0 ? (reviewStats.sentenceReviewCount / totalReviews) * 100 : 0;
+    
+        const totalTime = reviewStats.wordTimeSeconds + reviewStats.sentenceTimeSeconds;
+        const wordTimePct = totalTime > 0 ? (reviewStats.wordTimeSeconds / totalTime) * 100 : 0;
+        const sentenceTimePct = totalTime > 0 ? (reviewStats.sentenceTimeSeconds / totalTime) * 100 : 0;
+    
+        return { totalReviews, wordReviewPct, sentenceReviewPct, totalTime, wordTimePct, sentenceTimePct };
+    });
 
     async function loadMediaOptions() {
         const db = await getDb();
@@ -70,7 +107,7 @@
     }
 
     async function loadWords() {
-        const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
+        const mediaId = mediaFilter;
         const [wordRows, counts] = await Promise.all([
             getWords({ mediaId }),
             getLookupCounts({ mediaId }),
@@ -80,7 +117,7 @@
     }
 
     async function loadSentences() {
-        const mediaId = mediaFilter; // read synchronously so $effect tracks this as a dependency
+        const mediaId = mediaFilter;
         allSentences = await getAllSentences({ mediaId });
         sentencesLoaded = true;
     }
@@ -100,7 +137,7 @@
             )
         ).filter(Boolean);
     
-        const merged = new Map(); // entry.id -> { surfaceText, count, entry, surfaceTexts }
+        const merged = new Map();
         for (const item of resolved) {
             const key = item.entry.id;
             const existing = merged.get(key);
@@ -122,7 +159,6 @@
         frequentWords = mergedItems.map((item) => ({ ...item, tags: tagsByWordId[item.entry.id] ?? [] }));
         frequentLoaded = true;
     }
-
 
     async function mineFrequentWord(item) {
         const { entry, surfaceText, mediaIds } = item;
@@ -168,7 +204,7 @@
 
     onMount(async () => {
         settings = await loadSettings();
-        sortBy = settings?.default_dictionary_sort || 'date'
+        sortBy = settings?.default_dictionary_sort || 'date';
         loadMediaOptions();
         loadTagColors();
     });
@@ -198,7 +234,7 @@
     }
 
     async function selectWordStatus(word, status) {
-        word.status = status; // optimistic — avoids waiting on a refetch
+        word.status = status;
         closeStatusMenu();
         await updateWordStatus({ wordId: word.id, status });
     }
@@ -211,15 +247,6 @@
         blue: '#4FDCFF',
     };
 
-    // Ranked by percentile among words with at least one lookup — based on
-    // `words` (media-filtered) rather than `filteredWords`, so typing in the
-    // search box doesn't shift anyone's color as the visible set shrinks.
-    //
-    // Cutoffs are computed as counts (ceil of each fraction), each floored
-    // at the previous cutoff, so the top word is always red even with a
-    // small pool — a strict percentile fraction (rank / total) can exceed
-    // 0.1 for every word when total is small (e.g. 1/1 = 1.0), which would
-    // leave red unused entirely.
     let lookupFrequencyMeta = $derived.by(() => {
         const ranked = words
             .map((w) => ({ id: w.id, count: lookupCounts[w.id] ?? 0 }))
@@ -334,7 +361,7 @@
 
     async function commitWordNotes(word, value) {
         const notes = value.trim() || null;
-        word.notes = notes; // optimistic, same pattern as commitTranslation/selectWordStatus
+        word.notes = notes;
         await updateWordNotes({ wordId: word.id, notes });
     }
 
@@ -353,6 +380,31 @@
     
         await clearDictionaryData({ mediaId: mediaFilter });
         await loadWords();
+    }
+
+    async function loadReviewStats() {
+        reviewStats = await getReviewStats(mediaFilter);
+    }
+    
+    $effect(() => {
+        if (activeTab === 'review') {
+            mediaFilter;
+            loadReviewStats();
+        }
+    });
+
+    function formatDuration(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (h > 0) return `${h}h ${m}m`;
+        if (m > 0) return `${m}m`;
+        return `${seconds}s`;
+    }
+    
+    function formatReviewDate(dateStr) {
+        if (!dateStr) return 'Never';
+        const date = new Date(dateStr + 'T00:00:00');
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     }
 </script>
 
@@ -419,6 +471,14 @@
                 Frequently looked up
             </button>
         {/if}
+        <button
+            type="button"
+            class="tab-btn"
+            class:active={activeTab === 'review'}
+            onclick={() => (activeTab = 'review')}
+        >
+            Review
+        </button>
     </div>
 
     <div class="dict-content">
@@ -634,7 +694,159 @@
                 {/each}
             </div>
         {/if}
-    {/if}
+    {:else if activeTab === 'review'}
+        <div class="review-tab">
+            <!-- Quick Start Action Cards -->
+            <div class="review-actions-grid">
+                <button type="button" class="word-card review-action-card">
+                    <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.wordCount}">
+                        <span class="action-icon">{@html ICONS.book}</span>
+                    </div>
+                    <div class="action-details">
+                        <span class="action-title">Word Review</span>
+                        <span class="action-sub">Review words in dictionary</span>
+                    </div>
+                </button>
+
+                <button type="button" class="word-card review-action-card">
+                    <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.sentenceCount}">
+                        <span class="action-icon">{@html ICONS.translate}</span>
+                    </div>
+                    <div class="action-details">
+                        <span class="action-title">Sentence Review</span>
+                        <span class="action-sub">Review full sentences</span>
+                    </div>
+                </button>
+
+                <button type="button" class="word-card review-action-card">
+                    <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.lastReview}">
+                        <span class="action-icon">{@html ICONS.settings}</span>
+                    </div>
+                    <div class="action-details">
+                        <span class="action-title">Custom Review</span>
+                        <span class="action-sub">Override default review settings</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Section Heading -->
+            <h2 class="review-stats-heading">
+                {mediaFilter
+                    ? `Review stats for ${mediaOptions.find((m) => m.value === String(mediaFilter))?.label ?? 'this media'}`
+                    : 'Review stats for all media'}
+            </h2>
+
+            <!-- Combined & Simplified Streak + Last Review Card -->
+            <div class="word-card streak-review-card">
+                <div class="streak-stat">
+                    <span class="stat-icon fire-icon">{@html ICONS.fire}</span>
+                    <div class="stat-info">
+                        <span class="stat-value">{reviewStats.currentStreak} <span class="stat-unit">days</span></span>
+                        <span class="stat-label">Current Streak</span>
+                    </div>
+                </div>
+
+                <div class="stat-divider"></div>
+
+                <div class="streak-stat">
+                    <span class="stat-icon fire-icon-longest">{@html ICONS.trophy}</span>
+                    <div class="stat-info">
+                        <span class="stat-value">{reviewStats.longestStreak} <span class="stat-unit">days</span></span>
+                        <span class="stat-label">Longest Streak</span>
+                    </div>
+                </div>
+
+                <div class="stat-divider"></div>
+
+                <div class="streak-stat">
+                    <span class="stat-icon calendar-icon">{@html ICONS.calendar ?? ICONS.book}</span>
+                    <div class="stat-info">
+                        <span class="stat-value">{formatReviewDate(reviewStats.lastReviewDate)}</span>
+                        <span class="stat-label">Last Reviewed</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Overview Grid: Visual Distribution & Metric Cards -->
+            <div class="stats-overview-grid">
+                <!-- Visual Breakdown Bars -->
+                <div class="word-card breakdown-panel">
+                    <h3 class="panel-title">Review Breakdown</h3>
+
+                    <div class="dist-group">
+                        <div class="dist-meta">
+                            <span class="dist-name">Total Reviews ({reviewTotals.totalReviews})</span>
+                            <span class="dist-legend">
+                                <span class="legend-dot word"></span> Words ({Math.round(reviewTotals.wordReviewPct)}%)
+                                <span class="legend-dot sentence"></span> Sentences ({Math.round(reviewTotals.sentenceReviewPct)}%)
+                            </span>
+                        </div>
+                        <div class="dist-bar-track">
+                            <div class="dist-bar-fill word-fill" style="width: {reviewTotals.wordReviewPct}%"></div>
+                            <div class="dist-bar-fill sentence-fill" style="width: {reviewTotals.sentenceReviewPct}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="dist-group">
+                        <div class="dist-meta">
+                            <span class="dist-name">Time Spent ({formatDuration(reviewTotals.totalTime)})</span>
+                            <span class="dist-legend">
+                                <span class="legend-dot word"></span> Words ({Math.round(reviewTotals.wordTimePct)}%)
+                                <span class="legend-dot sentence"></span> Sentences ({Math.round(reviewTotals.sentenceTimePct)}%)
+                            </span>
+                        </div>
+                        <div class="dist-bar-track">
+                            <div class="dist-bar-fill word-fill" style="width: {reviewTotals.wordTimePct}%"></div>
+                            <div class="dist-bar-fill sentence-fill" style="width: {reviewTotals.sentenceTimePct}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="metrics-quad-grid">
+                    <div class="word-card metric-card">
+                        <div class="metric-icon-box" style="--icon-color: {STAT_COLORS.wordCount}">
+                            {@html ICONS.book}
+                        </div>
+                        <div class="metric-body">
+                            <span class="metric-value">{reviewStats.wordReviewCount}</span>
+                            <span class="metric-label">Words Reviewed</span>
+                        </div>
+                    </div>
+
+                    <div class="word-card metric-card">
+                        <div class="metric-icon-box" style="--icon-color: {STAT_COLORS.sentenceCount}">
+                            {@html ICONS.translate}
+                        </div>
+                        <div class="metric-body">
+                            <span class="metric-value">{reviewStats.sentenceReviewCount}</span>
+                            <span class="metric-label">Sentences Reviewed</span>
+                        </div>
+                    </div>
+
+                    <div class="word-card metric-card">
+                        <div class="metric-icon-box" style="--icon-color: {STAT_COLORS.wordTime}">
+                            {@html ICONS.hourglass ?? ICONS.stats}
+                        </div>
+                        <div class="metric-body">
+                            <span class="metric-value">{formatDuration(reviewStats.wordTimeSeconds)}</span>
+                            <span class="metric-label">Time on Words</span>
+                        </div>
+                    </div>
+
+                    <div class="word-card metric-card">
+                        <div class="metric-icon-box" style="--icon-color: {STAT_COLORS.sentenceTime}">
+                            {@html ICONS.hourglass ?? ICONS.stats}
+                        </div>
+                        <div class="metric-body">
+                            <span class="metric-value">{formatDuration(reviewStats.sentenceTimeSeconds)}</span>
+                            <span class="metric-label">Time on Sentences</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {/if}
     </div>
 </main>
 
@@ -789,7 +1001,7 @@
         border: 1px solid var(--theme-border, #404040);
         border-radius: 12px;
         padding: 1rem 1.25rem;
-        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
         will-change: transform;
         transform: translateZ(0);
     }
@@ -1152,5 +1364,316 @@
     .notes-input::placeholder {
         color: var(--theme-textSecondary, #b3b3b3);
         opacity: 0.6;
+    }
+
+    /* ==========================================================================
+       REVIEW TAB STYLES
+       ========================================================================== */
+    
+    .review-tab {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-width: 1200px;
+        padding-bottom: 2rem;
+    }
+
+    /* Action Cards */
+    .review-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .review-action-card {
+        display: flex;
+        align-items: center;
+        gap: 1.2rem;
+        color: var(--theme-text, #f6f6f6);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .review-action-card:hover {
+        border-color: var(--theme-primary, #36b7bd);
+        background: color-mix(in srgb, var(--theme-primary, #36b7bd) 8%, var(--theme-surface, #2d2d2d));
+    }
+
+    .action-icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        flex-shrink: 0;
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--accent-color, #36b7bd) 15%, transparent);
+        color: var(--accent-color, #36b7bd);
+    }
+
+    .action-icon {
+        font-family: "Symbols Nerd Font";
+        font-size: 1.5rem;
+        display: flex;
+        width: 1.35rem;
+        height: 1.5rem;
+    }
+
+    .action-icon :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+
+    .action-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .action-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .action-sub {
+        font-size: 0.8rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+    }
+
+    /* Review Stats Heading */
+    .review-stats-heading {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin: 0.5rem 0 0 0;
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    /* Streak & Last Review Card */
+    .streak-review-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        gap: 1.5rem;
+        padding: 1.25rem 2rem;
+        flex-wrap: wrap;
+    }
+
+    .streak-review-card .streak-stat {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .streak-stat .stat-icon {
+        font-family: "Symbols Nerd Font";
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        flex-shrink: 0;
+        border-radius: 100px;
+    }
+
+    .action-icon-wrap :global(svg),
+    .metric-icon-box :global(svg),
+    .streak-stat .stat-icon :global(svg) {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .streak-review-card .stat-icon :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+
+    .streak-review-card .stat-icon {
+        background: color-mix(in srgb, var(--icon-color, #36b7bd) 14%, transparent);
+        color: var(--icon-color, #36b7bd);
+    }
+    
+    .streak-review-card .stat-icon.fire-icon {
+        font-size: 1.6rem;
+        --icon-color: #f38ba8;
+    }
+    
+    .streak-review-card .stat-icon.fire-icon-longest {
+        font-size: 1.3rem;
+        --icon-color: #fab387;
+    }
+    
+    .streak-review-card .stat-icon.calendar-icon {
+        font-size: 1.1rem;
+        --icon-color: #cba6f7;
+    }
+
+    .streak-review-card .stat-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .streak-review-card .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--theme-text, #f6f6f6);
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .streak-review-card .stat-unit {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--theme-textSecondary, #b3b3b3);
+    }
+
+    .streak-review-card .stat-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: var(--theme-textSecondary, #b3b3b3);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .streak-review-card .stat-divider {
+        width: 1px;
+        height: 2rem;
+        background: color-mix(in srgb, var(--theme-border, #404040) 60%, transparent);
+    }
+
+    @media (max-width: 800px) {
+        .streak-review-card .stat-divider {
+            display: none;
+        }
+    }
+
+    /* Stats Overview Grid */
+    .stats-overview-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    @media (max-width: 900px) {
+        .stats-overview-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Breakdown Panel */
+    .breakdown-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+    }
+
+    .panel-title {
+        font-size: 01em;
+        font-weight: 700;
+        margin: 0;
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .dist-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .dist-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.78rem;
+    }
+
+    .dist-name {
+        font-weight: 600;
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .dist-legend {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.72rem;
+    }
+
+    .legend-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 0.2rem;
+    }
+
+    .legend-dot.word, .dist-bar-fill.word-fill { background: #36b7bd; }
+    .legend-dot.sentence, .dist-bar-fill.sentence-fill { background: #89b4fa; }
+
+    .dist-bar-track {
+        display: flex;
+        height: 10px;
+        width: 100%;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--theme-border, #404040) 40%, transparent);
+        overflow: hidden;
+    }
+
+    .dist-bar-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+
+    /* Metrics Quad Grid */
+    .metrics-quad-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .metric-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .metric-icon-box {
+        font-family: "Symbols Nerd Font";
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        flex-shrink: 0;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--icon-color, #36b7bd) 14%, transparent);
+        color: var(--icon-color, #36b7bd);
+        font-size: 1.1rem;
+    }
+
+    .metric-icon-box :global(svg) {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    .metric-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+    }
+
+    .metric-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--theme-text, #f6f6f6);
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .metric-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--theme-textSecondary, #b3b3b3);
     }
 </style>
