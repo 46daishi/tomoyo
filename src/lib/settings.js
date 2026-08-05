@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { STATUS_LEVELS } from './constants';
 
 let cached = null;
 
@@ -43,6 +44,11 @@ export const DICTIONARY_SORT_OPTIONS = [
   { value: 'date', label: 'Date mined' },
   { value: 'status', label: "Status" },
   { value: 'lookup', label: "Times looked up" },
+]
+
+export const SENTENCE_REVIEW_MODES = [
+  { value: 'interactive', label: 'Interactive' },
+  { value: 'plain', label: 'Plain text' },
 ]
 
 // Each option: { key, label, type, subRow?, showIf?, ...type-specific fields }
@@ -166,7 +172,16 @@ export const SETTINGS_SCHEMA = [
         id: 'review',
         label: 'Review',
         options: [
-            { key: 'default_review_mode', label: 'Default review mode', type: 'select', options: REVIEW_MODE_OPTIONS },
+          { key: 'default_review_mode', label: 'Default word review mode', type: 'select', options: REVIEW_MODE_OPTIONS },
+          { key: 'word_review_count', label: 'Default number of words to review', type: 'number' },
+          { key: 'sentence_review_text', label: 'Type of sentence review text', type: 'select', options: SENTENCE_REVIEW_MODES },
+          { key: 'sentence_review_count', label: 'Default number of sentences to review', type: 'number' },
+          {
+              key: 'review_statuses',
+              label: 'Word levels to include in reviews',
+              type: 'multi_select',
+              options: STATUS_LEVELS.map((level, i) => ({ value: i, label: level.label, color: level.color })),
+          }
         ],
   },
 ];

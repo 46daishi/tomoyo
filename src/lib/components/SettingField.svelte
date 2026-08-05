@@ -2,6 +2,7 @@
     import SelectInput from '$lib/components/SelectInput.svelte';
     import ThemeGrid from '$lib/components/ThemeGrid.svelte';
     import HotkeyInput from '$lib/components/HotkeyInput.svelte';
+    import MultiSelectInput from './MultiSelectInput.svelte';
 
     let { option, settings = $bindable(), onChange, onAction } = $props();
 
@@ -78,13 +79,17 @@
                     <button class="modal-btn" onclick={() => onAction(btn.action)}>{btn.label}</button>
                 {/each}
             </div>
+        {:else if option.type === 'multi_select'}
+            <MultiSelectInput
+                options={option.options}
+                values={settings[option.key] ?? []}
+                onChange={(next) => onChange(option.key, next)}
+            />
         {/if}
     {/if}
 </div>
 
 <style>
-   
-
     .setting-row {
         display: flex;
         align-items: center;

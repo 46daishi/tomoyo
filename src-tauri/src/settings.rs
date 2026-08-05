@@ -36,8 +36,12 @@ pub struct AppSettings {
     pub mini_mode_exit_height: u32,
     pub mini_mode_transparency: f32,
 
-    // ── Review (placeholder) ──
+    // ── Review  ──
     pub default_review_mode: String, // "normal" | "flashcard"
+    pub word_review_count: u32,
+    pub sentence_review_count: u32,
+    pub sentence_review_text: String, // "interactive" | "plain"
+    pub review_statuses: Vec<u8>, // 0-4
 
     // ── Dictionary ──
     pub default_dictionary_sort: String, // "date" | "status" | "lookup"
@@ -74,6 +78,10 @@ impl Default for AppSettings {
             mini_mode_transparency: 0.5,
 
             default_review_mode: "normal".into(),
+            word_review_count: 20,
+            sentence_review_count: 10,
+            sentence_review_text: "interactive".into(),
+            review_statuses: vec![0, 1, 2, 3],
 
             default_dictionary_sort: "date".into(),
             word_sentence_count: 5,
