@@ -41,6 +41,7 @@ pub struct AppSettings {
     pub word_review_count: u32,
     pub sentence_review_count: u32,
     pub sentence_review_text: String, // "interactive" | "plain"
+    pub only_review_translated: bool,
     pub review_statuses: Vec<u8>, // 0-4
 
     // ── Dictionary ──
@@ -81,6 +82,7 @@ impl Default for AppSettings {
             word_review_count: 20,
             sentence_review_count: 10,
             sentence_review_text: "interactive".into(),
+            only_review_translated: false,
             review_statuses: vec![0, 1, 2, 3],
 
             default_dictionary_sort: "date".into(),

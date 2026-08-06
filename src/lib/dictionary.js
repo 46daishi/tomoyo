@@ -289,3 +289,22 @@ export async function getReviewPool({ mediaId = null, statuses = [] }) {
         [mediaId, ...statuses]
     );
 }
+
+export async function getSentenceReviewPool({ mediaId = null, onlyTranslated = false }) {
+    const db = await getDb();
+    return db.select(
+        `SELECT 
+            ws.sentence_text, 
+            MAX(ws.translation) AS translation, 
+            COALESCE(ws.media_id, MAX(wt.media_id)) AS media_id,
+            GROUP_CONCAT(DISTINCT m.color) AS tag_colors
+        FROM word_sentences ws
+        LEFT JOIN word_tags wt ON wt.word_id = ws.word_id
+        LEFT JOIN media m ON m.id = wt.media_id
+        WHERE ($1 = 0 OR ws.translation IS NOT NULL)
+          AND ($2 IS NULL OR ws.media_id = $2 OR wt.media_id = $2)
+        GROUP BY ws.sentence_text
+        ORDER BY MAX(ws.created_at) DESC`,
+        [onlyTranslated ? 1 : 0, mediaId]
+    );
+}

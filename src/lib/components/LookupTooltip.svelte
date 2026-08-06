@@ -71,6 +71,12 @@
 </div>
 
 <style>
+    .lookup-tooltip {
+        font-size: 1rem;
+        font-weight: 400;
+        text-align: left;
+    }
+    
     .entry-row {
         display: flex;
         align-items: flex-start;

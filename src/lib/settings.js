@@ -176,6 +176,7 @@ export const SETTINGS_SCHEMA = [
           { key: 'word_review_count', label: 'Default number of words to review', type: 'number' },
           { key: 'sentence_review_text', label: 'Type of sentence review text', type: 'select', options: SENTENCE_REVIEW_MODES },
           { key: 'sentence_review_count', label: 'Default number of sentences to review', type: 'number' },
+          { key: 'only_review_translated', label: 'Only review sentences with translations', type: 'checkbox' },
           {
               key: 'review_statuses',
               label: 'Word levels to include in reviews',

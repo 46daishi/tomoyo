@@ -413,11 +413,11 @@
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     }
     
-    function startWordReview() {
+    function startReview(kind) {
         const url = new URL(window.location.href);
         url.searchParams.set('tab', 'review');
-        history.replaceState(history.state, '', url); // rewrite the current entry in place, no navigation happens
-        goto(`/review/word${mediaFilter ? '?media=' + mediaFilter : ''}`);
+        history.replaceState(history.state, '', url);
+        goto(`/review/${kind}${mediaFilter ? '?media=' + mediaFilter : ''}`);
     }
 </script>
 
@@ -711,7 +711,7 @@
         <div class="review-tab">
             <!-- Quick Start Action Cards -->
             <div class="review-actions-grid">
-                <button type="button" class="word-card review-action-card" onclick={startWordReview}>
+                <button type="button" class="word-card review-action-card" onclick={() => startReview('word')}>
                     <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.wordCount}">
                         <span class="action-icon">{@html ICONS.book}</span>
                     </div>
@@ -721,7 +721,7 @@
                     </div>
                 </button>
 
-                <button type="button" class="word-card review-action-card">
+                <button type="button" class="word-card review-action-card" onclick={() => startReview('sentence')}>
                     <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.sentenceCount}">
                         <span class="action-icon">{@html ICONS.translate}</span>
                     </div>
@@ -1144,6 +1144,7 @@
     }
 
     .mine-btn {
+        font-family: "Symbols Nerd Font";
         background: color-mix(in srgb, var(--theme-primary, #36b7bd) 18%, transparent);
         border: 1px solid color-mix(in srgb, var(--theme-primary, #36b7bd) 40%, transparent);
         color: var(--theme-primary, #36b7bd);

@@ -186,20 +186,22 @@
 
 <style>
     .review-page {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 2rem;
+        padding: 6rem;
         box-sizing: border-box;
         min-height: 100vh;
         gap: 2rem;
     }
-
+    
     .review-header {
-        width: 100%;
-        max-width: 1200px;
-        display: flex;
-        align-items: center;
+        position: absolute;
+        top: 1.5rem;
+        left: 1.5rem;
+        z-index: 10;
+        width: auto;
     }
 
     /* Centered Bottom Navigation */
