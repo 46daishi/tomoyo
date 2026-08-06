@@ -13,7 +13,12 @@
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_LEVELS } from '$lib/constants';
     import { getReviewStats } from '$lib/reviewStats.js';
-    import { goto } from '$app/navigation';
+    import { goto, afterNavigate } from '$app/navigation';
+
+    afterNavigate(() => {
+        const tabParam = page.url.searchParams.get('tab');
+        if (tabParam) activeTab = tabParam;
+    });
 
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
@@ -204,8 +209,6 @@
     });
 
     onMount(async () => {
-        const tabParam = page.url.searchParams.get('tab');
-        if (tabParam) activeTab = tabParam;
         settings = await loadSettings();
         sortBy = settings?.default_dictionary_sort || 'date';
         loadMediaOptions();
@@ -408,6 +411,13 @@
         if (!dateStr) return 'Never';
         const date = new Date(dateStr + 'T00:00:00');
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    
+    function startWordReview() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', 'review');
+        history.replaceState(history.state, '', url); // rewrite the current entry in place, no navigation happens
+        goto(`/review/word${mediaFilter ? '?media=' + mediaFilter : ''}`);
     }
 </script>
 
@@ -701,7 +711,7 @@
         <div class="review-tab">
             <!-- Quick Start Action Cards -->
             <div class="review-actions-grid">
-                <button type="button" class="word-card review-action-card" onclick={() => goto(`/review/word${mediaFilter ? '?media=' + mediaFilter : ''}`)}>
+                <button type="button" class="word-card review-action-card" onclick={startWordReview}>
                     <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.wordCount}">
                         <span class="action-icon">{@html ICONS.book}</span>
                     </div>

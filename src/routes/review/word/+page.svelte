@@ -88,7 +88,7 @@
 
     async function handleExit() {
         if (sessionId && !done) await endReviewSession(sessionId);
-        goto(`/dictionary?tab=review${mediaId ? '&media=' + mediaId : ''}`);
+        history.back();
     }
 
     function handleKeydown(e) {
@@ -133,7 +133,7 @@
                 {completionStats.count} word{completionStats.count === 1 ? '' : 's'} reviewed in {formatDuration(completionStats.totalSeconds)}
                 ({completionStats.perReviewSeconds.toFixed(1)}s per word)
             </p>
-            <button class="modal-btn primary" onclick={() => goto(`/dictionary?tab=review${mediaId ? '&media=' + mediaId : ''}`)}>
+            <button class="modal-btn primary" onclick={() => { if (sessionId && !done) endReviewSession(sessionId); history.back(); }}>
                 Back to Reviews
             </button>
         </div>
