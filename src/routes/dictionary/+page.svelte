@@ -13,6 +13,7 @@
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_LEVELS } from '$lib/constants';
     import { getReviewStats } from '$lib/reviewStats.js';
+    import { goto } from '$app/navigation';
 
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
@@ -203,6 +204,8 @@
     });
 
     onMount(async () => {
+        const tabParam = page.url.searchParams.get('tab');
+        if (tabParam) activeTab = tabParam;
         settings = await loadSettings();
         sortBy = settings?.default_dictionary_sort || 'date';
         loadMediaOptions();
@@ -698,7 +701,7 @@
         <div class="review-tab">
             <!-- Quick Start Action Cards -->
             <div class="review-actions-grid">
-                <button type="button" class="word-card review-action-card">
+                <button type="button" class="word-card review-action-card" onclick={() => goto(`/review/word${mediaFilter ? '?media=' + mediaFilter : ''}`)}>
                     <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.wordCount}">
                         <span class="action-icon">{@html ICONS.book}</span>
                     </div>
@@ -1413,10 +1416,10 @@
 
     .action-icon {
         font-family: "Symbols Nerd Font";
-        font-size: 1.5rem;
+        font-size: 1.6rem;
         display: flex;
-        width: 1.35rem;
-        height: 1.5rem;
+        width: 1.32rem;
+        height: 1.6rem;
     }
 
     .action-icon :global(svg) {
@@ -1649,7 +1652,7 @@
         border-radius: 10px;
         background: color-mix(in srgb, var(--icon-color, #36b7bd) 14%, transparent);
         color: var(--icon-color, #36b7bd);
-        font-size: 1.1rem;
+        font-size: 1.2rem;
     }
 
     .metric-icon-box :global(svg) {

@@ -274,3 +274,18 @@ export async function getKnownWordsMap() {
     const rows = await db.select('SELECT id, status FROM words');
     return new Map(rows.map((r) => [r.id, r.status]));
 }
+
+export async function getReviewPool({ mediaId = null, statuses = [] }) {
+    if (statuses.length === 0) return [];
+    const db = await getDb();
+    const statusPlaceholders = statuses.map((_, i) => `$${i + 2}`).join(', ');
+
+    return db.select(
+        `SELECT w.* FROM words w
+         WHERE w.status IN (${statusPlaceholders})
+           AND ($1 IS NULL
+             OR EXISTS (SELECT 1 FROM word_sentences ws WHERE ws.word_id = w.id AND ws.media_id = $1)
+             OR EXISTS (SELECT 1 FROM word_tags wt WHERE wt.word_id = w.id AND wt.media_id = $1))`,
+        [mediaId, ...statuses]
+    );
+}
