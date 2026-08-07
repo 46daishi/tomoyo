@@ -12,10 +12,11 @@
     import { loadSettings } from '$lib/settings';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_LEVELS } from '$lib/constants';
-    import { getReviewStats } from '$lib/reviewStats.js';
+    import { getReviewStats, getReviewActivityByDay } from '$lib/reviewStats.js';
     import { goto, afterNavigate } from '$app/navigation';
     import CustomReviewModal from '$lib/components/CustomReviewModal.svelte';
     import Toast from '$lib/components/Toast.svelte';
+    import HeatMap from '$lib/components/HeatMap.svelte';
 
     afterNavigate(() => {
         const tabParam = page.url.searchParams.get('tab');
@@ -395,11 +396,18 @@
     async function loadReviewStats() {
         reviewStats = await getReviewStats(mediaFilter);
     }
+
+    let reviewActivity = $state([]);
+    
+    async function loadReviewActivity() {
+        reviewActivity = await getReviewActivityByDay(52);
+    }
     
     $effect(() => {
         if (activeTab === 'review') {
             mediaFilter;
             loadReviewStats();
+            loadReviewActivity();
         }
     });
 
@@ -886,6 +894,17 @@
                     </div>
                 </div>
             </div>
+            <div class="word-card breakdown-panel">
+                <h3 class="panel-title">Review Activity</h3>
+                <div class="review-heatmap-section">
+                    <HeatMap
+                        data={reviewActivity}
+                        primaryColor="var(--theme-primary, #36b7bd)"
+                        weeks={52}
+                        formatValue={(count) => `${count} review${count === 1 ? '' : 's'}`}
+                    />
+                </div>
+            </div>
             <CustomReviewModal bind:show={showCustomReviewModal} {mediaFilter} onEmptyPool={showToast} />
             <Toast message={toastMessage} />
         </div>
@@ -907,6 +926,10 @@
         display: flex;
         flex-direction: column;
         min-height: 0;
+        width: 100%;
+        max-width: 1100px;
+        margin-inline: auto;
+        box-sizing: border-box;
     }
 
     .dict-content {
@@ -915,6 +938,10 @@
         overflow-y: scroll;
         padding-right: 1rem;
         padding-top: 0.2rem;
+        width: 100%;
+        max-width: 1100px;
+        margin-inline: auto;
+        box-sizing: border-box;
     }
 
     .dict-content::-webkit-scrollbar {
@@ -1609,6 +1636,7 @@
         display: flex;
         flex-direction: column;
         gap: 1.15rem;
+
     }
 
     .panel-title {
@@ -1719,5 +1747,13 @@
         font-size: 0.72rem;
         font-weight: 600;
         color: var(--theme-textSecondary, #b3b3b3);
+    }
+
+    .review-heatmap-section {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        overflow: hidden;
+        padding-bottom: 1rem;
     }
 </style>

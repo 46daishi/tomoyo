@@ -133,3 +133,17 @@ export async function getReviewWeighting(reviewType, mediaId = null) {
         rows.map((r) => [r.item_key, { timesReviewed: r.times_reviewed, lastReviewedAt: r.last_reviewed_at }])
     );
 }
+
+export async function getReviewActivityByDay(weeks = 52) {
+    const db = await getDb();
+    const rows = await db.select(
+        `SELECT date(reviewed_at, 'unixepoch', 'localtime') as day,
+                COUNT(*) as count
+         FROM review_log
+         GROUP BY day
+         ORDER BY day DESC
+         LIMIT $1`,
+        [weeks * 7]
+    );
+    return rows.map((r) => ({ date: r.day, studyMinutes: r.count }));
+}
