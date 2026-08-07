@@ -68,6 +68,7 @@
         height: 100%;
         object-fit: cover;
         display: block;
+
     }
 
     .cover-placeholder {

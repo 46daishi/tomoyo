@@ -233,6 +233,8 @@
 
     .cover img,
     .cover-placeholder {
+        position: relative;
+        top: 0;
         transition: filter 0.3s ease;
     }
 

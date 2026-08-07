@@ -2,10 +2,11 @@
     import { page } from '$app/state';
     import { onMount } from 'svelte';
     import { fly } from 'svelte/transition'; // Added missing transition import
-    import { getDb } from '$lib/db';
+    import { getDb, coverSrc } from '$lib/db';
     import { setMediaTitle } from '$lib/stores/presence.svelte.js';
     import { loadSettings } from '$lib/settings.js';
     import { goto } from '$app/navigation';
+    import { extractDominantColor } from '$lib/utils/color.js';
 
     import { initMiniMode } from '$lib/miniMode.js';
     import { createSessionStore } from '$lib/stores/session.svelte.js';
@@ -52,10 +53,30 @@
             miniModeManager.destroy();
         };
     });
+
+    let pageGlow = $state(null);
+    let glowRequestId = 0;
+    let glowColor = $derived(pageGlow ?? media?.color ?? '#dc143c');
+    
+    $effect(() => {
+        const path = media?.cover_path;
+        const requestId = ++glowRequestId;
+    
+        if (!path) {
+            pageGlow = null;
+            return;
+        }
+    
+        extractDominantColor(coverSrc(path)).then((color) => {
+            if (requestId === glowRequestId) {
+                pageGlow = color;
+            }
+        });
+    });
 </script>
 
 {#key mediaId}
-    <main class="page home">
+    <main class="page home" style={`--page-glow: ${glowColor}; --page-glow-soft: color-mix(in srgb, ${glowColor} 30%, transparent)`}>
         {#if media}
             <MediaHeader {media}>
                 <MediaStats {mediaId} {media} refreshKey={session.running} />
@@ -111,6 +132,7 @@
 
 <style>
     .page.home {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -132,6 +154,27 @@
         overflow: hidden;
         gap: 0;
         background: transparent !important;
+    }
+
+    .page.home::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 420px;
+        background: radial-gradient(
+            ellipse at top,
+            color-mix(in srgb, var(--page-glow, var(--theme-primary, #dc143c)) 20%, transparent) 0%,
+            transparent 50%
+        );
+        pointer-events: none;
+        z-index: -1;
+        transition: background 0.5s ease;
+    }
+    
+    :global(body.mini-mode) .page.home::before {
+        display: none;
     }
 
     .session-timer {
