@@ -2,8 +2,7 @@
     import { goto } from '$app/navigation';
     import { STATUS_LEVELS } from '$lib/constants.js';
     import MultiSelectInput from '$lib/components/MultiSelectInput.svelte';
-
-    let { show = $bindable(false), mediaFilter = null } = $props();
+    import { getReviewPool, getSentenceReviewPool } from '$lib/dictionary';
 
     let reviewKind = $state('word'); // 'word' | 'sentence'
     let count = $state(20);
@@ -14,21 +13,38 @@
         show = false;
     }
 
-    function startCustomReview() {
+    let { show = $bindable(false), mediaFilter = null, onEmptyPool } = $props();
+    
+    async function startCustomReview() {
+        const statuses = reviewKind === 'word' ? selectedStatuses : null;
+    
+        if (reviewKind === 'word') {
+            const pool = await getReviewPool({ mediaId: mediaFilter, statuses });
+            if (pool.length === 0) {
+                onEmptyPool?.('No words available to review.');
+                return;
+            }
+        } else {
+            const pool = await getSentenceReviewPool({ mediaId: mediaFilter, onlyTranslated });
+            if (pool.length === 0) {
+                onEmptyPool?.('No sentences available to review.');
+                return;
+            }
+        }
+    
         const params = new URLSearchParams();
         if (mediaFilter) params.set('media', mediaFilter);
         params.set('count', String(count));
-
         if (reviewKind === 'word') {
             params.set('statuses', selectedStatuses.join(','));
         } else {
             params.set('onlyTranslated', onlyTranslated ? '1' : '0');
         }
-
+    
         const url = new URL(window.location.href);
         url.searchParams.set('tab', 'review');
         history.replaceState(history.state, '', url);
-
+    
         goto(`/review/${reviewKind}?${params.toString()}`);
     }
 

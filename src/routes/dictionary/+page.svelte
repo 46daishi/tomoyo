@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, clearDictionaryData } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, getReviewPool, getSentenceReviewPool } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
@@ -15,6 +15,7 @@
     import { getReviewStats } from '$lib/reviewStats.js';
     import { goto, afterNavigate } from '$app/navigation';
     import CustomReviewModal from '$lib/components/CustomReviewModal.svelte';
+    import Toast from '$lib/components/Toast.svelte';
 
     afterNavigate(() => {
         const tabParam = page.url.searchParams.get('tab');
@@ -415,8 +416,32 @@
         const date = new Date(dateStr + 'T00:00:00');
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     }
+
+    let toastMessage = $state(null);
     
-    function startReview(kind) {
+    function showToast(message) {
+        toastMessage = message;
+        setTimeout(() => (toastMessage = null), 1800);
+    }
+    
+    async function startReview(kind) {
+        const settings = await loadSettings();
+    
+        if (kind === 'word') {
+            const statuses = settings.review_statuses ?? [0, 1, 2, 3];
+            const pool = await getReviewPool({ mediaId: mediaFilter, statuses });
+            if (pool.length === 0) {
+                showToast('No words available to review.');
+                return;
+            }
+        } else {
+            const pool = await getSentenceReviewPool({ mediaId: mediaFilter, onlyTranslated: settings.only_review_translated ?? false });
+            if (pool.length === 0) {
+                showToast('No sentences available to review.');
+                return;
+            }
+        }
+    
         const url = new URL(window.location.href);
         url.searchParams.set('tab', 'review');
         history.replaceState(history.state, '', url);
@@ -861,7 +886,8 @@
                     </div>
                 </div>
             </div>
-            <CustomReviewModal bind:show={showCustomReviewModal} mediaFilter={mediaFilter} />
+            <CustomReviewModal bind:show={showCustomReviewModal} {mediaFilter} onEmptyPool={showToast} />
+            <Toast message={toastMessage} />
         </div>
         {/if}
     </div>
