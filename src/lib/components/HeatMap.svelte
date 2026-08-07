@@ -106,7 +106,7 @@
             if (m !== last) {
                 out.push({
                     wi,
-                    label: col[0].date.toLocaleDateString("en-US", { month: "short" }),
+                    label: col[0].date.toLocaleDateString("ja-JP", { month: "short" }),
                 });
                 last = m;
             }
@@ -129,8 +129,8 @@
     $: ttY = tooltip ? Math.max(tooltip.y - 40, 4) : 0;
 
     // ── Day labels ────────────────────────────────────────────────────────── [...]
-    const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const SHOW_ROWS = new Set([1, 3, 5]);
+    const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
+    const SHOW_ROWS = new Set([0, 1, 2, 3, 4, 5, 6]);
 
     onMount(() => { W = wrapEl?.clientWidth ?? 0; });
 </script>
@@ -143,7 +143,7 @@
                 <text
                     x={DAY_LBL_W + ml.wi * (CELL + GAP)}
                     y={MONTH_H - 6}
-                    font-size="10"
+                    font-size="13"
                     fill="var(--theme-textSecondary,#b3b3b3)"
                 >{ml.label}</text>
             {/each}
@@ -153,7 +153,7 @@
                     <text
                         x={DAY_LBL_W - 4}
                         y={MONTH_H + di * (CELL + GAP) + CELL / 2}
-                        font-size="9"
+                        font-size="13"
                         fill="var(--theme-textSecondary,#b3b3b3)"
                         text-anchor="end"
                         dominant-baseline="middle"

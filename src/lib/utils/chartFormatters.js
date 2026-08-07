@@ -22,7 +22,7 @@ export function formatDate(dateInput) {
  * @returns {string}
  */
 export function formatDateFull(date) {
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString("ja-JP", {
         weekday: "short",
         month: "short",
         day: "numeric",

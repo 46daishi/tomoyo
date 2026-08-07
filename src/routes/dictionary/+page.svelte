@@ -398,9 +398,11 @@
     }
 
     let reviewActivity = $state([]);
+
+    const HEATMAP_WEEKS = 57;
     
     async function loadReviewActivity() {
-        reviewActivity = await getReviewActivityByDay(52);
+        reviewActivity = await getReviewActivityByDay(HEATMAP_WEEKS);
     }
     
     $effect(() => {
@@ -422,7 +424,7 @@
     function formatReviewDate(dateStr) {
         if (!dateStr) return 'Never';
         const date = new Date(dateStr + 'T00:00:00');
-        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        return date.toLocaleDateString("ja-JP", { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
     let toastMessage = $state(null);
@@ -790,7 +792,7 @@
                 <div class="streak-stat">
                     <span class="stat-icon fire-icon">{@html ICONS.fire}</span>
                     <div class="stat-info">
-                        <span class="stat-value">{reviewStats.currentStreak} <span class="stat-unit">days</span></span>
+                        <span class="stat-value">{reviewStats.currentStreak} <span class="stat-unit">日</span></span>
                         <span class="stat-label">Current Streak</span>
                     </div>
                 </div>
@@ -800,7 +802,7 @@
                 <div class="streak-stat">
                     <span class="stat-icon fire-icon-longest">{@html ICONS.trophy}</span>
                     <div class="stat-info">
-                        <span class="stat-value">{reviewStats.longestStreak} <span class="stat-unit">days</span></span>
+                        <span class="stat-value">{reviewStats.longestStreak} <span class="stat-unit">日</span></span>
                         <span class="stat-label">Longest Streak</span>
                     </div>
                 </div>
@@ -900,7 +902,7 @@
                     <HeatMap
                         data={reviewActivity}
                         primaryColor="var(--theme-primary, #36b7bd)"
-                        weeks={52}
+                        weeks={HEATMAP_WEEKS}
                         formatValue={(count) => `${count} review${count === 1 ? '' : 's'}`}
                     />
                 </div>
@@ -1593,7 +1595,7 @@
     }
 
     .streak-review-card .stat-unit {
-        font-size: 0.8rem;
+        font-size: 1rem;
         font-weight: 500;
         color: var(--theme-textSecondary, #b3b3b3);
     }
