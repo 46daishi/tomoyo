@@ -14,6 +14,7 @@
     import { STATUS_LEVELS } from '$lib/constants';
     import { getReviewStats } from '$lib/reviewStats.js';
     import { goto, afterNavigate } from '$app/navigation';
+    import CustomReviewModal from '$lib/components/CustomReviewModal.svelte';
 
     afterNavigate(() => {
         const tabParam = page.url.searchParams.get('tab');
@@ -41,6 +42,8 @@
     let frequentWords = $state([]);
     let frequentLoaded = $state(false);
     let frequentLimit = $state(10);
+
+    let showCustomReviewModal = $state(false);
 
     const STAT_COLORS = {
         wordCount: '#36b7bd',
@@ -731,7 +734,7 @@
                     </div>
                 </button>
 
-                <button type="button" class="word-card review-action-card">
+                <button type="button" class="word-card review-action-card" onclick={() => (showCustomReviewModal = true)}>
                     <div class="action-icon-wrap" style="--accent-color: {STAT_COLORS.lastReview}">
                         <span class="action-icon">{@html ICONS.settings}</span>
                     </div>
@@ -858,6 +861,7 @@
                     </div>
                 </div>
             </div>
+            <CustomReviewModal bind:show={showCustomReviewModal} mediaFilter={mediaFilter} />
         </div>
         {/if}
     </div>

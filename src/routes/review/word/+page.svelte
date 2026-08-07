@@ -30,19 +30,26 @@
         return keyed.slice(0, n).map((k) => k.item);
     }
 
+    const desiredCountParam = page.url.searchParams.get('count');
+    const statusesParam = page.url.searchParams.get('statuses');
+    
     async function loadQueue() {
         settings = await loadSettings();
-        const statuses = settings.review_statuses ?? [0, 1, 2, 3];
+    
+        const statuses = statusesParam
+            ? statusesParam.split(',').map(Number)
+            : settings.review_statuses ?? [0, 1, 2, 3];
+    
         const pool = await getReviewPool({ mediaId, statuses });
         if (pool.length === 0) {
             queue = [];
             return;
         }
-
+    
         const weighting = await getReviewWeighting('word', null);
         const weights = pool.map((w) => 1 / (1 + (weighting[String(w.id)]?.timesReviewed ?? 0)));
-
-        const desired = settings.word_review_count ?? 20;
+    
+        const desired = desiredCountParam ? Number(desiredCountParam) : settings.word_review_count ?? 20;
         const n = Math.min(desired, pool.length);
         queue = weightedSample(pool, weights, n);
     }

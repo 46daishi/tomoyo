@@ -28,24 +28,28 @@
         return keyed.slice(0, n).map((k) => k.item);
     }
 
+    const desiredCountParam = page.url.searchParams.get('count');
+    const onlyTranslatedParam = page.url.searchParams.get('onlyTranslated');
+    
     async function loadQueue() {
         settings = await loadSettings();
-        const pool = await getSentenceReviewPool({
-            mediaId,
-            onlyTranslated: settings.only_review_translated ?? false,
-        });
+    
+        const onlyTranslated = onlyTranslatedParam !== null
+            ? onlyTranslatedParam === '1'
+            : settings.only_review_translated ?? false;
+    
+        const pool = await getSentenceReviewPool({ mediaId, onlyTranslated });
         if (pool.length === 0) {
             queue = [];
             return;
         }
-
+    
         const weighting = await getReviewWeighting('sentence', null);
         const weights = pool.map((s) => 1 / (1 + (weighting[s.sentence_text]?.timesReviewed ?? 0)));
-
-        const desired = settings.sentence_review_count ?? 20;
+    
+        const desired = desiredCountParam ? Number(desiredCountParam) : settings.sentence_review_count ?? 20;
         const n = Math.min(desired, pool.length);
         queue = weightedSample(pool, weights, n);
-        console.log('pool size:', pool.length, 'onlyTranslated:', settings.only_review_translated, 'mediaId:', mediaId);
     }
 
     function formatDuration(seconds) {
