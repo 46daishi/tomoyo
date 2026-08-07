@@ -487,7 +487,7 @@
     .sentence-window {
         position: relative;
         width: 100%;
-        max-width: 800px;
+        max-width: 900px;
         min-height: 200px;
         margin-top: 2rem;
         background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 70%, #000);

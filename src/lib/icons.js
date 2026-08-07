@@ -39,4 +39,5 @@ export const ICONS = {
   hourglass: "\uf254",
   calendar: "\uf073",
   right: "\uea9c",
+  clock: "\uf017",
 };

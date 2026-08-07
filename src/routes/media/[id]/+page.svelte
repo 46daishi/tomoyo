@@ -17,6 +17,7 @@
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SentenceViewer from '$lib/components/SentenceWindow.svelte';
     import MediaFormModal from '$lib/components/MediaFormModal.svelte';
+    import MediaStats from '$lib/components/MediaStats.svelte';
 
     let settings = $state(null);
     let showEditModal = $state(false);
@@ -56,7 +57,9 @@
 {#key mediaId}
     <main class="page home">
         {#if media}
-            <MediaHeader {media} />
+            <MediaHeader {media}>
+                <MediaStats {mediaId} {media} refreshKey={session.running} />
+            </MediaHeader>
         {/if}
 
         <SentenceViewer {settings} {miniMode} {session} {mediaId} mediaTag={media?.tag ?? media?.title} />

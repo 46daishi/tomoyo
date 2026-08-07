@@ -2,7 +2,7 @@
     import { coverSrc } from '$lib/db';
     import { STATUS_COLORS } from '$lib/constants.js';
 
-    let { media } = $props();
+    let { media, children } = $props();
 </script>
 
 <div class="media-header">
@@ -28,6 +28,12 @@
                 {media.status}
             </span>
         </div>
+
+        {#if children}
+            <div class="media-stats-slot">
+                {@render children()}
+            </div>
+        {/if}
     </div>
 </div>
 
@@ -40,18 +46,18 @@
     }
 
     .media-header {
-        display: flex;
-        gap: 1.5rem;
-        align-items: flex-start;
-        width: 100%;
-        max-width: 800px;
-        margin-top: 1rem;
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+            width: 100%;
+            max-width: 900px;
+            margin-top: 1rem;
     }
 
     .cover {
         flex-shrink: 0;
         aspect-ratio: 2 / 3;
-        width: 130px;
+        width: 153px;
         border-radius: 10px;
         overflow: hidden;
         background: var(--surface1, #313244);
@@ -71,12 +77,19 @@
     }
 
     .media-info {
+        flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         align-items: flex-start;
         text-align: left;
         gap: 0.3rem;
-        padding-top: 0.4rem;
+        padding-top: 0.2rem;
+    }
+
+    .media-stats-slot {
+        width: 100%;
+        margin-top: 0.75rem;
     }
 
     .media-title {
@@ -93,17 +106,18 @@
     }
 
     .status {
+        padding-top: 0.2rem;
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        font-size: 0.85rem;
+        font-size: 1rem;
         color: var(--theme-textSecondary, #b3b3b3);
         text-transform: capitalize;
     }
 
     .status-dot {
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
         background: var(--dot-color, var(--theme-textSecondary, #b3b3b3));
         flex-shrink: 0;
