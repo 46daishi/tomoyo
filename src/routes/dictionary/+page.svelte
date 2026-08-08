@@ -2,7 +2,7 @@
     import { page } from '$app/state';
     import { onMount } from 'svelte';
     import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, getReviewPool, getSentenceReviewPool } from '$lib/dictionary.js';
-    import { getFrequentUnknownWords, getMediaTagsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
+    import { getFrequentUnknownWords, getMediaTagsForWordIds, getMediaIdsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
@@ -166,8 +166,13 @@
         const mergedItems = Array.from(merged.values()).map(({ _bestCount, ...rest }) => rest);
     
         const tagsByWordId = await getMediaTagsForWordIds(mergedItems.map((item) => item.entry.id));
-    
-        frequentWords = mergedItems.map((item) => ({ ...item, tags: tagsByWordId[item.entry.id] ?? [] }));
+        const mediaIdsByWordId = await getMediaIdsForWordIds(mergedItems.map((item) => item.entry.id));
+        
+        frequentWords = mergedItems.map((item) => ({
+            ...item,
+            tags: tagsByWordId[item.entry.id] ?? [],
+            mediaIds: mediaIdsByWordId[item.entry.id] ?? [],
+        }));
         frequentLoaded = true;
     }
 

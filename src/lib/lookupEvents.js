@@ -51,6 +51,24 @@ export async function getMediaTagsForWordIds(wordIds) {
     return map;
 }
 
+export async function getMediaIdsForWordIds(wordIds) {
+    if (wordIds.length === 0) return {};
+    const wanted = new Set(wordIds);
+    const db = await getDb();
+    const rows = await db.select(
+        `SELECT word_id, GROUP_CONCAT(DISTINCT media_id) as media_ids
+         FROM lookup_events
+         WHERE media_id IS NOT NULL AND word_id IS NOT NULL
+         GROUP BY word_id`
+    );
+    const map = {};
+    for (const row of rows) {
+        if (!wanted.has(row.word_id)) continue;
+        map[row.word_id] = row.media_ids ? row.media_ids.split(',').map(Number) : [];
+    }
+    return map;
+}
+
 export async function dismissUnknownWords(surfaceTexts) {
     if (!surfaceTexts || surfaceTexts.length === 0) return;
     const db = await getDb();
