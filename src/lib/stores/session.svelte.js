@@ -1,4 +1,4 @@
-import { startSession, endSession, recordSentenceRead } from '$lib/sessions.js';
+import { startSession, endSession, recordSentenceRead, logSentenceRead } from '$lib/sessions.js';
 
 export function createSessionStore(mediaId) {
     let running = $state(false);
@@ -23,9 +23,10 @@ export function createSessionStore(mediaId) {
         }
     }
 
-    async function recordSentence(mojiCount) {
+    async function recordSentence(sentenceText) {
         if (sessionId) {
-            await recordSentenceRead(sessionId, mojiCount);
+            await recordSentenceRead(sessionId, sentenceText.length);
+            await logSentenceRead({ sessionId, mediaId, sentenceText });
         }
     }
 

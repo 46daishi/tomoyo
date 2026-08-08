@@ -79,7 +79,7 @@
         tooltipVisible = false;
         cycleSkip = 0;
 
-        session?.recordSentence(text.length);
+        session?.recordSentence(text);
     }
 
     $effect(() => {

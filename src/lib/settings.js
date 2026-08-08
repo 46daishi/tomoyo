@@ -77,6 +77,7 @@ export const SETTINGS_SCHEMA = [
               subRow: true,
               showIf: (s) => s.input_mode === 'websocket',
           },
+          { key: 'estimate_coverage', label: "Estimate media vocabulary coverage", type: 'checkbox' },
           { key: 'discord_rpc_enabled', label: 'Discord Rich Presence', type: 'checkbox' },
             {
                 key: 'data_actions',

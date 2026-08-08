@@ -1,18 +1,24 @@
 <script>
     import { getMediaStats } from '$lib/sessions.js';
+    import { getVocabularyCoverage } from '$lib/coverage';
     import { ICONS } from '$lib/icons';
 
-    let { mediaId, media, refreshKey } = $props();
+    let { mediaId, media, refreshKey, settings } = $props();
 
     let stats = $state({ last_active: null, moji_read: 0, reading_seconds: 0, words_mined: 0, session_count: 0 });
+    let vocab = $state({ gathering: true, percentage: null });
 
     async function load() {
         stats = await getMediaStats(mediaId);
+        if (settings?.estimate_coverage) {
+            vocab = await getVocabularyCoverage(mediaId);
+        }
     }
 
     $effect(() => {
         mediaId;
         refreshKey;
+        settings?.estimate_coverage;
         load();
     });
 
@@ -80,6 +86,19 @@
         </div>
         <div class="stat-value-label">total words mined</div>
     </div>
+
+    {#if settings?.estimate_coverage}
+            <div class="stat-tile">
+                <span class="bar"></span>
+                <div class="stat-header">
+                    <span class="stat-icon">{@html ICONS.star_half ?? ''}</span>
+                    <div class="stat-value">{vocab.gathering ? 'Gathering data…' : `${vocab.percentage}% coverage`}</div>
+                </div>
+                <div class="stat-value-label">
+                    {vocab.gathering ? 'vocabulary coverage' : 'last 100 sentences'}
+                </div>
+            </div>
+        {/if}
     
 </div>
 
@@ -134,7 +153,7 @@
         font-weight: 700;
         color: var(--theme-text, #f4f4f4);
         font-variant-numeric: tabular-nums;
-        line-height: 1.1;
+        line-height: 1.3;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;

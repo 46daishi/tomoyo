@@ -40,4 +40,5 @@ export const ICONS = {
   calendar: "\uf073",
   right: "\uea9c",
   clock: "\uf017",
+  star_half: "\ueb5a",
 };

@@ -10,6 +10,7 @@ pub struct AppSettings {
     pub font_family: String,
     pub font_size: u32,
     pub discord_rpc_enabled: bool,
+    pub estimate_coverage: bool,
 
     // ── Lookup ──
     pub lookup_mode: String, // "click" | "hover" | "hotkey"
@@ -55,6 +56,7 @@ impl Default for AppSettings {
             font_family: "Noto Sans JP".into(),
             font_size: 32,
             discord_rpc_enabled: false,
+            estimate_coverage: true,
 
             lookup_mode: "click".into(),
             lookup_hotkey: "AltLeft".into(),

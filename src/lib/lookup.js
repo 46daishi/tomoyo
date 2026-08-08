@@ -18,32 +18,28 @@ export async function lookupAtPosition(text, position, skip = 0) {
     return await invoke('lookup_at_position', { text, position, skip });
 }
 
-export async function findKnownWordSpans(text, knownWordsMap) {
-    if (!text || knownWordsMap.size === 0) return [];
-
+export async function scanSentenceSpans(text) {
+    if (!text) return [];
     const chars = [...text];
     const spans = [];
     let pos = 0;
 
     while (pos < chars.length) {
         const result = await lookupAtPosition(text, pos, 0);
-
-        if (result && result.entries.length > 0) {
-            const match = result.entries.find((e) => knownWordsMap.has(e.id));
-            if (match) {
-                spans.push({
-                    start: result.start,
-                    end: result.end,
-                    wordId: match.id,
-                    status: knownWordsMap.get(match.id),
-                });
-                pos = result.end; // skip past the whole matched span
-                continue;
-            }
-        }
-
-        pos += 1;
+        if (!result) { pos += 1; continue; }
+        spans.push({
+            start: result.start,
+            end: result.end,
+            wordId: result.entries.length > 0 ? result.entries[0].id : null,
+        });
+        pos = result.end;
     }
-
     return spans;
+}
+
+export async function findKnownWordSpans(text, knownWordsMap) {
+    const allSpans = await scanSentenceSpans(text);
+    return allSpans
+        .filter((s) => s.wordId !== null && knownWordsMap.has(s.wordId))
+        .map((s) => ({ ...s, status: knownWordsMap.get(s.wordId) }));
 }

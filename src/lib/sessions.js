@@ -63,3 +63,11 @@ export async function getMediaStats(mediaId) {
 
     return { ...session, words_mined: words.words_mined ?? 0 };
 }
+
+export async function logSentenceRead({ sessionId, mediaId, sentenceText }) {
+    const db = await getDb();
+    await db.execute(
+        'INSERT INTO sentence_read_events (session_id, media_id, sentence_text) VALUES ($1, $2, $3)',
+        [sessionId, mediaId, sentenceText]
+    );
+}

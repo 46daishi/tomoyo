@@ -79,7 +79,7 @@
     <main class="page home" style={`--page-glow: ${glowColor}; --page-glow-soft: color-mix(in srgb, ${glowColor} 30%, transparent)`}>
         {#if media}
             <MediaHeader {media}>
-                <MediaStats {mediaId} {media} refreshKey={session.running} />
+                <MediaStats {mediaId} {media} refreshKey={session.running} {settings}/>
             </MediaHeader>
         {/if}
 

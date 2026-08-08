@@ -372,6 +372,12 @@ pub fn run() {
             sql: include_str!("../migrations/0010_reviews.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 11,
+            description: "sentences_read_events",
+            sql: include_str!("../migrations/0011_sentences_read_events.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
