@@ -16,7 +16,6 @@ use zstd::Decoder;
 use serde::Deserialize;
 use std::collections::HashSet;
 use discord_rpc::DiscordState;
-use discord_rich_presence::{DiscordIpc};
 
 #[derive(Serialize)]
 struct TokenOut {
@@ -35,6 +34,7 @@ struct DictEntry {
     readings: Vec<String>,
     definitions: Vec<String>,
     pos: Vec<String>,
+    priority: Vec<String>,
 }
 
 struct DictionaryIndex {
@@ -82,6 +82,29 @@ impl DictionaryIndex {
     }
 }
 
+fn is_bound_only(entry: &DictEntry) -> bool {
+    !entry.pos.is_empty()
+        && entry.pos.iter().all(|p| p.eq_ignore_ascii_case("suffix") || p.eq_ignore_ascii_case("prefix"))
+}
+
+fn priority_score(entry: &DictEntry) -> u16 {
+    let base = entry.priority.iter().map(|t| match t.as_str() {
+        "ichi1" => 950,
+        "news1" => 900,
+        "gai1"  => 850,
+        "spec1" => 800, // common but not corpus-measured — treat as mid-tier by default
+        "spec2" | "ichi2" | "news2" | "gai2" => 500,
+        t if t.starts_with("nf") => {
+            let n: u16 = t[2..].parse().unwrap_or(48);
+            1000 - n * 10
+        }
+        _ => 0,
+    }).max().unwrap_or(0);
+
+    let is_particle = entry.pos.iter().any(|p| p.eq_ignore_ascii_case("particle"));
+    if is_particle { base + 200 } else { base }
+}
+
 fn find_containing(query: &str, index: &DictionaryIndex, limit: usize) -> Vec<Arc<DictEntry>> {
     let normalized = normalize::normalize_text(query);
     if normalized.is_empty() {
@@ -112,25 +135,29 @@ fn find_containing(query: &str, index: &DictionaryIndex, limit: usize) -> Vec<Ar
         }
     }
 
-    let mut results = Vec::new();
+    let mut results: Vec<(Arc<DictEntry>, bool)> = Vec::new();
     for id in candidates {
         if let Some(entry) = index.by_id.get(&id) {
-            let actually_contains = entry
-                .spellings
-                .iter()
-                .chain(entry.readings.iter())
-                .any(|s| normalize::normalize_text(s).contains(&normalized));
-
+            let forms: Vec<String> = entry.spellings.iter().chain(entry.readings.iter())
+                .map(|s| normalize::normalize_text(s))
+                .collect();
+    
+            let is_exact = forms.iter().any(|f| f == &normalized);
+            let actually_contains = is_exact || forms.iter().any(|f| f.contains(&normalized));
+    
             if actually_contains {
-                results.push(Arc::clone(entry));
-                if results.len() >= limit {
-                    break;
-                }
+                results.push((Arc::clone(entry), is_exact));
             }
         }
     }
-
-    results
+    
+    results.sort_by(|(a, a_exact), (b, b_exact)| {
+        b_exact.cmp(a_exact)
+            .then(priority_score(b).cmp(&priority_score(a)))
+    });
+    results.truncate(limit);
+    
+    results.into_iter().map(|(e, _)| e).collect()
 }
 
 struct DeconjRulesState(Vec<DeconjRule>);
@@ -235,6 +262,8 @@ fn lookup_from_position(
     None
 }
 
+
+
 /// Tries every normalized variant of `candidate` (there can be more than
 /// one due to chouonpu ambiguity — see normalize::chouonpu_variants)
 /// against the dictionary index: literal match first, then deconjugation.
@@ -252,26 +281,60 @@ fn lookup_candidate(
 ) -> Option<(Vec<Arc<DictEntry>>, Option<String>)> {
     let variants = normalize_variants(candidate);
 
+    // (entry, chain_len, chain_description) — chain_len 0 and no description
+    // means "literal match," anything else means "reached via deconjugation."
+    let mut candidates: Vec<(Arc<DictEntry>, usize, Option<String>)> = Vec::new();
+    let mut seen_ids: HashSet<u32> = HashSet::new();
+
+    // Literal matches first — inserted with chain_len 0, so they win ties
+    // against equal-priority deconjugated results, same as before.
     for key in &variants {
         if let Some(entries) = index.by_text.get(key) {
-            return Some((entries.clone(), None));
-        }
-    }
-
-    let mut best: Option<(usize, Vec<Arc<DictEntry>>, String)> = None;
-    for key in &variants {
-        for form in deconjugate(key, decon_rules, MAX_DECONJUGATION_DEPTH) {
-            if let Some(entries) = index.by_text.get(&form.text) {
-                let chain_len = form.rule_chain.len();
-                let is_better = best.as_ref().map_or(true, |(best_len, _, _)| chain_len < *best_len);
-                if is_better {
-                    best = Some((chain_len, entries.clone(), form.rule_chain.join(" + ")));
+            for e in entries {
+                if seen_ids.insert(e.id) {
+                    candidates.push((Arc::clone(e), 0, None));
                 }
             }
         }
     }
 
-    best.map(|(_, entries, chain)| (entries, Some(chain)))
+    // Deconjugated matches — no longer gated behind "only if no literal
+    // match exists." Entries already found literally are skipped via
+    // seen_ids, so a word never appears twice just because both paths
+    // happened to resolve to it.
+    for key in &variants {
+        for form in deconjugate(key, decon_rules, MAX_DECONJUGATION_DEPTH) {
+            if let Some(entries) = index.by_text.get(&form.text) {
+                let chain_len = form.rule_chain.len();
+                let chain_desc = form.rule_chain.join(" + ");
+                for e in entries {
+                    if seen_ids.insert(e.id) {
+                        candidates.push((Arc::clone(e), chain_len, Some(chain_desc.clone())));
+                    }
+                }
+            }
+        }
+    }
+
+    if candidates.is_empty() {
+        return None;
+    }
+
+    // Priority-tagged entries first; among ties, fewest deconjugation
+    // steps first (literal matches, at 0 steps, sort ahead of anything
+    // requiring inflection to reach).
+    candidates.sort_by(|a, b| {
+        let a_prio = priority_score(&a.0);
+        let b_prio = priority_score(&b.0);
+        b_prio.cmp(&a_prio)
+            .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
+            .then(a.1.cmp(&b.1))
+    });
+
+    let deconjugated_from = candidates[0].2.clone();
+    let entries: Vec<Arc<DictEntry>> = candidates.into_iter().map(|(e, _, _)| e).collect();
+
+    Some((entries, deconjugated_from))
 }
 
 struct DictState(DictionaryIndex);
