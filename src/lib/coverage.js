@@ -3,7 +3,7 @@ import { scanSentenceSpans } from '$lib/lookup.js';
 import { getKnownWordsMap } from '$lib/dictionary.js';
 
 const STATUS_WEIGHT = { 0: 0.10, 1: 0.30, 2: 0.50, 3: 0.80, 4: 1.00 };
-const MIN_MINED_WORDS_THRESHOLD = 0;
+const MIN_MINED_WORDS_THRESHOLD = 300;
 
 export async function getVocabularyCoverage(mediaId) {
     const db = await getDb();
