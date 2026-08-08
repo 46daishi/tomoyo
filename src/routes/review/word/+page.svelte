@@ -8,7 +8,8 @@
     import { loadSettings } from '$lib/settings.js';
     import { getReviewPool, updateWordStatus } from '$lib/dictionary.js';
     import { getReviewWeighting, startReviewSession, endReviewSession, logReviewedItem } from '$lib/reviewStats.js';
-
+    import { setReviewProgress } from '$lib/stores/presence.svelte';
+    
     const mediaId = page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null;
 
     let settings = $state(null);
@@ -61,6 +62,9 @@
     }
 
     function advance() {
+        setReviewProgress(queue.length > 0
+            ? `${index+1}/${queue.length} reviewed`
+            : null);
         revealed = false;
         if (index + 1 >= queue.length) {
             finishReview();
@@ -119,10 +123,14 @@
         startTime = Date.now();
         await loadQueue();
         sessionId = await startReviewSession('word', mediaId);
+        setReviewProgress(queue.length > 0
+            ? `${index}/${queue.length} reviewed`
+            : null);
     });
 
     onDestroy(() => {
         if (sessionId && !done) endReviewSession(sessionId);
+        setReviewProgress(null);
     });
 </script>
 

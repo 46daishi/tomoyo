@@ -8,7 +8,8 @@
     import { getSentenceReviewPool } from '$lib/dictionary.js';
     import { getReviewWeighting, startReviewSession, endReviewSession, logReviewedItem } from '$lib/reviewStats.js';
     import InteractiveSentenceText from '$lib/components/InteractiveSentenceText.svelte';
-
+    import { setReviewProgress } from '$lib/stores/presence.svelte.js';
+    
     const mediaId = page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null;
 
     let settings = $state(null);
@@ -63,11 +64,15 @@
         await logReviewedItem({ sessionId, reviewType: 'sentence', itemKey: currentSentence.sentence_text, mediaId });
 
         translationOpen = false;
+        setReviewProgress(queue.length > 0
+          ? `${index + 1}/${queue.length} reviewed`
+          : null);
         if (index + 1 >= queue.length) {
             await finishReview();
         } else {
             index += 1;
         }
+        
     }
 
     async function finishReview() {
@@ -92,15 +97,19 @@
             advance();
         }
     }
-
+    
     onMount(async () => {
         startTime = Date.now();
         await loadQueue();
         sessionId = await startReviewSession('sentence', mediaId);
+        setReviewProgress(queue.length > 0
+            ? `${index}/${queue.length} reviewed`
+            : null);
     });
 
     onDestroy(() => {
         if (sessionId && !done) endReviewSession(sessionId);
+        setReviewProgress(null);
     });
 </script>
 
