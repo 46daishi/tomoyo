@@ -102,10 +102,10 @@
     onAction={() => history.back()} 
   />
   <ActionButton 
-    icon={ICONS.edit} 
+    icon={ICONS.book} 
     variant="secondary" 
     size="small" 
-    onAction={() => (showEditModal = true)} 
+    onAction={() => goto(`/dictionary?media=${mediaId}`)}
   />
   <div class="stats-btn-wrap">
     {#if mediaCoverSrc}
@@ -119,10 +119,10 @@
     />
   </div>
   <ActionButton 
-    icon={ICONS.book} 
+    icon={ICONS.edit} 
     variant="secondary" 
     size="small" 
-    onAction={() => goto(`/dictionary?media=${mediaId}`)}
+    onAction={() => (showEditModal = true)} 
   />
   <ActionButton
     icon={session.running ? ICONS.pause : ICONS.play}
@@ -207,5 +207,10 @@
         border-radius: 100px;
         pointer-events: none;
         z-index: 1;
+        transition: opacity 0.2s ease;
+    }
+
+    .stats-btn-wrap:hover .cover-cover {
+        opacity: 0.3;
     }
 </style>

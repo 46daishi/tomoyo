@@ -342,5 +342,10 @@
         border-radius: 100px;
         pointer-events: none;
         z-index: 1;
+        transition: opacity 0.2s ease;
+    }
+
+    .stats-btn-wrap:hover .profile-cover {
+        opacity: 0.3;
     }
 </style>
