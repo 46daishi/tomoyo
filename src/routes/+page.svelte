@@ -79,7 +79,8 @@
     <div class="toolbar">
         <SelectInput
             options={FILTER_OPTIONS}
-            bind:value={statusFilter}
+            value={statusFilter}
+            on:change={(e) => (statusFilter = e.target.value)}
         />
         <ActionButton
             icon={ICONS.plus}
@@ -134,12 +135,6 @@
     {#if mediaList.length === 0}
         <div class="empty-notice">
             <p>No media added yet.</p>
-            <ActionButton
-                icon={ICONS.plus}
-                variant="primary"
-                size="small"
-                onAction={openAddModal}
-            />
         </div>
     {:else if filtered.length === 0}
         <p class="empty-notice">There are no media entries that match this query.</p>
@@ -159,6 +154,7 @@
     icon={ICONS.stats}
     variant="secondary"
     size="small"
+    onAction={() => goto('/statistics')}
   />
   <ActionButton
     icon={ICONS.book}

@@ -91,7 +91,7 @@
             <div class="stat-tile">
                 <span class="bar"></span>
                 <div class="stat-header">
-                    <span class="stat-icon">{@html ICONS.star_half ?? ''}</span>
+                    <span class="stat-icon">{@html ICONS.half_circle ?? ''}</span>
                     <div class="stat-value">{vocab.gathering ? 'Gathering data…' : `${vocab.percentage}% coverage`}</div>
                 </div>
                 <div class="stat-value-label">

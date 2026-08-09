@@ -41,4 +41,9 @@ export const ICONS = {
   right: "\uea9c",
   clock: "\uf017",
   star_half: "\ueb5a",
+  book_open: "\uf405",
+  half_circle: "\udb84\udf96",
+  fire2: "\udb86\udc07",
+  calendar2: "\udb80\udced",
+  star: "\uf41e",
 };

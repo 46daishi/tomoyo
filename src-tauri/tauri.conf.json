@@ -20,7 +20,7 @@
       "security": {
           "assetProtocol": {
               "enable": true,
-              "scope": ["$APPDATA/covers/*"]
+              "scope": ["$APPDATA/covers/*", "$APPDATA/profile/*"]
           }
       }
   },

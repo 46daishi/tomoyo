@@ -18,7 +18,7 @@
     "core:event:allow-listen",
     {
       "identifier": "fs:scope",
-      "allow": ["$APPDATA/covers", "$APPDATA/covers/**"]
+      "allow": ["$APPDATA/covers", "$APPDATA/covers/**", "$APPDATA/profile", "$APPDATA/profile/**"]
     }
   ]
 }

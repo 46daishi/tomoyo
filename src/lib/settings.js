@@ -69,6 +69,8 @@ export const SETTINGS_SCHEMA = [
         label: 'General',
         options: [
           { key: 'theme', label: 'Theme', type: 'theme' },
+          { key: 'username', label: 'Username', type: 'text', placeholder: 'Your name' },
+          { key: 'profile_picture', label: 'Profile picture', type: 'image' },
           { key: 'input_mode', label: 'Input source', type: 'select', options: INPUT_MODE_OPTIONS },
           {
               key: 'websocket_address',
@@ -77,7 +79,6 @@ export const SETTINGS_SCHEMA = [
               subRow: true,
               showIf: (s) => s.input_mode === 'websocket',
           },
-          { key: 'estimate_coverage', label: "Estimate media vocabulary coverage", type: 'checkbox' },
           { key: 'discord_rpc_enabled', label: 'Discord Rich Presence', type: 'checkbox' },
             {
                 key: 'data_actions',
@@ -166,8 +167,9 @@ export const SETTINGS_SCHEMA = [
         { key: 'default_dictionary_sort', label: 'Default sorting in dictionary', type: 'select', options: DICTIONARY_SORT_OPTIONS },
         { key: 'track_unknown_words', label: 'Track commonly looked-up words not in dictionary', type: 'checkbox' },
         { key: 'unknown_words_count', label: "Number of words to show", type: 'number', subRow: true, showIf: (s) => s.track_unknown_words },
-        { key: 'word_sentence_count', label: "Number of sentences to display under a word", type: 'number' }
-        ],
+        { key: 'word_sentence_count', label: "Number of sentences to display under a word", type: 'number' },
+        { key: 'estimate_coverage', label: "Estimate media vocabulary coverage", type: 'checkbox' },
+      ],
     },
     {
         id: 'review',

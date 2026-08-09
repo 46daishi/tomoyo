@@ -5,6 +5,7 @@
     import { loadSettings, saveSettings } from '$lib/settings.js';
     import { SETTINGS_SCHEMA } from '$lib/settings.js';
     import SettingField from '$lib/components/SettingField.svelte';
+    import { pickProfilePicture } from '$lib/db.js';
     import { discordEnabled } from '$lib/stores/discordSettings.js';
 
     let settings = $state(null);
@@ -35,6 +36,13 @@
             // wire to your export logic
         } else if (action === 'import') {
             // wire to your import logic
+        } else if (action === 'pick_profile_picture') {
+            pickProfilePicture().then((path) => {
+                if (path) {
+                    settings.profile_picture = path;
+                    queueSave();
+                }
+            });
         }
     }
 

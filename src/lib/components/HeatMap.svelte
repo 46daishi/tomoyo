@@ -6,13 +6,16 @@
      * Props:
      * data         – Array<{ date: string, studyMinutes: number }>
      * palette      - Array of colors from lowest to highest intensity
-     * weeks        – maximum number of weeks to show (default 52)
+     * weeks        – maximum number of weeks to show (default 52); used when `year` is null
+     * year         – when set (number), renders that full calendar year (Jan 1 – Dec 31)
+     * formatValue  - formatter for the tooltip value
      */
      import { formatDateFull, formatMinutes } from "$lib/utils/chartFormatters.js";
      
      export let data = [];
      export let primaryColor = "var(--theme-accent)";
      export let weeks = 52;
+     export let year = /** @type {number | null} */ (null);
      export let formatValue = formatMinutes;
          
      // Dynamically generate a 9-step palette using modern CSS color-mix()
@@ -35,78 +38,111 @@
     let wrapEl;
     let W = 0;
 
-    // ── Constants ─────────────────────────────────────────────────────────── [...]
-    const CELL      = 13;
-    const GAP       =  3;
-    const DAY_LBL_W = 28;
-    const MONTH_H   = 20;
-
-    // How many weeks actually fit in the current width
-    $: visibleWeeks = W > 0
-        ? Math.min(weeks, Math.max(1, Math.floor((W - DAY_LBL_W) / (CELL + GAP))))
-        : weeks;
-        
-    $: svgW = DAY_LBL_W + visibleWeeks * (CELL + GAP) - GAP;
-    $: svgH = MONTH_H   + 7          * (CELL + GAP) - GAP;
+    // ── Constants ───────────────────────────────────────────────────────────
+    const GAP            =  3;
+    const DAY_LBL_W      = 28;
+    const MONTH_H        = 20;
+    const CELL_TRAILING  = 13;
 
     // ── Date-keyed lookup ─────────────────────────────────────────────────────
     $: dataMap = Object.fromEntries(
         data.map((d) => [d.date, d.studyMinutes ?? 0]),
     );
 
-    // ── Grid ───────────────────────────────────────────────────────────[...]
+    // ── Grid ────────────────────────────────────────────────────────────────
+    // Full calendar year (Jan 1 – Dec 31) when `year` is set, otherwise the
+    // trailing `weeks` columns ending today.
+    $: visibleWeeks = W > 0
+        ? Math.min(weeks, Math.max(1, Math.floor((W - DAY_LBL_W) / (CELL_TRAILING + GAP))))
+        : weeks;
+
     $: grid = (() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
-
         const cols = [];
-        for (let w = visibleWeeks - 1; w >= 0; w--) {
-            const col = [];
-            for (let d = 0; d < 7; d++) {
-                const date = new Date(weekStart);
-                date.setDate(weekStart.getDate() - w * 7 + d);
-              
-                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-                col.push({
-                    date,
-                    key,
-                    mins: dataMap[key] ?? 0,
-                    isFuture: date > today,
-                });
+        if (year !== null) {
+            const colStart = new Date(year, 0, 1);
+            colStart.setDate(colStart.getDate() - colStart.getDay());      // back to Sunday
+            const colEnd = new Date(year, 11, 31);
+            colEnd.setDate(colEnd.getDate() + (6 - colEnd.getDay()));      // forward to Saturday
+
+            const cursor = new Date(colStart);
+            while (cursor <= colEnd) {
+                const col = [];
+                for (let d = 0; d < 7; d++) {
+                    const date = new Date(cursor);
+                    date.setDate(cursor.getDate() + d);
+                    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                    col.push({
+                        date,
+                        key,
+                        mins: dataMap[key] ?? 0,
+                        isFuture: date > today,
+                        inYear: date.getFullYear() === year,
+                    });
+                }
+                cols.push(col);
+                cursor.setDate(cursor.getDate() + 7);
             }
-            cols.push(col);
+        } else {
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            for (let w = visibleWeeks - 1; w >= 0; w--) {
+                const col = [];
+                for (let d = 0; d < 7; d++) {
+                    const date = new Date(weekStart);
+                    date.setDate(weekStart.getDate() - w * 7 + d);
+                    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                    col.push({
+                        date,
+                        key,
+                        mins: dataMap[key] ?? 0,
+                        isFuture: date > today,
+                        inYear: true,
+                    });
+                }
+                cols.push(col);
+            }
         }
         return cols;
     })();
 
+    $: numWeeks = grid.length;
+
+    // In full-year mode the cells stretch to fill the available width so the
+    // grid ends right at the edge instead of leaving dead space on the right.
+    $: CELL = year !== null
+        ? W > 0
+            ? Math.min(22, Math.max(6, (W - DAY_LBL_W - (numWeeks - 1) * GAP) / numWeeks))
+            : 12
+        : CELL_TRAILING;
+
+    $: svgW = DAY_LBL_W + numWeeks * (CELL + GAP) - GAP;
+    $: svgH = MONTH_H   + 7          * (CELL + GAP) - GAP;
+
     // ── Intensity & Colors ────────────────────────────────────────────────────
     $: maxMins = Math.max(...data.map((d) => d.studyMinutes ?? 0), 1);
 
-    // Replaces the old 0-4 intensity function with a dynamic proportional scale
     function getColor(mins) {
         if (mins <= 0) return palette[0];
-        
         const r = mins / maxMins; // Ratio between 0.0 and 1.0
         const maxIndex = palette.length - 1;
-        
-        // Math.ceil ensures that even tiny amounts get at least index 1
         const index = Math.max(1, Math.ceil(r * maxIndex));
         return palette[Math.min(index, maxIndex)];
     }
 
-    // ── Month labels ────────────────────────────────────────────────────────── [...]
+    // ── Month labels ──────────────────────────────────────────────────────────
     $: monthLabels = (() => {
         const out = [];
         let last = -1;
         grid.forEach((col, wi) => {
-            const m = col[0].date.getMonth();
+            const anchor = col.find((c) => c.inYear) ?? col[0];
+            const m = anchor.date.getMonth();
             if (m !== last) {
                 out.push({
                     wi,
-                    label: col[0].date.toLocaleDateString("ja-JP", { month: "short" }),
+                    label: anchor.date.toLocaleDateString("ja-JP", { month: "short" }),
                 });
                 last = m;
             }
@@ -125,8 +161,8 @@
     
     function hideTooltip() { tooltip = null; }
 
-    $: ttX = tooltip ? Math.min(tooltip.x + 14, (W || 400) - 180) : 0;
-    $: ttY = tooltip ? Math.max(tooltip.y - 40, 4) : 0;
+    $: ttX = tooltip ? Math.min(Math.max(tooltip.x, 70), (W || 400) - 70) : 0;
+    $: ttY = tooltip ? Math.max(tooltip.y - 48, 8) : 0;
 
     // ── Day labels ────────────────────────────────────────────────────────── [...]
     const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
@@ -170,9 +206,11 @@
                         rx="2" ry="2"
                         class="cell"
                         class:future={cell.isFuture}
+                        class:offyear={!cell.inYear}
                         style="fill: {getColor(cell.mins)};"
-                        on:mouseenter={(e) => !cell.isFuture && showTooltip(e, cell)}
-                        on:mousemove={(e)  => !cell.isFuture && showTooltip(e, cell)}
+                        role="presentation"
+                        on:mouseenter={(e) => cell.inYear && !cell.isFuture && showTooltip(e, cell)}
+                        on:mousemove={(e)  => cell.inYear && !cell.isFuture && showTooltip(e, cell)}
                         on:mouseleave={hideTooltip}
                     />
                 {/each}
@@ -219,16 +257,21 @@
         opacity: 0.1;
     }
 
+    .cell.offyear {
+        opacity: 0.12;
+    }
+
     .tooltip {
         position: absolute;
         pointer-events: none;
+        transform: translateX(-50%);
         background: var(--theme-background, #1a1a1a);
         border: 1px solid var(--theme-border, #404040);
         border-radius: 8px;
         padding: 8px 12px;
         font-size: 0.8rem;
         color: var(--theme-text, #f6f6f6);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 4px 16px var(--theme-shadow, rgba(0, 0, 0, 0.5));
         white-space: nowrap;
         z-index: 999;
     }

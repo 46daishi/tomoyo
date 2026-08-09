@@ -12,6 +12,10 @@ pub struct AppSettings {
     pub discord_rpc_enabled: bool,
     pub estimate_coverage: bool,
 
+    // ── Profile ──
+    pub username: String,
+    pub profile_picture: String,
+
     // ── Lookup ──
     pub lookup_mode: String, // "click" | "hover" | "hotkey"
     pub lookup_hotkey: String,
@@ -57,6 +61,9 @@ impl Default for AppSettings {
             font_size: 32,
             discord_rpc_enabled: false,
             estimate_coverage: true,
+
+            username: "Reader".into(),
+            profile_picture: String::new(),
 
             lookup_mode: "click".into(),
             lookup_hotkey: "AltLeft".into(),

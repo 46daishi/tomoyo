@@ -37,3 +37,24 @@ export async function pickCoverImage() {
 export function coverSrc(path) {
     return path ? convertFileSrc(path) : null;
 }
+
+export async function pickProfilePicture() {
+    const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+    });
+    if (!selected) return null;
+
+    const dataDir = await appDataDir();
+    const profileDir = await join(dataDir, 'profile');
+    if (!(await exists(profileDir))) {
+        await mkdir(profileDir, { recursive: true });
+    }
+
+    const ext = selected.split('.').pop();
+    const filename = `${crypto.randomUUID()}.${ext}`;
+    const destPath = await join(profileDir, filename);
+
+    await copyFile(selected, destPath);
+    return destPath; // store this in the settings
+}

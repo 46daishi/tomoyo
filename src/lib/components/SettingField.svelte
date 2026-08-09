@@ -3,6 +3,7 @@
     import ThemeGrid from '$lib/components/ThemeGrid.svelte';
     import HotkeyInput from '$lib/components/HotkeyInput.svelte';
     import MultiSelectInput from './MultiSelectInput.svelte';
+    import { coverSrc } from '$lib/db.js';
 
     let { option, settings = $bindable(), onChange, onAction } = $props();
 
@@ -79,6 +80,18 @@
                     <button class="modal-btn" onclick={() => onAction(btn.action)}>{btn.label}</button>
                 {/each}
             </div>
+        {:else if option.type === 'image'}
+            <button
+                class="profile-picker"
+                title="Choose a profile picture"
+                onclick={() => onAction('pick_profile_picture')}
+            >
+                {#if settings[option.key]}
+                    <img src={coverSrc(settings[option.key])} alt="" />
+                {:else}
+                    <span>+ Picture</span>
+                {/if}
+            </button>
         {:else if option.type === 'multi_select'}
             <MultiSelectInput
                 options={option.options}
@@ -125,8 +138,34 @@
         gap: 0.5rem;
     }
 
-    .setting-x {
+    .profile-picker {
+        flex-shrink: 0;
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        border: 2px dashed var(--theme-border, #404040);
+        background: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        padding: 0;
         color: var(--theme-textSecondary, #b3b3b3);
+        font-family: inherit;
+        font-size: 0.8rem;
+        transition: border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .profile-picker:hover {
+        border-color: var(--theme-primary, #36b7bd);
+        color: var(--theme-primary, #36b7bd);
+    }
+
+    .profile-picker img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
     }
 
     .settings-number-input {
