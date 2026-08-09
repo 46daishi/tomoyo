@@ -14,8 +14,8 @@
 
     let total = $derived(data.reduce((sum, d) => sum + d.value, 0));
 
-    const R = 60;
-    const STROKE = 26;
+    const R = 70;
+    const STROKE = 18;
     const C = 2 * Math.PI * R;
     const GAP = 2.5;
 
@@ -96,7 +96,7 @@
     .donut-wrap {
         position: relative;
         flex-shrink: 0;
-        width: 180px;
+        width: 200px;
     }
 
     .donut-svg {
@@ -124,14 +124,19 @@
         gap: 2px;
         pointer-events: none;
         text-align: center;
+        padding: 0 16px;
+        box-sizing: border-box;
     }
 
     .center-value {
-        font-size: 1.4rem;
+        font-size: 1.45rem;
         font-weight: 700;
         color: var(--theme-text, #f6f6f6);
         font-variant-numeric: tabular-nums;
         line-height: 1.1;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .center-label {

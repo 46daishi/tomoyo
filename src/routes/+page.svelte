@@ -270,7 +270,7 @@
     .cover-placeholder {
         width: 100%;
         height: 100%;
-        background: linear-gradient(135deg, var(--surface1, #313244), var(--surface0, #1e1e2e));
+        background: linear-gradient(135deg, color-mix(in srgb, var(--accent, var(--theme-primary, #36b7bd)) 35%, #000), var(--theme-surface, #2d2d2d));
     }
 
     .title {
