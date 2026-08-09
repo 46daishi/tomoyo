@@ -13,6 +13,15 @@ export function initMiniMode(settings, onMiniModeChange) {
     }
 
     function checkWindowSize() {
+        if (settings?.mini_mode_enabled === false) {
+            if (miniMode) {
+                miniMode = false;
+                applyMiniModeClasses(false);
+                onMiniModeChange(false);
+            }
+            return;
+        }
+
         const h = window.innerHeight;
         const enterHeight = settings?.mini_mode_enter_height ?? 200;
         const exitHeight = settings?.mini_mode_exit_height ?? 300;
