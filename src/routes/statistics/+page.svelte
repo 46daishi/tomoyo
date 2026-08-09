@@ -272,21 +272,21 @@
                 <div class="cover-title profile-name">{username}'s stats</div>
                 <ul class="profile-stats">
                     <li class="profile-stat">
-                        <span class="meta-icon" style="color: #89b4fa">{@html ICONS.book_open}</span>
+                        <span class="meta-icon" style="color: var(--theme-primary, #36b7bd)">{@html ICONS.book_open}</span>
                         <span class="meta-label">Media</span>
                         <span class="meta-value">{profileStats.mediaCount.toLocaleString()}</span>
                     </li>
                     <li class="profile-stat">
-                        <span class="meta-icon" style="color: #fab387">{@html ICONS.calendar}</span>
+                        <span class="meta-icon" style="color: var(--theme-primary, #36b7bd)">{@html ICONS.calendar}</span>
                         <span class="meta-value">{formatFirstUsed(profileStats.firstUsed)}</span>
                     </li>
                     <li class="profile-stat">
-                        <span class="meta-icon" style="color: #cba6f7">{@html ICONS.book}</span>
+                        <span class="meta-icon" style="color: var(--theme-primary, #36b7bd)">{@html ICONS.book}</span>
                         <span class="meta-label">Words</span>
                         <span class="meta-value">{profileStats.wordCount.toLocaleString()}</span>
                     </li>
                     <li class="profile-stat">
-                        <span class="meta-icon" style="color: #a6e3a1">{@html ICONS.translate}</span>
+                        <span class="meta-icon" style="color: var(--theme-primary, #36b7bd)">{@html ICONS.translate}</span>
                         <span class="meta-label">Sentences</span>
                         <span class="meta-value">{profileStats.sentenceCount.toLocaleString()}</span>
                     </li>
@@ -305,7 +305,7 @@
                     <div class="cover-title">Stats for {mediaInfo.title}</div>
                     <ul class="media-meta">
                         <li>
-                            <span class="meta-icon" style="color: #FFFF69">{@html ICONS.star}</span>
+                            <span class="meta-icon" style="color: {mediaInfo.color || '#fab387'}">{@html ICONS.star}</span>
                             <span class="meta-label">Status</span>
                             <span class="meta-value-group">
                                 <span class="meta-dot" style="background: {STATUS_COLORS[/** @type {'active' | 'planned' | 'paused' | 'dropped' | 'completed'} */ (mediaInfo.status)] || '#6c7086'}"></span>
@@ -313,19 +313,19 @@
                             </span>
                         </li>
                         <li>
-                            <span class="meta-icon" style="color: white">{@html ICONS.half_circle}</span>
+                            <span class="meta-icon" style="color: {mediaInfo.color || '#fab387'}">{@html ICONS.half_circle}</span>
                             <span class="meta-label">Vocab coverage</span>
                             <span class="meta-value">
                                 {vocabCoverage?.gathering ? 'Gathering…' : vocabCoverage?.percentage != null ? `${vocabCoverage.percentage}%` : '—'}
                             </span>
                         </li>
                         <li>
-                            <span class="meta-icon" style="color: #81FF59">{@html ICONS.plus}</span>
+                            <span class="meta-icon" style="color: {mediaInfo.color || '#fab387'}">{@html ICONS.plus}</span>
                             <span class="meta-label">Words mined</span>
                             <span class="meta-value">{(mediaStats?.words_mined ?? 0).toLocaleString()}</span>
                         </li>
                         <li>
-                            <span class="meta-icon" style="color: #fab387">{@html ICONS.calendar2}</span>
+                            <span class="meta-icon" style="color: {mediaInfo.color || '#fab387'}">{@html ICONS.calendar2}</span>
                             <span class="meta-label">Created</span>
                             <span class="meta-value">{formatMediaDate(mediaInfo.created_at)}</span>
                         </li>
