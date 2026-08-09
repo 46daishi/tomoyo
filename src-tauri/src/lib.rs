@@ -372,6 +372,45 @@ fn tokenize_text(state: tauri::State<TokenizerState>, text: String) -> Vec<Token
         .collect()
 }
 
+#[tauri::command]
+fn export_database(app: tauri::AppHandle, dest: String) -> Result<(), String> {
+    let db_path = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("immersion.db");
+    std::fs::copy(&db_path, &dest).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn import_database(app: tauri::AppHandle, source: String) -> Result<(), String> {
+    let header = std::fs::read(&source).map_err(|e| e.to_string())?;
+    if header.len() < 16 || &header[..16] != b"SQLite format 3\0" {
+        return Err("Selected file is not a valid SQLite database".into());
+    }
+
+    let db_path = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("immersion.db");
+
+    // Remove sidecar files left behind by a previous connection so the
+    // fresh copy starts clean (especially after a crash).
+    for suffix in ["-journal", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{}", db_path.display(), suffix));
+    }
+
+    std::fs::copy(&source, &db_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![
@@ -460,6 +499,7 @@ pub fn run() {
             discord_rpc::disconnect_discord,
             tokenize_text, lookup_at_position,
             get_settings, save_settings,
+            export_database, import_database, restart_app,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

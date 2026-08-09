@@ -4,6 +4,7 @@ import { appDataDir, join } from '@tauri-apps/api/path';
 import { copyFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
+/** @type {import('@tauri-apps/plugin-sql').default | null} */
 let dbInstance = null;
 
 export async function getDb() {
@@ -11,6 +12,13 @@ export async function getDb() {
         dbInstance = await Database.load('sqlite:immersion.db');
     }
     return dbInstance;
+}
+
+export async function closeDb() {
+    if (dbInstance) {
+        await dbInstance.close();
+        dbInstance = null;
+    }
 }
 
 export async function pickCoverImage() {

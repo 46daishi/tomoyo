@@ -1,11 +1,13 @@
 <script>
     import { onMount } from 'svelte';
+    import { invoke } from '@tauri-apps/api/core';
+    import { open, save, confirm } from '@tauri-apps/plugin-dialog';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import { ICONS } from '$lib/icons';
     import { loadSettings, saveSettings } from '$lib/settings.js';
     import { SETTINGS_SCHEMA } from '$lib/settings.js';
     import SettingField from '$lib/components/SettingField.svelte';
-    import { pickProfilePicture } from '$lib/db.js';
+    import { pickProfilePicture, closeDb } from '$lib/db.js';
     import { discordEnabled } from '$lib/stores/discordSettings.js';
 
     let settings = $state(null);
@@ -33,9 +35,9 @@
 
     function handleAction(action) {
         if (action === 'export') {
-            // wire to your export logic
+            handleExport();
         } else if (action === 'import') {
-            // wire to your import logic
+            handleImport();
         } else if (action === 'pick_profile_picture') {
             pickProfilePicture().then((path) => {
                 if (path) {
@@ -44,6 +46,46 @@
                 }
             });
         }
+    }
+
+    async function handleExport() {
+        const dest = await save({
+            title: 'Export database',
+            defaultPath: 'tomoyo-backup.db',
+            filters: [{ name: 'SQLite database', extensions: ['db', 'sqlite'] }],
+        });
+        if (!dest) return;
+        try {
+            await closeDb();
+            await invoke('export_database', { dest });
+        } catch (e) {
+            alert(`Export failed: ${e}`);
+        }
+    }
+
+    async function handleImport() {
+        const source = await open({
+            multiple: false,
+            title: 'Import database',
+            filters: [{ name: 'SQLite database', extensions: ['db', 'sqlite'] }],
+        });
+        if (!source) return;
+
+        const yes = await confirm(
+            'Importing will replace all current data with the contents of the selected database. This cannot be undone. Continue?',
+            { title: 'Import database', kind: 'warning' }
+        );
+        if (!yes) return;
+
+        try {
+            await closeDb();
+            await invoke('import_database', { source });
+        } catch (e) {
+            alert(`Import failed: ${e}`);
+            return;
+        }
+
+        await invoke('restart_app');
     }
 
     let activeTabSchema = $derived(SETTINGS_SCHEMA.find((t) => t.id === activeTab));
