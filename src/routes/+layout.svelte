@@ -40,7 +40,6 @@
           }
         }
         if(path.startsWith("/review/sentence")){
-          console.log(presenceState.reviewProgress)
           return {
                   details: PRESENCE_DETAILS.reviewDetailsSentences, // add this key to defaults/discord.js if missing
                   smallImage: PRESENCE_ICONS.immersionIcon,
@@ -48,12 +47,16 @@
               };
         }
         if(path.startsWith("/review/word")){
-          console.log(presenceState.reviewProgress)
           return {
                   details: PRESENCE_DETAILS.reviewDetailsWords, // add this key to defaults/discord.js if missing
                   smallImage: PRESENCE_ICONS.immersionIcon,
                   status: presenceState.reviewProgress ?? null,
               };
+        }
+        if(path.startsWith("/statistics")){
+            return {
+                details: PRESENCE_DETAILS.statsDetails,
+            };
         }
         return {};
     }

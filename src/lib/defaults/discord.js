@@ -13,7 +13,7 @@ export const PRESENCE_DETAILS = {
   homeDetails: "On the home page",
   mediaDetails: "Viewing media page",
   immersionDetails: "Immersing",
-  statsDetails: "Viewing Stats",
+  statsDetails: "Viewing statistics",
   settingsDetails: "Editing Settings",
   dictionaryDetails: "Browsing the dictionary",
   reviewDetailsWords: "Reviewing words",
