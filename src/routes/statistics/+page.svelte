@@ -625,6 +625,12 @@
         border-radius: 12px;
         padding: 1.25rem 1.5rem;
         margin-bottom: 1.5rem;
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .panel:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        transform: translateY(-1px);
     }
 
     .panel-head {
