@@ -92,7 +92,7 @@
                 <span class="bar"></span>
                 <div class="stat-header">
                     <span class="stat-icon">{@html ICONS.half_circle ?? ''}</span>
-                    <div class="stat-value">{vocab.gathering ? 'Gathering data…' : `${vocab.percentage}% coverage`}</div>
+                    <div class="stat-value">{vocab.gathering ? 'Gathering data…' : vocab.percentage != null ? `${vocab.percentage}% coverage` : 'N/A'}</div>
                 </div>
                 <div class="stat-value-label">
                     {vocab.gathering ? 'vocabulary coverage' : 'last 100 sentences'}

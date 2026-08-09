@@ -54,6 +54,7 @@
         const miniModeManager = initMiniMode(settings, (mode) => (miniMode = mode));
 
         return () => {
+            setMediaTitle(null);
             session.destroy();
             miniModeManager.destroy();
         };

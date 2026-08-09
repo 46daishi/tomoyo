@@ -114,6 +114,18 @@
         hoveredSpan = null;
     }
 
+    function isRelatedTargetInSentenceArea(/** @type {EventTarget | null} */ relatedTarget) {
+        const el = /** @type {Element | null} */ (relatedTarget);
+        if (!el?.closest) return false;
+        return el.closest('.char-token') || el.closest('.lookup-tooltip');
+    }
+
+    function closeHoverTooltip() {
+        tooltipSpan = null;
+        tooltipVisible = false;
+        hoveredSpan = null;
+    }
+
     async function handleMine(entry) {
         if (!tooltipSpan || !entry) return;
         await mineWord({
@@ -157,7 +169,13 @@
 
 <svelte:window onclick={() => (tooltipVisible = false)} />
 
-<div class="interactive-sentence" bind:this={containerEl} onmouseleave={handleLeave}>
+<div class="interactive-sentence" bind:this={containerEl} onmouseleave={(e) => {
+        if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {
+            closeHoverTooltip();
+        } else {
+            handleLeave();
+        }
+    }}>
     {#each chars as char, i}
         <span
             class="char-token"
@@ -178,7 +196,11 @@
             {tooltipY}
             {tooltipMaxHeight}
             onMine={handleMine}
-            onMouseLeave={() => {}}
+            onMouseLeave={(/** @type {MouseEvent} */ e) => {
+                if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {
+                    closeHoverTooltip();
+                }
+            }}
         />
     {/if}
 

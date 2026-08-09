@@ -119,6 +119,7 @@ export async function updateSentenceTranslation({ sentenceText, translation }) {
 // Lookup counts per word (word_id in lookup_events), for the "looked up N
 // times" badge on word cards. Filterable by media so it stays consistent
 // with whatever the media filter is currently showing.
+/** @param {{ mediaId?: number | null }} [opts] */
 export async function getLookupCounts({ mediaId = null } = {}) {
     const db = await getDb();
     const rows = await db.select(
@@ -168,6 +169,7 @@ export async function getWordWithDetails(wordId) {
     };
 }
 
+/** @param {{ mediaId?: number | null }} [opts] */
 export async function getWords({ mediaId = null } = {}) {
     const db = await getDb();
     return db.select(
@@ -283,6 +285,23 @@ export async function clearDictionaryData({ mediaId = null }) {
           AND id NOT IN (SELECT DISTINCT word_id FROM word_sentences)
     `);
     await db.execute('DELETE FROM lookup_events WHERE media_id = $1', [mediaId]);
+}
+
+export async function getDictionaryWordCount({ mediaId = null }) {
+    const db = await getDb();
+
+    if (mediaId === null) {
+        const [{ count }] = await db.select('SELECT COUNT(*) as count FROM words');
+        return count;
+    }
+
+    const [{ count }] = await db.select(
+        `SELECT COUNT(*) as count FROM words w
+         WHERE EXISTS (SELECT 1 FROM word_sentences ws WHERE ws.word_id = w.id AND ws.media_id = $1)
+            OR EXISTS (SELECT 1 FROM word_tags wt WHERE wt.word_id = w.id AND wt.media_id = $1)`,
+        [mediaId]
+    );
+    return count;
 }
 
 export async function getKnownWordsMap() {

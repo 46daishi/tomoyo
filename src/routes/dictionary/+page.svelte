@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, getReviewPool, getSentenceReviewPool, parseDefinitions } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, getReviewPool, getSentenceReviewPool, parseDefinitions, clearDictionaryData, getDictionaryWordCount } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, getMediaIdsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
@@ -18,15 +18,19 @@
     import Toast from '$lib/components/Toast.svelte';
     import HeatMap from '$lib/components/HeatMap.svelte';
 
+    const TABS = ['words', 'sentences', 'frequent', 'review'];
+
     afterNavigate(() => {
         const tabParam = page.url.searchParams.get('tab');
-        if (tabParam) activeTab = tabParam;
+        if (tabParam && TABS.includes(tabParam)) activeTab = tabParam;
     });
 
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
     );
     let dictRequestId = 0;
+    let reviewStatsRequestId = 0;
+    let reviewActivityRequestId = 0;
     let settings = $state(null);
     let statusFilter = $state(null); // words tab only — null means all statuses
     let sortBy = $state('date'); // words tab only — 'date' | 'lookup' | 'status'
@@ -133,8 +137,9 @@
     async function loadSentences() {
         const my = ++dictRequestId;
         const mediaId = mediaFilter;
-        allSentences = await getAllSentences({ mediaId });
+        const next = await getAllSentences({ mediaId });
         if (dictRequestId !== my) return;
+        allSentences = next;
         sentencesLoaded = true;
     }
 
@@ -174,12 +179,12 @@
         const tagsByWordId = await getMediaTagsForWordIds(mergedItems.map((item) => item.entry.id));
         const mediaIdsByWordId = await getMediaIdsForWordIds(mergedItems.map((item) => item.entry.id));
         
+        if (dictRequestId !== my) return;
         frequentWords = mergedItems.map((item) => ({
             ...item,
             tags: tagsByWordId[item.entry.id] ?? [],
             mediaIds: mediaIdsByWordId[item.entry.id] ?? [],
         }));
-        if (dictRequestId !== my) return;
         frequentLoaded = true;
     }
 
@@ -393,7 +398,7 @@
             ? mediaOptions.find((m) => m.value === String(mediaFilter))?.label ?? 'this media'
             : 'all media';
     
-        const wordCount = filteredWords.length;
+        const wordCount = await getDictionaryWordCount({ mediaId: mediaFilter });
     
         const yes = await confirm(
             `Delete all ${wordCount} word${wordCount === 1 ? '' : 's'} and their lookup history for ${scopeLabel}? This cannot be undone.`,
@@ -406,9 +411,10 @@
     }
 
     async function loadReviewStats() {
-        const my = ++dictRequestId;
-        reviewStats = await getReviewStats(mediaFilter);
-        if (dictRequestId !== my) return;
+        const my = ++reviewStatsRequestId;
+        const next = await getReviewStats(mediaFilter);
+        if (reviewStatsRequestId !== my) return;
+        reviewStats = next;
     }
 
     let reviewActivity = $state([]);
@@ -416,9 +422,10 @@
     const HEATMAP_WEEKS = 57;
     
     async function loadReviewActivity() {
-        const my = ++dictRequestId;
-        reviewActivity = await getReviewActivityByDay(HEATMAP_WEEKS);
-        if (dictRequestId !== my) return;
+        const my = ++reviewActivityRequestId;
+        const next = await getReviewActivityByDay(HEATMAP_WEEKS);
+        if (reviewActivityRequestId !== my) return;
+        reviewActivity = next;
     }
     
     $effect(() => {

@@ -20,6 +20,7 @@
     let done = $state(false);
     let completionStats = $state(null);
     let startTime = 0;
+    let advancing = $state(false);
 
     let currentWord = $derived(queue[index] ?? null);
     let mode = $derived(settings?.default_review_mode ?? 'normal');
@@ -74,16 +75,26 @@
     }
 
     async function selectStatus(status) {
-        if (!currentWord) return;
-        await updateWordStatus({ wordId: currentWord.id, status });
-        await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
-        advance();
+        if (!currentWord || advancing) return;
+        advancing = true;
+        try {
+            await updateWordStatus({ wordId: currentWord.id, status });
+            await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
+            advance();
+        } finally {
+            advancing = false;
+        }
     }
 
     async function skipNext() {
-        if (!currentWord || !isRevealed) return;
-        await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
-        advance();
+        if (!currentWord || !isRevealed || advancing) return;
+        advancing = true;
+        try {
+            await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
+            advance();
+        } finally {
+            advancing = false;
+        }
     }
 
     async function finishReview() {

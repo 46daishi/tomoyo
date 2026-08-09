@@ -69,6 +69,7 @@
     }
 
     function handleCardKeydown(e, id) {
+        if (e.target instanceof HTMLButtonElement) return;
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             openMedia(id);

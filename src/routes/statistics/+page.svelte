@@ -89,9 +89,15 @@
         const next = await getReadingStats({ mediaId: mediaFilter, timeframe });
         if (latestStats.get() !== my) return;
         stats = next;
-        streak = await getReadingStreak(mediaFilter);
-        dailyMoji = await getDailyMoji(mediaFilter, 30);
-        monthlyMoji = await getMonthlyMoji(mediaFilter, 12);
+        const [nextStreak, nextDaily, nextMonthly] = await Promise.all([
+            getReadingStreak(mediaFilter),
+            getDailyMoji(mediaFilter, 30),
+            getMonthlyMoji(mediaFilter, 12),
+        ]);
+        if (latestStats.get() !== my) return;
+        streak = nextStreak;
+        dailyMoji = nextDaily;
+        monthlyMoji = nextMonthly;
     }
 
     async function loadYearActivity() {
