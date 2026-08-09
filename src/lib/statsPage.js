@@ -8,6 +8,20 @@ export const TIMEFRAME_OPTIONS = [
     { value: 'all', label: 'All Time' },
 ];
 
+/**
+ * Returns a local-timezone YYYY-MM-DD string for a Date, matching how SQLite's
+ * `date(x, 'unixepoch', 'localtime')` buckets rows (so JS-side day keys align
+ * with the SQL day buckets even across the local-midnight boundary).
+ * @param {Date} date
+ * @returns {string}
+ */
+function localDayKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 /** @param {string} timeframe */
 function timeframeCutoff(timeframe) {
     const now = new Date();
@@ -87,8 +101,8 @@ function computeStreaks(days) {
         longestStreak = Math.max(longestStreak, run);
     }
 
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const yesterdayStr = new Date(Date.now() - oneDayMs).toISOString().slice(0, 10);
+    const todayStr = localDayKey(new Date());
+    const yesterdayStr = localDayKey(new Date(Date.now() - oneDayMs));
 
     let currentStreak = 0;
     if (days[0] === todayStr || days[0] === yesterdayStr) {
@@ -199,7 +213,7 @@ export async function getWordsMinedByDay(mediaId = null, days = 30) {
     const byDay = Object.fromEntries(rows.map((/** @type {any} */ r) => [r.day, r.count]));
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
-        const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const key = localDayKey(new Date(Date.now() - i * 86400000));
         result.push({ key, mined: byDay[key] ?? 0 });
     }
     return result;
@@ -245,7 +259,7 @@ export async function getDailyMoji(mediaId = null, days = 30) {    const db = aw
 
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
-        const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const key = localDayKey(new Date(Date.now() - i * 86400000));
         const entry = byDay[key] ?? { moji: 0, seconds: 0 };
         result.push({ key, moji: entry.moji, minutes: Math.round(entry.seconds / 60) });
     }
@@ -305,7 +319,7 @@ export async function getVocabularyGrowth(mediaId = null, days = 365) {
     const result = [];
     let running = 0;
     for (let i = days - 1; i >= 0; i--) {
-        const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const key = localDayKey(new Date(Date.now() - i * 86400000));
         running += byDay[key] ?? 0;
         result.push({ key, total: running });
     }
@@ -333,7 +347,7 @@ export async function getReviewActivityByDay(mediaId = null, days = 30) {
 
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
-        const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const key = localDayKey(new Date(Date.now() - i * 86400000));
         result.push({ key, reviews: byDay[key] ?? 0 });
     }
     return result;

@@ -6,7 +6,7 @@
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS } from '$lib/constants.js';
     import { loadSettings } from '$lib/settings.js';
-    import { getReviewPool, updateWordStatus } from '$lib/dictionary.js';
+    import { getReviewPool, updateWordStatus, parseDefinitions } from '$lib/dictionary.js';
     import { getReviewWeighting, startReviewSession, endReviewSession, logReviewedItem } from '$lib/reviewStats.js';
     import { setReviewProgress } from '$lib/stores/presence.svelte';
     
@@ -162,7 +162,7 @@
 
             {#if isRevealed}
                 <div class="review-reading">{currentWord.reading}</div>
-                <div class="review-definitions">{JSON.parse(currentWord.definitions).join('; ')}</div>
+                <div class="review-definitions">{parseDefinitions(currentWord.definitions).join('; ')}</div>
             {/if}
         </div>
 

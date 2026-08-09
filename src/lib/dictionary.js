@@ -1,5 +1,21 @@
 import { getDb } from '$lib/db';
 
+/**
+ * Safely parses a word's `definitions` JSON array column. Returns [] for
+ * NULL/blank/invalid values so callers never crash on legacy data.
+ * @param {string | null | undefined} definitions
+ * @returns {string[]}
+ */
+export function parseDefinitions(definitions) {
+    if (!definitions) return [];
+    try {
+        const parsed = JSON.parse(definitions);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
 export async function mineWord({
     dictId, spelling, reading, definitions, wordType,
     mediaId = null, sentenceText, highlightStart, highlightEnd, translation = null,
@@ -146,7 +162,7 @@ export async function getWordWithDetails(wordId) {
 
     return {
         ...word,
-        definitions: JSON.parse(word.definitions),
+        definitions: parseDefinitions(word.definitions),
         tags: tags.map((t) => t.tag),
         sentences,
     };

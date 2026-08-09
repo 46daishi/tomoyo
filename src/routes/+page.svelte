@@ -59,6 +59,9 @@
         const db = await getDb();
     
         await db.execute('DELETE FROM sessions WHERE media_id = $1', [media.id]);
+        await db.execute('DELETE FROM sentence_read_events WHERE media_id = $1', [media.id]);
+        await db.execute('DELETE FROM review_sessions WHERE media_id = $1', [media.id]);
+        await db.execute('DELETE FROM review_log WHERE media_id = $1', [media.id]);
         await clearDictionaryData({ mediaId: media.id });
     
         await db.execute('DELETE FROM media WHERE id = $1', [media.id]);

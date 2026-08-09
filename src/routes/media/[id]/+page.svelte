@@ -28,12 +28,16 @@
     let media = $state(/** @type {Record<string, any> | null} */ (null));
     let mediaCoverSrc = $derived(media?.cover_path ? coverSrc(media.cover_path) : null);
 
+    let mediaRequestId = 0;
+
     // Initialize session store
     const session = createSessionStore(mediaId);
 
     async function loadMedia(id) {
+        const my = ++mediaRequestId;
         const db = await getDb();
         const rows = await db.select('SELECT * FROM media WHERE id = $1', [id]);
+        if (mediaRequestId !== my) return;
         media = rows[0] ?? null;
 
         if (media?.title) {

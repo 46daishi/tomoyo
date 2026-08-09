@@ -20,6 +20,7 @@
     let done = $state(false);
     let completionStats = $state(null);
     let startTime = 0;
+    let advancing = $state(false);
 
     let currentSentence = $derived(queue[index] ?? null);
 
@@ -60,19 +61,23 @@
     }
 
     async function advance() {
-        if (!currentSentence) return;
-        await logReviewedItem({ sessionId, reviewType: 'sentence', itemKey: currentSentence.sentence_text, mediaId });
+        if (!currentSentence || advancing || done) return;
+        advancing = true;
+        try {
+            await logReviewedItem({ sessionId, reviewType: 'sentence', itemKey: currentSentence.sentence_text, mediaId });
 
-        translationOpen = false;
-        setReviewProgress(queue.length > 0
-          ? `${index + 1}/${queue.length} reviewed`
-          : null);
-        if (index + 1 >= queue.length) {
-            await finishReview();
-        } else {
-            index += 1;
+            translationOpen = false;
+            setReviewProgress(queue.length > 0
+              ? `${index + 1}/${queue.length} reviewed`
+              : null);
+            if (index + 1 >= queue.length) {
+                await finishReview();
+            } else {
+                index += 1;
+            }
+        } finally {
+            advancing = false;
         }
-        
     }
 
     async function finishReview() {

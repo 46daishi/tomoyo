@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/state';
     import { onMount } from 'svelte';
-    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, getReviewPool, getSentenceReviewPool } from '$lib/dictionary.js';
+    import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, getReviewPool, getSentenceReviewPool, parseDefinitions } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, getMediaIdsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { getDb } from '$lib/db';
@@ -26,6 +26,7 @@
     let mediaFilter = $state(
         page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null
     );
+    let dictRequestId = 0;
     let settings = $state(null);
     let statusFilter = $state(null); // words tab only — null means all statuses
     let sortBy = $state('date'); // words tab only — 'date' | 'lookup' | 'status'
@@ -118,22 +119,27 @@
     }
 
     async function loadWords() {
+        const my = ++dictRequestId;
         const mediaId = mediaFilter;
         const [wordRows, counts] = await Promise.all([
             getWords({ mediaId }),
             getLookupCounts({ mediaId }),
         ]);
+        if (dictRequestId !== my) return;
         words = wordRows;
         lookupCounts = counts;
     }
 
     async function loadSentences() {
+        const my = ++dictRequestId;
         const mediaId = mediaFilter;
         allSentences = await getAllSentences({ mediaId });
+        if (dictRequestId !== my) return;
         sentencesLoaded = true;
     }
 
     async function loadFrequentWords() {
+        const my = ++dictRequestId;
         frequentLimit = settings?.unknown_words_count || 10;
         const mediaId = mediaFilter;
         const rows = await getFrequentUnknownWords(mediaId, 1, frequentLimit);
@@ -173,6 +179,7 @@
             tags: tagsByWordId[item.entry.id] ?? [],
             mediaIds: mediaIdsByWordId[item.entry.id] ?? [],
         }));
+        if (dictRequestId !== my) return;
         frequentLoaded = true;
     }
 
@@ -305,7 +312,7 @@
                 searchQuery.trim()
                     ? w.spelling.includes(searchQuery) ||
                       w.reading.includes(searchQuery) ||
-                      JSON.parse(w.definitions).some((d) =>
+                      parseDefinitions(w.definitions).some((d) =>
                           d.toLowerCase().includes(searchQuery.toLowerCase())
                       )
                     : true
@@ -399,7 +406,9 @@
     }
 
     async function loadReviewStats() {
+        const my = ++dictRequestId;
         reviewStats = await getReviewStats(mediaFilter);
+        if (dictRequestId !== my) return;
     }
 
     let reviewActivity = $state([]);
@@ -407,7 +416,9 @@
     const HEATMAP_WEEKS = 57;
     
     async function loadReviewActivity() {
+        const my = ++dictRequestId;
         reviewActivity = await getReviewActivityByDay(HEATMAP_WEEKS);
+        if (dictRequestId !== my) return;
     }
     
     $effect(() => {
@@ -585,7 +596,7 @@
                         </div>
                         <div class="entry-pos">{word.word_type}</div>
                         <div class="word-definitions">
-                            {JSON.parse(word.definitions).join('; ')}
+                            {parseDefinitions(word.definitions).join('; ')}
                         </div>
                         <div class="notes-edit-row">
                             <span class="notes-icon">{@html ICONS.note}</span>

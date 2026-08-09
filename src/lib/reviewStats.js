@@ -101,8 +101,14 @@ function computeStreaks(days) {
         longestStreak = Math.max(longestStreak, run);
     }
 
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const yesterdayStr = new Date(Date.now() - oneDayMs).toISOString().slice(0, 10);
+    const localDayKey = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+    const todayStr = localDayKey(new Date());
+    const yesterdayStr = localDayKey(new Date(Date.now() - oneDayMs));
 
     let currentStreak = 0;
     if (days[0] === todayStr || days[0] === yesterdayStr) {
