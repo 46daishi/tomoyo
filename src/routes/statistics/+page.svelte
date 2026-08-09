@@ -49,29 +49,54 @@
         mediaOptions = [{ value: '', label: 'All media' }, ...rows.map((/** @type {any} */ m) => ({ value: String(m.id), label: m.title }))];
     }
 
+    // Guards each media-dependent async loader so a slow response for a
+    // previously selected media can't overwrite the current one (which made
+    // the heatmap sometimes keep the previous media's colour).
+    function makeLatest() {
+        let last = 0;
+        return {
+            next: () => ++last,
+            get: () => last,
+        };
+    }
+    const latestInfo = makeLatest();
+    const latestStats = makeLatest();
+    const latestYearActivity = makeLatest();
+    const latestYears = makeLatest();
+    const latestMeta = makeLatest();
+    const latestCharts = makeLatest();
+
     async function loadMediaInfo() {
+        const my = latestInfo.next();
         if (!mediaFilter) {
             mediaInfo = null;
             return;
         }
         const db = await getDb();
         const rows = await db.select('SELECT id, title, color, cover_path, status, tag, created_at FROM media WHERE id = $1', [mediaFilter]);
-        mediaInfo = rows[0] ?? null;
+        if (latestInfo.get() === my) mediaInfo = rows[0] ?? null;
     }
 
     async function loadStats() {
-        stats = await getReadingStats({ mediaId: mediaFilter, timeframe });
+        const my = latestStats.next();
+        const next = await getReadingStats({ mediaId: mediaFilter, timeframe });
+        if (latestStats.get() !== my) return;
+        stats = next;
         streak = await getReadingStreak(mediaFilter);
         dailyMoji = await getDailyMoji(mediaFilter, 30);
         monthlyMoji = await getMonthlyMoji(mediaFilter, 12);
     }
 
     async function loadYearActivity() {
-        yearActivity = await getMojiActivityByYear(mediaFilter, heatmapYear);
+        const my = latestYearActivity.next();
+        const next = await getMojiActivityByYear(mediaFilter, heatmapYear);
+        if (latestYearActivity.get() === my) yearActivity = next;
     }
 
     async function loadActivityYears() {
+        const my = latestYears.next();
         const years = await getActivityYears(mediaFilter);
+        if (latestYears.get() !== my) return;
         yearOptions = years.map((y) => ({ value: String(y), label: `${y}年` }));
         if (!years.includes(heatmapYear)) {
             heatmapYear = years[0] ?? new Date().getFullYear();
@@ -79,18 +104,28 @@
     }
 
     async function loadMediaMeta() {
+        const my = latestMeta.next();
         if (!mediaFilter) {
             mediaStats = null;
             vocabCoverage = null;
             return;
         }
-        mediaStats = await getMediaStats(mediaFilter);
-        vocabCoverage = settings?.estimate_coverage ? await getVocabularyCoverage(mediaFilter) : null;
+        const stats = await getMediaStats(mediaFilter);
+        const coverage = settings?.estimate_coverage ? await getVocabularyCoverage(mediaFilter) : null;
+        if (latestMeta.get() === my) {
+            mediaStats = stats;
+            vocabCoverage = coverage;
+        }
     }
 
     async function loadMediaCharts() {
-        wordsMinedDaily = await getWordsMinedByDay(mediaFilter, 30);
-        wordStatusCounts = await getWordStatusCounts(mediaFilter);
+        const my = latestCharts.next();
+        const words = await getWordsMinedByDay(mediaFilter, 30);
+        const statuses = await getWordStatusCounts(mediaFilter);
+        if (latestCharts.get() === my) {
+            wordsMinedDaily = words;
+            wordStatusCounts = statuses;
+        }
     }
 
     $effect(() => {
@@ -302,7 +337,7 @@
                             <div class="cover-placeholder"></div>
                         {/if}
                     </div>
-                    <div class="cover-title">Stats for {mediaInfo.title}</div>
+                    <div class="cover-title">{mediaInfo.title}</div>
                     <ul class="media-meta">
                         <li>
                             <span class="meta-icon" style="color: {mediaInfo.color || '#fab387'}">{@html ICONS.star}</span>
@@ -438,7 +473,7 @@
         </div>
         <div class="heatmap-wrapper">
             <!-- HeatMap utilizes the yearActivity state -->
-            <HeatMap data={yearActivity} year={heatmapYear} primaryColor="var(--theme-primary, #36b7bd)" formatValue={(m) => `${m.toLocaleString()} 文字`} />
+            <HeatMap data={yearActivity} year={heatmapYear} primaryColor={mediaInfo?.color || 'var(--theme-primary, #36b7bd)'} formatValue={(m) => `${m.toLocaleString()} 文字`} />
         </div>
     </div>
 </main>

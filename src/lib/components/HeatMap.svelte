@@ -124,14 +124,6 @@
     // ── Intensity & Colors ────────────────────────────────────────────────────
     $: maxMins = Math.max(...data.map((d) => d.studyMinutes ?? 0), 1);
 
-    function getColor(mins) {
-        if (mins <= 0) return palette[0];
-        const r = mins / maxMins; // Ratio between 0.0 and 1.0
-        const maxIndex = palette.length - 1;
-        const index = Math.max(1, Math.ceil(r * maxIndex));
-        return palette[Math.min(index, maxIndex)];
-    }
-
     // ── Month labels ──────────────────────────────────────────────────────────
     $: monthLabels = (() => {
         const out = [];
@@ -199,6 +191,9 @@
 
             {#each grid as col, wi}
                 {#each col as cell, di}
+                    {@const color = cell.mins <= 0
+                        ? palette[0]
+                        : palette[Math.min(palette.length - 1, Math.max(1, Math.ceil((cell.mins / maxMins) * (palette.length - 1))))]}
                     <rect
                         x={DAY_LBL_W + wi * (CELL + GAP)}
                         y={MONTH_H   + di * (CELL + GAP)}
@@ -207,7 +202,7 @@
                         class="cell"
                         class:future={cell.isFuture}
                         class:offyear={!cell.inYear}
-                        style="fill: {getColor(cell.mins)};"
+                        style="fill: {color};"
                         role="presentation"
                         on:mouseenter={(e) => cell.inYear && !cell.isFuture && showTooltip(e, cell)}
                         on:mousemove={(e)  => cell.inYear && !cell.isFuture && showTooltip(e, cell)}
