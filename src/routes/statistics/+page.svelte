@@ -4,6 +4,7 @@
     import { page } from '$app/state';
     import { getDb, coverSrc } from '$lib/db';
     import { loadSettings } from '$lib/settings.js';
+    import { confirm } from '@tauri-apps/plugin-dialog';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
     import HeatMap from '$lib/components/HeatMap.svelte';
@@ -18,8 +19,8 @@
     import {
         getReadingStats, getReadingStreak, getActivityYears, getMojiActivityByYear,
         getDailyMoji, getMonthlyMoji, getWordsMinedByDay, getWordStatusCounts,
-        getProfileStats,
-        TIMEFRAME_OPTIONS,
+        getProfileStats, getVocabularyGrowth, getReviewActivityByDay, getMediaBreakdown,
+        clearStatistics, TIMEFRAME_OPTIONS,
     } from '$lib/statsPage.js';
 
     let timeframe = $state('all');
@@ -44,6 +45,9 @@
     let wordsMinedDaily = $state(/** @type {Array<Record<string, any>>} */ ([]));
     let wordStatusCounts = $state(/** @type {Array<{ status: number, count: number }>} */ ([]));
     let profileStats = $state({ mediaCount: 0, firstUsed: /** @type {number | null} */ (null), wordCount: 0, sentenceCount: 0 });
+    let vocabGrowth = $state(/** @type {Array<Record<string, any>>} */ ([]));
+    let reviewActivity = $state(/** @type {Array<Record<string, any>>} */ ([]));
+    let mediaBreakdown = $state(/** @type {Array<{ id: number, title: string, color: string | null, coverPath: string | null, totalMoji: number, totalSeconds: number, sessionCount: number }>} */ ([]));
 
     async function loadMediaOptions() {
         const db = await getDb();
@@ -67,6 +71,7 @@
     const latestYears = makeLatest();
     const latestMeta = makeLatest();
     const latestCharts = makeLatest();
+    const latestGrowth = makeLatest();
 
     async function loadMediaInfo() {
         const my = latestInfo.next();
@@ -130,6 +135,20 @@
         }
     }
 
+    async function loadGrowthCharts() {
+        const my = latestGrowth.next();
+        const [growth, reviews, breakdown] = await Promise.all([
+            getVocabularyGrowth(mediaFilter),
+            getReviewActivityByDay(mediaFilter, 30),
+            getMediaBreakdown(timeframe),
+        ]);
+        if (latestGrowth.get() === my) {
+            vocabGrowth = growth;
+            reviewActivity = reviews;
+            mediaBreakdown = breakdown;
+        }
+    }
+
     $effect(() => {
         timeframe;
         mediaFilter;
@@ -145,6 +164,12 @@
     $effect(() => {
         mediaFilter;
         loadMediaCharts();
+    });
+
+    $effect(() => {
+        mediaFilter;
+        timeframe;
+        loadGrowthCharts();
     });
 
     $effect(() => {
@@ -182,6 +207,18 @@
     function handleTimeframeChange(e) {
         const el = /** @type {HTMLSelectElement} */ (e.currentTarget);
         timeframe = el.value;
+    }
+    async function handleClearStatistics() {
+        const scopeLabel = mediaFilter
+            ? mediaOptions.find((m) => m.value === String(mediaFilter))?.label ?? 'this media'
+            : 'all media';
+        const yes = await confirm(
+            `Clear all reading, review and lookup statistics for ${scopeLabel}? This cannot be undone.`,
+            { title: 'Clear statistics', kind: 'warning' }
+        );
+        if (!yes) return;
+        await clearStatistics(mediaFilter);
+        await Promise.all([loadStats(), loadMediaCharts(), loadGrowthCharts(), loadActivityYears(), loadYearActivity()]);
     }
     /** @param {Event} e */
     function handleYearChange(e) {
@@ -226,6 +263,16 @@
     function formatWords(v) {
         return `${v.toLocaleString()} words`;
     }
+    /** @param {number} v */
+    function formatReviews(v) {
+        return `${v.toLocaleString()} reviews`;
+    }
+    /** @param {number} seconds */
+    function formatBreakdownTime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
 
     let subtitle = $derived.by(() => {
         const tf = TIMEFRAME_OPTIONS.find((o) => o.value === timeframe)?.label ?? 'All time';
@@ -244,6 +291,8 @@
             return { label: lvl.label, value: entry?.count ?? 0, color: lvl.color };
         })
     );
+
+    let breakdownMaxMoji = $derived(Math.max(...mediaBreakdown.map((m) => m.totalMoji), 1));
 
     let tiles = $derived([
         {
@@ -285,6 +334,13 @@
         <div class="filter-group">
             <SelectInput options={TIMEFRAME_OPTIONS} value={timeframe} on:change={handleTimeframeChange} />
             <SelectInput options={mediaOptions} value={mediaFilter ? String(mediaFilter) : ''} on:change={handleMediaFilterChange} />
+            <ActionButton
+                icon={ICONS.trash}
+                label="Clear stats"
+                variant="danger"
+                size="small"
+                onAction={handleClearStatistics}
+            />
         </div>
     </header>
 
@@ -429,6 +485,55 @@
                     </li>
                 </ul>
             </div>
+
+            <div class="panel">
+                <div class="panel-head" style="--icon-color: #89b4fa">
+                    <span class="panel-icon">{@html ICONS.book_open}</span>
+                    <h2>By media</h2>
+                </div>
+                {#if mediaBreakdown.length === 0}
+                    <p class="empty-note">No reading sessions yet.</p>
+                {:else}
+                    <ul class="media-breakdown">
+                        {#each mediaBreakdown as m (m.id)}
+                            <li>
+                                <div
+                                    class="media-breakdown-row"
+                                    onclick={() => goto(`/media/${m.id}`)}
+                                    onkeydown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            goto(`/media/${m.id}`);
+                                        }
+                                    }}
+                                    role="button"
+                                    tabindex="0"
+                                    title={m.title}
+                                >
+                                {#if m.coverPath}
+                                    <span class="mb-cover"><img src={coverSrc(m.coverPath)} alt="" /></span>
+                                {:else}
+                                    <span class="mb-cover mb-cover-placeholder" style="--mb-accent: {m.color || 'var(--theme-primary, #36b7bd)'}"></span>
+                                {/if}
+                                <span class="mb-body">
+                                    <span class="mb-title">{m.title}</span>
+                                    <span class="mb-bar-track">
+                                        <span
+                                            class="mb-bar"
+                                            style="width: {Math.max(4, (m.totalMoji / breakdownMaxMoji) * 100)}%; background: {m.color || 'var(--theme-primary, #36b7bd)'}"
+                                        ></span>
+                                    </span>
+                                </span>
+                                <span class="mb-values">
+                                    <span class="mb-value">{formatBreakdownTime(m.totalSeconds)}</span>
+                                    <span class="mb-sub">{m.totalMoji.toLocaleString()} 文字</span>
+                                </span>
+                                </div>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
         </aside>
 
         <!-- Tier 3: Deep dive charts -->
@@ -464,7 +569,7 @@
                 />
             </div>
 
-            <div class="chart-row">
+            <div class="chart-grid">
                 <div class="panel chart-panel">
                     <div class="panel-head" style="--icon-color: #f9e2af">
                         <span class="panel-icon">{@html ICONS.plus}</span>
@@ -482,6 +587,29 @@
                         <h2>Dictionary status</h2>
                     </div>
                     <DonutChart data={donutData} />
+                </div>
+
+                <div class="panel chart-panel">
+                    <div class="panel-head" style="--icon-color: #a6e3a1">
+                        <span class="panel-icon">{@html ICONS.book}</span>
+                        <h2>Vocabulary growth</h2>
+                    </div>
+                    <LineChart
+                        data={vocabGrowth}
+                        series={[{ key: 'total', color: 'var(--theme-primary, #36b7bd)', label: 'Total words', formatValue: formatWords }]}
+                        formatLabel={formatDayLabel}
+                    />
+                </div>
+                <div class="panel chart-panel">
+                    <div class="panel-head" style="--icon-color: #f9e2af">
+                        <span class="panel-icon">{@html ICONS.check}</span>
+                        <h2>Review activity</h2>
+                    </div>
+                    <BarChart
+                        data={reviewActivity}
+                        series={[{ key: 'reviews', color: 'var(--theme-accent, #8fb2e8)', label: 'Reviews', formatValue: formatReviews }]}
+                        formatLabel={formatDayLabel}
+                    />
                 </div>
             </div>
         </div>
@@ -911,6 +1039,119 @@
         color: var(--theme-textSecondary, #b3b3b3);
     }
 
+    /* Media breakdown (All media sidebar panel) */
+    .media-breakdown {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    .media-breakdown-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        cursor: pointer;
+        border-radius: 8px;
+        padding: 0.15rem 0.3rem;
+        margin: -0.15rem -0.3rem;
+        transition: background 0.15s ease;
+        outline: none;
+    }
+
+    .media-breakdown-row:hover,
+    .media-breakdown-row:focus-visible {
+        background: color-mix(in srgb, var(--theme-primary, #36b7bd) 10%, transparent);
+    }
+
+    .mb-cover {
+        width: 32px;
+        height: 48px;
+        flex-shrink: 0;
+        border-radius: 4px;
+        overflow: hidden;
+        background: var(--theme-surface, #2d2d2d);
+    }
+
+    .mb-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .mb-cover-placeholder {
+        background: linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--mb-accent, var(--theme-primary, #36b7bd)) 35%, #000),
+            var(--theme-surface, #2d2d2d)
+        );
+    }
+
+    .mb-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .mb-title {
+        font-family: "Noto Sans JP";
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--theme-text, #f6f6f6);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mb-bar-track {
+        display: block;
+        height: 5px;
+        border-radius: 3px;
+        background: color-mix(in srgb, var(--theme-border, #404040) 45%, transparent);
+        overflow: hidden;
+    }
+
+    .mb-bar {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+    }
+
+    .mb-values {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.1rem;
+        flex-shrink: 0;
+    }
+
+    .mb-value {
+        font-family: "Noto Sans JP";
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--theme-text, #f6f6f6);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .mb-sub {
+        font-size: 0.7rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .empty-note {
+        margin: 0;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.85rem;
+        text-align: center;
+        padding: 1rem 0;
+    }
+
     .main-charts {
         display: flex;
         flex-direction: column;
@@ -922,15 +1163,23 @@
         flex-direction: column;
     }
 
-    .chart-row {
+    .chart-grid {
         display: grid;
         grid-template-columns: 1.4fr 1fr;
         gap: 1.5rem;
         align-items: stretch;
     }
 
-    .chart-row .panel {
+    .chart-grid .panel {
         margin-bottom: 0;
+    }
+
+    .chart-grid .chart-panel :global(.line-chart-wrapper),
+    .chart-grid .chart-panel :global(.bar-chart-wrapper) {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        flex: 1;
     }
 
     /* Full-width heatmap */
@@ -949,7 +1198,7 @@
         .stat-grid {
             grid-template-columns: repeat(2, 1fr);
         }
-        .chart-row {
+        .chart-grid {
             grid-template-columns: 1fr;
         }
     }

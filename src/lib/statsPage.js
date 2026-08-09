@@ -231,8 +231,7 @@ export async function getWordStatusCounts(mediaId = null) {
  * @param {number | null | undefined} [mediaId]
  * @param {number} [days]
  */
-export async function getDailyMoji(mediaId = null, days = 30) {
-    const db = await getDb();
+export async function getDailyMoji(mediaId = null, days = 30) {    const db = await getDb();
     const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
     const rows = await db.select(
         `SELECT date(started_at, 'unixepoch', 'localtime') as day,
@@ -281,4 +280,117 @@ export async function getMonthlyMoji(mediaId = null, months = 12) {
         result.push({ key, moji: entry.moji, minutes: entry.minutes });
     }
     return result;
+}
+
+/**
+ * Cumulative mined words over time. Uses word_sentences.created_at so the
+ * curve reflects vocabulary growth (new words linked to mined sentences).
+ *
+ * @param {number | null | undefined} [mediaId]
+ * @param {number} [days]
+ * @returns {Promise<Array<{ key: string, total: number }>>}
+ */
+export async function getVocabularyGrowth(mediaId = null, days = 365) {
+    const db = await getDb();
+    const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
+    const rows = await db.select(
+        `SELECT date(created_at, 'unixepoch', 'localtime') as day, COUNT(*) as count
+         FROM word_sentences
+         WHERE ($1 IS NULL OR media_id = $1) AND created_at >= $2
+         GROUP BY day ORDER BY day ASC`,
+        [mediaId, cutoff]
+    );
+    const byDay = Object.fromEntries(rows.map((/** @type {any} */ r) => [r.day, r.count]));
+
+    const result = [];
+    let running = 0;
+    for (let i = days - 1; i >= 0; i--) {
+        const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        running += byDay[key] ?? 0;
+        result.push({ key, total: running });
+    }
+    return result;
+}
+
+/**
+ * Review activity: number of items reviewed per day.
+ *
+ * @param {number | null | undefined} [mediaId]
+ * @param {number} [days]
+ * @returns {Promise<Array<{ key: string, reviews: number }>>}
+ */
+export async function getReviewActivityByDay(mediaId = null, days = 30) {
+    const db = await getDb();
+    const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
+    const rows = await db.select(
+        `SELECT date(reviewed_at, 'unixepoch', 'localtime') as day, COUNT(*) as count
+         FROM review_log
+         WHERE ($1 IS NULL OR media_id = $1) AND reviewed_at >= $2
+         GROUP BY day ORDER BY day ASC`,
+        [mediaId, cutoff]
+    );
+    const byDay = Object.fromEntries(rows.map((/** @type {any} */ r) => [r.day, r.count]));
+
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+        const key = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        result.push({ key, reviews: byDay[key] ?? 0 });
+    }
+    return result;
+}
+
+/**
+ * Per-media reading totals for the "All media" breakdown sidebar panel.
+ * Only includes media with at least one session in the timeframe.
+ *
+ * @param {string} [timeframe]
+ * @returns {Promise<Array<{ id: number, title: string, color: string | null, coverPath: string | null, totalMoji: number, totalSeconds: number, sessionCount: number }>>}
+ */
+export async function getMediaBreakdown(timeframe = 'all') {
+    const db = await getDb();
+    const cutoff = timeframeCutoff(timeframe);
+    const rows = await db.select(
+        `SELECT m.id, m.title, m.color, m.cover_path,
+                COALESCE(SUM(s.moji_read), 0) as total_moji,
+                COALESCE(SUM(COALESCE(s.ended_at, s.last_updated_at) - s.started_at), 0) as total_seconds,
+                COUNT(s.id) as session_count
+         FROM media m
+         LEFT JOIN sessions s ON s.media_id = m.id AND ($1 IS NULL OR s.started_at >= $1)
+         GROUP BY m.id
+         HAVING COUNT(s.id) > 0
+         ORDER BY total_seconds DESC
+         LIMIT 5`,
+        [cutoff]
+    );
+    return rows.map((/** @type {any} */ r) => ({
+        id: r.id,
+        title: r.title,
+        color: r.color ?? null,
+        coverPath: r.cover_path ?? null,
+        totalMoji: r.total_moji ?? 0,
+        totalSeconds: r.total_seconds ?? 0,
+        sessionCount: r.session_count ?? 0,
+    }));
+}
+
+/**
+ * Wipes all statistics for a media (or every media when mediaId is null):
+ * reading sessions, per-sentence read events, review sessions and logs,
+ * and dictionary lookup history. Word/status data and media entries are
+ * left untouched.
+ *
+ * @param {number | null} [mediaId]
+ */
+export async function clearStatistics(mediaId = null) {
+    const db = await getDb();
+    const scope = mediaId === null
+        ? ''
+        : ' WHERE media_id = $1';
+    const args = mediaId === null ? [] : [mediaId];
+
+    await db.execute(`DELETE FROM sessions${scope}`, args);
+    await db.execute(`DELETE FROM sentence_read_events${scope}`, args);
+    await db.execute(`DELETE FROM review_sessions${scope}`, args);
+    await db.execute(`DELETE FROM review_log${scope}`, args);
+    await db.execute(`DELETE FROM lookup_events${scope}`, args);
 }
