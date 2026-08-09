@@ -26,6 +26,7 @@ pub struct AppSettings {
     pub show_related_entries: bool,
     pub track_unknown_words: bool,
     pub unknown_words_count: u32,
+    pub unknown_words_min_lookups: u32,
 
     pub highlight_known_words: bool,
 
@@ -74,6 +75,7 @@ impl Default for AppSettings {
             show_related_entries: true,
             track_unknown_words: false,
             unknown_words_count: 10,
+            unknown_words_min_lookups: 1,
 
             highlight_known_words: false,
 

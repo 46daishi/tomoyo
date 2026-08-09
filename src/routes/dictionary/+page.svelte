@@ -31,7 +31,7 @@
     let dictRequestId = 0;
     let reviewStatsRequestId = 0;
     let reviewActivityRequestId = 0;
-    let settings = $state(null);
+    let settings = $state(/** @type {Record<string, any> | null} */ (null));
     let statusFilter = $state(null); // words tab only — null means all statuses
     let sortBy = $state('date'); // words tab only — 'date' | 'lookup' | 'status'
     let searchQuery = $state('');
@@ -146,8 +146,9 @@
     async function loadFrequentWords() {
         const my = ++dictRequestId;
         frequentLimit = settings?.unknown_words_count || 10;
+        const minLookups = settings?.unknown_words_min_lookups || 1;
         const mediaId = mediaFilter;
-        const rows = await getFrequentUnknownWords(mediaId, 1, frequentLimit);
+        const rows = await getFrequentUnknownWords(mediaId, minLookups, frequentLimit);
     
         const resolved = (
             await Promise.all(
