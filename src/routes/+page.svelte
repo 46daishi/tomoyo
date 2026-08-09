@@ -10,11 +10,15 @@
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_COLORS, FILTER_OPTIONS, STATUS_OPTIONS } from '$lib/constants.js';
     import { clearDictionaryData } from "$lib/dictionary";
+    import { loadSettings } from '$lib/settings.js';
 
     let mediaList = $state([]);
     let statusFilter = $state('all');
     let showModal = $state(false);
     let editingMedia = $state(null);
+    let settings = $state(/** @type {Record<string, any> | null} */ (null));
+
+    let profilePicSrc = $derived(settings?.profile_picture ? coverSrc(settings.profile_picture) : null);
 
     const STATUS_ORDER = Object.fromEntries(STATUS_OPTIONS.map((o, i) => [o.value, i]));
 
@@ -72,7 +76,12 @@
         goto(`/media/${id}`);
     }
 
-    onMount(loadMedia);
+    async function onMountHome() {
+        settings = await loadSettings();
+        await loadMedia();
+    }
+
+    onMount(onMountHome);
 </script>
 
 <main class="page home">
@@ -151,12 +160,6 @@
     onAction={() => goto('/settings')}
   />
   <ActionButton
-    icon={ICONS.stats}
-    variant="secondary"
-    size="small"
-    onAction={() => goto('/statistics')}
-  />
-  <ActionButton
     icon={ICONS.book}
     variant="secondary"
     size="small"
@@ -167,6 +170,17 @@
     variant="secondary"
     size="small"
   />
+  <div class="stats-btn-wrap">
+    {#if profilePicSrc}
+        <img class="profile-cover" src={profilePicSrc} alt="Your profile" />
+    {/if}
+    <ActionButton
+      icon={ICONS.stats}
+      variant="secondary"
+      size="small"
+      onAction={() => goto('/statistics')}
+    />
+  </div>
 </SideNav>
 
 <style>
@@ -311,5 +325,22 @@
         text-align: center;
         margin-top: 3rem;
         opacity: 0.85;
+    }
+
+    .stats-btn-wrap {
+        position: relative;
+        display: inline-flex;
+    }
+
+    .profile-cover {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: calc(100% - 4px);
+        height: calc(100% - 4px);
+        object-fit: cover;
+        border-radius: 100px;
+        pointer-events: none;
+        z-index: 1;
     }
 </style>

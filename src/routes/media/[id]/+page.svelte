@@ -25,7 +25,8 @@
     let miniMode = $state(false);
 
     let mediaId = $derived(Number(page.params.id));
-    let media = $state(null);
+    let media = $state(/** @type {Record<string, any> | null} */ (null));
+    let mediaCoverSrc = $derived(media?.cover_path ? coverSrc(media.cover_path) : null);
 
     // Initialize session store
     const session = createSessionStore(mediaId);
@@ -106,11 +107,17 @@
     size="small" 
     onAction={() => (showEditModal = true)} 
   />
-  <ActionButton 
-    icon={ICONS.stats} 
-    variant="secondary" 
-    size="small" 
-  />
+  <div class="stats-btn-wrap">
+    {#if mediaCoverSrc}
+        <img class="cover-cover" src={mediaCoverSrc} alt={media?.title ?? 'Stats'} />
+    {/if}
+    <ActionButton 
+      icon={ICONS.stats} 
+      variant="secondary" 
+      size="small" 
+      onAction={() => goto(`/statistics?media=${mediaId}`)}
+    />
+  </div>
   <ActionButton 
     icon={ICONS.book} 
     variant="secondary" 
@@ -184,4 +191,21 @@
             font-variant-numeric: tabular-nums; /* keeps digit widths consistent so it doesn't jitter as numbers change */
             text-align: center;
         }
+
+    .stats-btn-wrap {
+        position: relative;
+        display: inline-flex;
+    }
+
+    .cover-cover {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: calc(100% - 4px);
+        height: calc(100% - 4px);
+        object-fit: cover;
+        border-radius: 100px;
+        pointer-events: none;
+        z-index: 1;
+    }
 </style>

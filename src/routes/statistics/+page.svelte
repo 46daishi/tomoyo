@@ -1,5 +1,7 @@
 <script>
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
+    import { page } from '$app/state';
     import { getDb, coverSrc } from '$lib/db';
     import { loadSettings } from '$lib/settings.js';
     import ActionButton from '$lib/components/ActionButton.svelte';
@@ -162,6 +164,10 @@
     });
 
     onMount(async () => {
+        const mediaParam = Number(page.url.searchParams.get('media'));
+        if (mediaParam && Number.isFinite(mediaParam)) {
+            mediaFilter = mediaParam;
+        }
         loadMediaOptions();
         settings = await loadSettings();
         profileStats = await getProfileStats();
@@ -298,11 +304,18 @@
         <aside class="sidebar">
             <div class="panel profile-card">
                 <div class="profile-frame">
-                    {#if profilePicSrc}
-                        <img class="avatar" src={profilePicSrc} alt="" />
-                    {:else}
-                        <div class="avatar avatar-placeholder">{initials}</div>
-                    {/if}
+                    <button
+                        class="avatar-btn"
+                        type="button"
+                        aria-label="Go to settings"
+                        onclick={() => goto('/settings')}
+                    >
+                        {#if profilePicSrc}
+                            <img class="avatar" src={profilePicSrc} alt="" />
+                        {:else}
+                            <div class="avatar avatar-placeholder">{initials}</div>
+                        {/if}
+                    </button>
                 </div>
                 <div class="cover-title profile-name">{username}'s stats</div>
                 <ul class="profile-stats">
@@ -329,8 +342,22 @@
             </div>
 
             {#if mediaInfo}
+                {@const info = mediaInfo}
                 <div class="panel cover-panel">
-                    <div class="cover-frame" style="--cover-accent: {mediaInfo.color || 'var(--theme-primary, #36b7bd)'}">
+                    <div
+                        class="cover-frame"
+                        style="--cover-accent: {info.color || 'var(--theme-primary, #36b7bd)'}"
+                        onclick={() => goto(`/media/${info.id}`)}
+                        onkeydown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                goto(`/media/${info.id}`);
+                            }
+                        }}
+                        role="button"
+                        tabindex="0"
+                        title={info.title}
+                    >
                         {#if coverSrcValue}
                             <img src={coverSrcValue} alt={mediaInfo.title} />
                         {:else}
@@ -659,6 +686,13 @@
             var(--theme-surface, #2d2d2d)
         );
         border: 1px solid var(--theme-border, #404040);
+        cursor: pointer;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .cover-frame:hover {
+        border-color: var(--cover-accent, var(--theme-primary, #36b7bd));
+        transform: translateY(-2px);
     }
 
     .cover-frame img,
@@ -680,13 +714,34 @@
         padding: 0 0 0.6rem;
     }
 
-    .avatar {
+    .avatar-btn {
         width: 96px;
         height: 96px;
+        padding: 0;
+        border: none;
+        background: none;
+        border-radius: 50%;
+        cursor: pointer;
+        outline: none;
+        transition: filter 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .avatar-btn:hover {
+        filter: brightness(90%);
+    }
+
+    .avatar-btn:focus-visible {
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-primary, #36b7bd) 60%, transparent);
+    }
+
+    .avatar {
+        width: 100%;
+        height: 100%;
         border-radius: 50%;
         object-fit: cover;
         border: 2px solid color-mix(in srgb, var(--theme-primary, #36b7bd) 45%, var(--theme-border, #404040));
         flex-shrink: 0;
+        box-sizing: border-box;
     }
 
     .avatar-placeholder {
@@ -699,7 +754,6 @@
         font-size: 2.2rem;
         font-weight: 700;
     }
-
     .cover-title {
         text-align: center;
         font-weight: 600;
