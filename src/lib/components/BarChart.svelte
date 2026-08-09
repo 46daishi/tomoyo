@@ -204,8 +204,9 @@
     }
 
     .tt-val {
+        font-family: "Noto Sans JP";
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         font-variant-numeric: tabular-nums;
     }
 </style>

@@ -677,6 +677,7 @@
     }
 
     .media-meta {
+        font-family: "Noto Sans JP";
         list-style: none;
         margin: 0.5rem 0 0;
         padding: 0.6rem 0.1rem 0;
@@ -726,6 +727,7 @@
     }
 
     .profile-stat {
+        font-family: "Noto Sans JP";
         display: flex;
         align-items: center;
         gap: 0.4rem;
