@@ -161,29 +161,29 @@
 </main>
 
 <SideNav>
-  <ActionButton
-    icon={ICONS.settings}
-    variant="secondary"
-    size="small"
-    onAction={() => goto('/settings')}
-  />
+    <div class="stats-btn-wrap">
+        {#if profilePicSrc}
+            <img class="profile-cover" src={profilePicSrc} alt="Your profile" />
+        {/if}
+        <ActionButton
+        icon={ICONS.stats}
+        variant="secondary"
+        size="small"
+        onAction={() => goto('/statistics')}
+        />
+    </div>
   <ActionButton
     icon={ICONS.book}
     variant="secondary"
     size="small"
     onAction={() => goto(`/dictionary`)}
   />
-  <div class="stats-btn-wrap">
-    {#if profilePicSrc}
-        <img class="profile-cover" src={profilePicSrc} alt="Your profile" />
-    {/if}
-    <ActionButton
-      icon={ICONS.stats}
-      variant="secondary"
-      size="small"
-      onAction={() => goto('/statistics')}
-    />
-  </div>
+  <ActionButton
+    icon={ICONS.settings}
+    variant="secondary"
+    size="small"
+    onAction={() => goto('/settings')}
+  />
   <ActionButton
     icon={ICONS.question}
     variant="secondary"

@@ -106,18 +106,6 @@
     size="small" 
     onAction={() => history.back()} 
   />
-  <ActionButton
-    icon={ICONS.settings}
-    variant="secondary"
-    size="small"
-    onAction={() => goto('/settings')}
-  />
-  <ActionButton 
-    icon={ICONS.book} 
-    variant="secondary" 
-    size="small" 
-    onAction={() => goto(`/dictionary?media=${mediaId}`)}
-  />
   <div class="stats-btn-wrap">
     {#if mediaCoverSrc}
         <img class="cover-cover" src={mediaCoverSrc} alt={media?.title ?? 'Stats'} />
@@ -129,6 +117,18 @@
       onAction={() => goto(`/statistics?media=${mediaId}`)}
     />
   </div>
+  <ActionButton 
+    icon={ICONS.book} 
+    variant="secondary" 
+    size="small" 
+    onAction={() => goto(`/dictionary?media=${mediaId}`)}
+  />
+  <ActionButton
+    icon={ICONS.settings}
+    variant="secondary"
+    size="small"
+    onAction={() => goto('/settings')}
+  />
   <ActionButton 
     icon={ICONS.edit} 
     variant="secondary" 
