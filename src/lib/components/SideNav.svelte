@@ -4,7 +4,7 @@
 </script>
 
 <div class="logo">
-    <a href="https://x.com/46daishi" target="_blank" rel="noopener noreferrer"><img src="/tomoyo_full.png" alt="tomoyo" /></a>
+    <img src="/tomoyo_full.png" alt="tomoyo" />
 </div>
 <nav class="side-nav" aria-label="App navigation">
   <div class="nav-actions">
