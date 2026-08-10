@@ -48,4 +48,5 @@ export const ICONS = {
   star: "\uf41e",
   github: "\ue709",
   twitter: "\uf099",
+  bolt: "\uf0e7",
 };

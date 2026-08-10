@@ -464,7 +464,7 @@
 
             <div class="panel">
                 <div class="panel-head" style="--icon-color: #a6e3a1">
-                    <span class="panel-icon">{@html ICONS.book_open}</span>
+                    <span class="panel-icon">{@html ICONS.bolt}</span>
                     <h2>Reading pace</h2>
                 </div>
                 <ul class="pace-list">
@@ -585,6 +585,7 @@
                         data={wordsMinedDaily}
                         series={[{ key: 'mined', color: 'var(--theme-primary, #36b7bd)', label: 'Words mined', formatValue: formatWords }]}
                         formatLabel={formatDayLabel}
+                        showAxisLabels={false}
                     />
                 </div>
                 <div class="panel chart-panel">
@@ -597,24 +598,26 @@
 
                 <div class="panel chart-panel">
                     <div class="panel-head" style="--icon-color: #a6e3a1">
-                        <span class="panel-icon">{@html ICONS.book}</span>
+                        <span class="panel-icon">{@html ICONS.star}</span>
                         <h2>Vocabulary growth</h2>
                     </div>
                     <LineChart
                         data={vocabGrowth}
                         series={[{ key: 'total', color: 'var(--theme-primary, #36b7bd)', label: 'Total words', formatValue: formatWords }]}
                         formatLabel={formatDayLabel}
+                        showAxisLabels={false}
                     />
                 </div>
                 <div class="panel chart-panel">
                     <div class="panel-head" style="--icon-color: #f9e2af">
                         <span class="panel-icon">{@html ICONS.check}</span>
-                        <h2>Review activity</h2>
+                        <h2>Reviews</h2>
                     </div>
                     <BarChart
                         data={reviewActivity}
                         series={[{ key: 'reviews', color: 'var(--theme-accent, #8fb2e8)', label: 'Reviews', formatValue: formatReviews }]}
                         formatLabel={formatDayLabel}
+                        showAxisLabels={false}
                     />
                 </div>
             </div>
@@ -1197,7 +1200,7 @@
         margin-left: auto;
     }
 
-    @media (max-width: 1024px) {
+    @media (max-width: 924px) {
         .layout-grid {
             grid-template-columns: 1fr;
         }

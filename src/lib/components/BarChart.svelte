@@ -1,4 +1,6 @@
 <script>
+    import { calculateLabelStep } from '$lib/utils/chartFormatters.js';
+
     /**
      * @type {{
      *   data?: Array<Record<string, any>>,
@@ -6,6 +8,7 @@
      *   color?: string,
      *   formatValue?: (v: number) => string,
      *   formatLabel?: (k: string) => string,
+     *   showAxisLabels?: boolean,
      * }}
      */
     let {
@@ -14,6 +17,7 @@
         color = 'var(--theme-primary, #36b7bd)',
         formatValue = (v) => v.toLocaleString(),
         formatLabel = (k) => k,
+        showAxisLabels = true,
     } = $props();
 
     let chartWidth = $state(400);
@@ -28,6 +32,7 @@
         series.length > 0 ? series : [{ key: 'value', color, label: '' }]
     );
     let maxes = $derived(chartSeries.map((s) => Math.max(1, ...data.map((d) => d[s.key] ?? 0))));
+    let labelStep = $derived(calculateLabelStep(data.length));
 
     let hovered = $state(/** @type {number | null} */ (null));
 
@@ -68,31 +73,40 @@
             <!-- Baseline -->
             <line x1={padding.left} y1={baseY} x2={chartWidth - padding.right} y2={baseY} class="grid-line" />
 
-            {#each data as point, i}
-                {@const slot = plotW / data.length}
-                {@const inner = slot / chartSeries.length}
-                {@const bw = Math.max(2, inner - 3)}
+                {#each data as point, i}
+                    {@const slot = plotW / data.length}
+                    {@const inner = slot / chartSeries.length}
+                    {@const bw = Math.max(2, inner - 3)}
 
-                {#each chartSeries as s, si}
-                    {@const x = padding.left + i * slot + si * inner + (inner - bw) / 2}
-                    {@const barH = ((point[s.key] ?? 0) / maxes[si]) * plotH}
-                    {@const y = baseY - barH}
+                    {#each chartSeries as s, si}
+                        {@const x = padding.left + i * slot + si * inner + (inner - bw) / 2}
+                        {@const barH = ((point[s.key] ?? 0) / maxes[si]) * plotH}
+                        {@const y = baseY - barH}
 
-                    <!-- +1 height overdraws the baseline so the bottom stays square while the top rounds -->
-                    <rect
-                        {x}
-                        y={y - 1}
-                        width={bw}
-                        height={barH + 1}
-                        rx="4"
-                        fill={s.color}
-                        class="bar"
-                        class:dimmed={hovered !== null && hovered !== i}
-                        class:hot={hovered === i}
-                    />
+                        <!-- +1 height overdraws the baseline so the bottom stays square while the top rounds -->
+                        <rect
+                            {x}
+                            y={y - 1}
+                            width={bw}
+                            height={barH + 1}
+                            rx="4"
+                            fill={s.color}
+                            class="bar"
+                            class:dimmed={hovered !== null && hovered !== i}
+                            class:hot={hovered === i}
+                        />
+                    {/each}
                 {/each}
-            {/each}
-        </svg>
+
+                {#each data as point, i}
+                    {@const slot = plotW / data.length}
+                    {#if showAxisLabels && i % labelStep === 0}
+                        <text x={padding.left + i * slot + slot / 2} y={height - 8} class="axis-label" text-anchor="middle">
+                            {formatLabel(point.key)}
+                        </text>
+                    {/if}
+                {/each}
+            </svg>
     {/if}
 
     {#if hovered !== null}
@@ -156,6 +170,11 @@
     .grid-line {
         stroke: color-mix(in srgb, var(--theme-border, #404040) 60%, transparent);
         stroke-width: 1;
+    }
+
+    .axis-label {
+        font-size: 10px;
+        fill: var(--theme-textSecondary, #b3b3b3);
     }
 
     .bar {

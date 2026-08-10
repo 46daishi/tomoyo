@@ -7,6 +7,7 @@
      *   series?: Array<{ key: string, color: string, label: string, formatValue?: (v: number) => string }>,
      *   formatLabel?: (k: string) => string,
      *   formatValue?: (v: number) => string,
+     *   showAxisLabels?: boolean,
      * }}
      */
     let {
@@ -14,6 +15,7 @@
         series = [],
         formatLabel = (k) => k,
         formatValue = (v) => v.toLocaleString(),
+        showAxisLabels = true,
     } = $props();
 
     let chartWidth = $state(700);
@@ -105,7 +107,7 @@
             {/if}
 
             {#each data as d, i}
-                {#if i % labelStep === 0}
+                {#if showAxisLabels && i % labelStep === 0}
                     <text x={xFor(i)} y={height - 8} class="axis-label" text-anchor="middle">
                         {formatLabel(d.key)}
                     </text>
