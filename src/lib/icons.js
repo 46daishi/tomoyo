@@ -46,4 +46,6 @@ export const ICONS = {
   fire2: "\udb86\udc07",
   calendar2: "\udb80\udced",
   star: "\uf41e",
+  github: "\ue709",
+  twitter: "\uf099",
 };

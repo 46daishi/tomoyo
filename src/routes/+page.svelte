@@ -3,6 +3,7 @@
     import SelectInput from "$lib/components/SelectInput.svelte";
     import SideNav from "$lib/components/SideNav.svelte";
     import MediaFormModal from '$lib/components/MediaFormModal.svelte';
+    import AboutModal from '$lib/components/AboutModal.svelte';
     import { ICONS } from "$lib/icons.js";
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
@@ -17,6 +18,7 @@
     let showModal = $state(false);
     let editingMedia = $state(null);
     let settings = $state(/** @type {Record<string, any> | null} */ (null));
+    let showAbout = $state(false);
 
     let profilePicSrc = $derived(settings?.profile_picture ? coverSrc(settings.profile_picture) : null);
 
@@ -154,6 +156,8 @@
     {/if}
 
     <MediaFormModal bind:show={showModal} media={editingMedia} onSaved={loadMedia} />
+
+    <AboutModal bind:show={showAbout} />
 </main>
 
 <SideNav>
@@ -169,11 +173,6 @@
     size="small"
     onAction={() => goto(`/dictionary`)}
   />
-  <ActionButton
-    icon={ICONS.question}
-    variant="secondary"
-    size="small"
-  />
   <div class="stats-btn-wrap">
     {#if profilePicSrc}
         <img class="profile-cover" src={profilePicSrc} alt="Your profile" />
@@ -185,6 +184,12 @@
       onAction={() => goto('/statistics')}
     />
   </div>
+  <ActionButton
+    icon={ICONS.question}
+    variant="secondary"
+    size="small"
+    onAction={() => (showAbout = true)}
+  />
 </SideNav>
 
 <style>
