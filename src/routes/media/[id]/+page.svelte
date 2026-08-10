@@ -106,6 +106,12 @@
     size="small" 
     onAction={() => history.back()} 
   />
+  <ActionButton
+    icon={ICONS.settings}
+    variant="secondary"
+    size="small"
+    onAction={() => goto('/settings')}
+  />
   <ActionButton 
     icon={ICONS.book} 
     variant="secondary" 
