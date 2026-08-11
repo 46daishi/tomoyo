@@ -6,7 +6,7 @@
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS } from '$lib/constants.js';
     import { loadSettings } from '$lib/settings.js';
-    import { getReviewPool, updateWordStatus, parseDefinitions } from '$lib/dictionary.js';
+    import { getReviewPool, updateWordStatus, parseDefinitions, getSentencesForWord } from '$lib/dictionary.js';
     import { getReviewWeighting, startReviewSession, endReviewSession, logReviewedItem } from '$lib/reviewStats.js';
     import { setReviewProgress } from '$lib/stores/presence.svelte';
     
@@ -23,6 +23,7 @@
     let advancing = $state(false);
 
     let currentWord = $derived(queue[index] ?? null);
+    let currentSentence = $state(null);
     let mode = $derived(settings?.default_review_mode ?? 'normal');
     let isRevealed = $derived(mode === 'normal' || revealed);
 
@@ -60,6 +61,28 @@
         const m = Math.floor(seconds / 60);
         const s = Math.round(seconds % 60);
         return m > 0 ? `${m}m ${s}s` : `${s}s`;
+    }
+
+    function splitHighlighted(sentence) {
+        const s = sentence?.sentence_text ?? '';
+        const start = Number.isFinite(sentence?.highlight_start) ? sentence.highlight_start : -1;
+        const end = Number.isFinite(sentence?.highlight_end) ? sentence.highlight_end : -1;
+        if (start < 0 || end <= start || start > s.length || end > s.length) return null;
+        return {
+            before: s.slice(0, start),
+            highlight: s.slice(start, end),
+            after: s.slice(end),
+        };
+    }
+
+    async function loadRandomSentence(wordId) {
+        currentSentence = null;
+        const sentences = await getSentencesForWord(wordId);
+        if (sentences.length === 0) {
+            currentSentence = null;
+            return;
+        }
+        currentSentence = sentences[Math.floor(Math.random() * sentences.length)];
     }
 
     function advance() {
@@ -139,6 +162,11 @@
             : null);
     });
 
+    $effect(() => {
+        const id = currentWord?.id;
+        if (id != null) loadRandomSentence(id);
+    });
+
     onDestroy(() => {
         if (sessionId && !done) endReviewSession(sessionId);
         setReviewProgress(null);
@@ -174,6 +202,20 @@
             {#if isRevealed}
                 <div class="review-reading">{currentWord.reading}</div>
                 <div class="review-definitions">{parseDefinitions(currentWord.definitions).join('; ')}</div>
+                {#if currentSentence}
+                    <div class="review-sentence-wrap">
+                        {#if splitHighlighted(currentSentence)}
+                            <p class="review-sentence">
+                                {splitHighlighted(currentSentence).before}<mark class="sentence-highlight">{splitHighlighted(currentSentence).highlight}</mark>{splitHighlighted(currentSentence).after}
+                            </p>
+                        {:else}
+                            <p class="review-sentence">{currentSentence.sentence_text}</p>
+                        {/if}
+                        {#if currentSentence.translation}
+                            <p class="review-sentence-translation">{currentSentence.translation}</p>
+                        {/if}
+                    </div>
+                {/if}
             {/if}
         </div>
 
@@ -285,7 +327,7 @@
         align-items: center;
         gap: 0.75rem;
         text-align: center;
-        max-width: 500px;
+        max-width: 800px;
     }
 
     .current-status-badge {
@@ -314,9 +356,39 @@
     }
 
     .review-definitions {
-        font-size: 1rem;
+        font-size: 1.2rem;
         color: var(--theme-text, #f6f6f6);
         max-width: 420px;
+    }
+
+    .review-sentence-wrap {
+        margin-top: 1.25rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--theme-border, #404040);
+        max-width: 800px;
+    }
+
+    .review-sentence {
+        margin: 0;
+        font-family: "Noto Sans JP", Inter, sans-serif;
+        font-size: 1.6rem;
+        line-height: 1.6;
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .review-sentence-translation {
+        margin: 0.4rem 0 0;
+        font-size: 1.1rem;
+        color: var(--theme-text, #b3b3b3);
+    }
+
+    .sentence-highlight {
+        margin: 0;
+        padding: 0 0.1em;
+        border-radius: 3px;
+        background: none;
+        color: var(--theme-primary, #f6f6f6);
+        font-weight: 600;
     }
 
     .reveal-btn {
