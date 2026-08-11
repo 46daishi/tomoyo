@@ -117,6 +117,18 @@
         }
     }
 
+    function splitHighlighted(sentence) {
+        const s = sentence?.sentence_text ?? '';
+        const start = Number.isFinite(sentence?.highlight_start) ? sentence.highlight_start : -1;
+        const end = Number.isFinite(sentence?.highlight_end) ? sentence.highlight_end : -1;
+        if (start < 0 || end <= start || start > s.length || end > s.length) return null;
+        return {
+            before: s.slice(0, start),
+            highlight: s.slice(start, end),
+            after: s.slice(end),
+        };
+    }
+
     function viewFullSentences(word) {
         searchQuery = word.spelling;
         activeTab = 'sentences';
@@ -649,7 +661,13 @@
                                     <ul class="sentences-list">
                                         {#each sentencesByWord[word.id].slice(0, sentenceLimit) as sentence (sentence.id ?? sentence.sentence_text)}
                                             <li class="sentence-item">
-                                                <p class="sentence-text">{sentence.sentence_text}</p>
+                                                {#if splitHighlighted(sentence)}
+                                                    <p class="sentence-text">
+                                                        {splitHighlighted(sentence).before}<mark class="sentence-highlight">{splitHighlighted(sentence).highlight}</mark>{splitHighlighted(sentence).after}
+                                                    </p>
+                                                {:else}
+                                                    <p class="sentence-text">{sentence.sentence_text}</p>
+                                                {/if}
                                                 {#if sentence.translation}
                                                     <p class="sentence-translation">{sentence.translation}</p>
                                                 {/if}
@@ -1299,6 +1317,15 @@
         font-size: 1.1rem;
         color: var(--theme-text, #f6f6f6);
         font-family: "Noto Sans JP", Inter, sans-serif;
+    }
+
+    .sentence-highlight {
+        margin: 0;
+        padding: 0 0.1em;
+        border-radius: 3px;
+        background: none;
+        color: var(--theme-primary, #f6f6f6);
+        font-weight: 600;
     }
 
     .sentence-tab-text {

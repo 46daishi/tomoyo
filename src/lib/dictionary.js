@@ -196,7 +196,7 @@ export async function getMediaTagColors() {
 export async function getSentencesForWord(wordId) {
     const db = await getDb();
     return db.select(
-        `SELECT id, sentence_text, translation, MIN(created_at) as created_at
+        `SELECT id, sentence_text, translation, MAX(highlight_start) as highlight_start, MAX(highlight_end) as highlight_end, MIN(created_at) as created_at
          FROM word_sentences 
          WHERE word_id = $1 
          GROUP BY sentence_text
