@@ -220,6 +220,17 @@
         </div>
 
         {#if !isRevealed}
+            {#if currentSentence}
+                <div class="review-sentence-wrap">
+                    {#if splitHighlighted(currentSentence)}
+                        <p class="review-sentence">
+                            {splitHighlighted(currentSentence).before}<mark class="sentence-highlight">{splitHighlighted(currentSentence).highlight}</mark>{splitHighlighted(currentSentence).after}
+                        </p>
+                    {:else}
+                        <p class="review-sentence">{currentSentence.sentence_text}</p>
+                    {/if}
+                </div>
+            {/if}
             <button class="reveal-btn" onclick={() => (revealed = true)}>
                 Show details <span class="key-hint">Space</span>
             </button>
