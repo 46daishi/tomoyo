@@ -216,7 +216,22 @@ export async function getAllSentences({ mediaId = null } = {}) {
     const db = await getDb();
     return db.select(
         `SELECT ws.id, ws.sentence_text, ws.translation, ws.media_id, ws.created_at,
-                GROUP_CONCAT(DISTINCT COALESCE(m.tag, m.title)) as tags
+                GROUP_CONCAT(DISTINCT COALESCE(m.tag, m.title)) as tags,
+                (SELECT GROUP_CONCAT(spelling, '\x1f')
+                 FROM (SELECT DISTINCT w.spelling
+                       FROM word_sentences wsp
+                       JOIN words w ON w.id = wsp.word_id
+                       WHERE wsp.sentence_text = ws.sentence_text)) as mined_spellings,
+                (SELECT GROUP_CONCAT(reading, '\x1f')
+                 FROM (SELECT DISTINCT w.reading
+                       FROM word_sentences wspr
+                       JOIN words w ON w.id = wspr.word_id
+                       WHERE wspr.sentence_text = ws.sentence_text)) as mined_readings,
+                (SELECT GROUP_CONCAT(definitions, '\x1f')
+                 FROM (SELECT DISTINCT w.definitions
+                       FROM word_sentences wsd
+                       JOIN words w ON w.id = wsd.word_id
+                       WHERE wsd.sentence_text = ws.sentence_text)) as mined_definitions
          FROM word_sentences ws
          LEFT JOIN word_tags wt ON wt.word_id = ws.word_id
          LEFT JOIN media m ON m.id = wt.media_id

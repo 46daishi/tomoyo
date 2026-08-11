@@ -339,15 +339,20 @@
             .sort(SORT_COMPARATORS[sortBy])
     );
 
-    let filteredSentences = $derived(
-        searchQuery.trim()
-            ? allSentences.filter(
-                  (s) =>
-                      s.sentence_text.includes(searchQuery) ||
-                      (s.translation ?? '').toLowerCase().includes(searchQuery.toLowerCase())
-              )
-            : allSentences
-    );
+    function sentenceMatchesQuery(s) {
+        const q = searchQuery.trim();
+        if (!q) return true;
+        const lower = q.toLowerCase();
+        if (s.sentence_text.includes(q) || (s.translation ?? '').toLowerCase().includes(lower)) return true;
+        const fields = [s.mined_spellings, s.mined_readings, s.mined_definitions];
+        return fields.some(
+            (field) =>
+                field &&
+                field.split('\x1f').some((part) => part && part.toLowerCase().includes(lower))
+        );
+    }
+
+    let filteredSentences = $derived(allSentences.filter(sentenceMatchesQuery));
 
     let sentenceLimit = $derived(settings?.word_sentence_count || 5);
 
@@ -681,6 +686,14 @@
                                             onclick={() => viewFullSentences(word)}
                                         >
                                             View all
+                                        </button>
+                                    {:else}
+                                        <button
+                                            type="button"
+                                            class="view-full-sentences-btn"
+                                            onclick={() => viewFullSentences(word)}
+                                        >
+                                            Show in Sentences tab
                                         </button>
                                     {/if}
                                 {/if}
