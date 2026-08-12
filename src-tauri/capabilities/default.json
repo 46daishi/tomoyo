@@ -13,9 +13,14 @@
     "fs:allow-copy-file",
     "fs:allow-mkdir",
     "fs:allow-exists",
+    "fs:allow-write-file",
     "clipboard-manager:allow-read-text",
     "core:event:allow-emit",
     "core:event:allow-listen",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://*.vndb.org" }]
+    },
     {
       "identifier": "fs:scope",
       "allow": ["$APPDATA/covers", "$APPDATA/covers/**", "$APPDATA/profile", "$APPDATA/profile/**"]

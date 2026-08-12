@@ -51,6 +51,11 @@ export const SENTENCE_REVIEW_MODES = [
   { value: 'plain', label: 'Plain text' },
 ]
 
+export const VNDB_TITLE_OPTIONS = [
+  { value: 'romaji', label: 'Romaji' },
+  { value: 'japanese', label: 'Japanese' },
+]
+
 // Each option: { key, label, type, subRow?, showIf?, ...type-specific fields }
 // type-specific fields:
 //   select      -> options
@@ -80,6 +85,7 @@ export const SETTINGS_SCHEMA = [
               showIf: (s) => s.input_mode === 'websocket',
           },
           { key: 'discord_rpc_enabled', label: 'Discord Rich Presence', type: 'checkbox' },
+          { key: 'vndb_title_pref', label: 'Default VNDB title', type: 'select', options: VNDB_TITLE_OPTIONS },
             {
                 key: 'data_actions',
                 label: 'Data',

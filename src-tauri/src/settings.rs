@@ -53,6 +53,9 @@ pub struct AppSettings {
     // ── Dictionary ──
     pub default_dictionary_sort: String, // "date" | "status" | "lookup"
     pub word_sentence_count: u32,
+
+    // ── VNDB ──
+    pub vndb_title_pref: String, // "romaji" | "japanese"
 }
 
 impl Default for AppSettings {
@@ -98,6 +101,8 @@ impl Default for AppSettings {
 
             default_dictionary_sort: "date".into(),
             word_sentence_count: 5,
+
+            vndb_title_pref: "romaji".into(),
         }
     }
 }

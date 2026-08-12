@@ -16,6 +16,8 @@
     import { formatMinutes } from '$lib/utils/chartFormatters.js';
     import { getMediaStats } from '$lib/sessions.js';
     import { getVocabularyCoverage } from '$lib/coverage.js';
+    import { getVn, formatVnLength, formatVnRating, vndbUrl } from '$lib/vndb.js';
+    import { openUrl } from '@tauri-apps/plugin-opener';
     import {
         getReadingStats, getReadingStreak, getActivityYears, getMojiActivityByYear,
         getDailyMoji, getMonthlyMoji, getWordsMinedByDay, getWordStatusCounts,
@@ -28,6 +30,8 @@
     let mediaOptions = $state(/** @type {Array<{ value: string, label: string }>} */ ([{ value: '', label: 'All media' }]));
     let settings = $state(/** @type {Record<string, any> | null} */ (null));
     let mediaInfo = $state(/** @type {Record<string, any> | null} */ (null));
+    let vnInfo = $state(/** @type {Record<string, any> | null} */ (null));
+    let vnInfoRequestId = 0;
 
     // Native state initialized as provided
     let stats = $state({
@@ -80,8 +84,30 @@
             return;
         }
         const db = await getDb();
-        const rows = await db.select('SELECT id, title, color, cover_path, status, tag, created_at FROM media WHERE id = $1', [mediaFilter]);
+        const rows = await db.select('SELECT id, title, color, cover_path, status, tag, vndb_id, created_at FROM media WHERE id = $1', [mediaFilter]);
         if (latestInfo.get() === my) mediaInfo = rows[0] ?? null;
+    }
+
+    async function loadVnInfo() {
+        const id = mediaInfo?.vndb_id;
+        const my = ++vnInfoRequestId;
+        if (!id) {
+            vnInfo = null;
+            return;
+        }
+        try {
+            const vn = await getVn(id);
+            if (vnInfoRequestId === my) vnInfo = vn;
+        } catch (err) {
+            console.error('VNDB fetch failed:', err);
+            if (vnInfoRequestId === my) vnInfo = null;
+        }
+    }
+
+    /** @param {string} id */
+    async function openVndb(id) {
+        const url = vndbUrl(id);
+        if (url) await openUrl(url);
     }
 
     async function loadStats() {
@@ -192,6 +218,11 @@
     $effect(() => {
         mediaFilter;
         loadMediaInfo();
+    });
+
+    $effect(() => {
+        mediaInfo?.vndb_id;
+        loadVnInfo();
     });
 
     onMount(async () => {
@@ -427,6 +458,11 @@
                         {/if}
                     </div>
                     <div class="cover-title">{mediaInfo.title}</div>
+                    {#if info.vndb_id}
+                        <div class="vndb-row">
+                            <button class="vndb-link" onclick={() => openVndb(info.vndb_id)}>v{info.vndb_id.replace(/^v/i, '')}</button>
+                        </div>
+                    {/if}
                     <ul class="media-meta">
                         <li>
                             <span class="meta-icon" style="color: {mediaInfo.color || '#fab387'}">{@html ICONS.star}</span>
@@ -458,6 +494,18 @@
                             <span class="meta-label">Tag</span>
                             <span class="meta-value" style="color: {mediaInfo.color || '#fab387'}">{mediaInfo.tag || '—'}</span>
                         </li>
+                        {#if info.vndb_id}
+                            <li>
+                                <span class="meta-icon" style="color: {info.color || '#fab387'}">{@html ICONS.clock}</span>
+                                <span class="meta-label">Avg length</span>
+                                <span class="meta-value">{vnInfo ? formatVnLength(vnInfo) : '—'}</span>
+                            </li>
+                            <li>
+                                <span class="meta-icon" style="color: {info.color || '#fab387'}">{@html ICONS.star}</span>
+                                <span class="meta-label">VNDB rating</span>
+                                <span class="meta-value">{vnInfo ? formatVnRating(vnInfo) : '—'}</span>
+                            </li>
+                        {/if}
                     </ul>
                 </div>
             {/if}
@@ -898,6 +946,7 @@
         font-weight: 700;
     }
     .cover-title {
+        font-family: "Noto Sans JP";
         text-align: center;
         font-weight: 600;
         font-size: 0.95rem;
@@ -989,6 +1038,33 @@
         font-weight: 600;
         color: var(--theme-text, #f6f6f6);
         font-variant-numeric: tabular-nums;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .vndb-row {
+        display: flex;
+        justify-content: center;
+        padding: 0 0.5rem;
+    }
+
+    .vndb-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--theme-primary, #36b7bd);
+        transition: color 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .vndb-link:hover {
+        color: var(--theme-primaryHover, #17a4ab);
+        text-decoration: underline;
     }
 
     /* Pace list */

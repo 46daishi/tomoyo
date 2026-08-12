@@ -1,8 +1,16 @@
 <script>
     import { coverSrc } from '$lib/db';
     import { STATUS_COLORS } from '$lib/constants.js';
+    import { openUrl } from '@tauri-apps/plugin-opener';
+    import { vndbUrl } from '$lib/vndb.js';
 
     let { media, children } = $props();
+
+    /** @param {string} id */
+    async function openVndb(id) {
+        const url = vndbUrl(id);
+        if (url) await openUrl(url);
+    }
 </script>
 
 <div class="media-header">
@@ -27,6 +35,9 @@
                 <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
                 {media.status}
             </span>
+            {#if media.vndb_id}
+                <button class="vndb-link" onclick={() => openVndb(media.vndb_id)} title="Open on VNDB">v{media.vndb_id.replace(/^v/i, '')}</button>
+            {/if}
         </div>
 
         {#if children}
@@ -39,6 +50,7 @@
 
 <style>
     .title-row {
+        font-family: "Noto Sans JP";
         display: flex;
         align-items: center;
         gap: 0.7rem;
@@ -107,6 +119,7 @@
     }
 
     .status {
+        font-family: "Noto Sans JP";
         padding-top: 0.2rem;
         display: flex;
         align-items: center;
@@ -122,6 +135,24 @@
         border-radius: 50%;
         background: var(--dot-color, var(--theme-textSecondary, #b3b3b3));
         flex-shrink: 0;
+    }
+
+    .vndb-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        padding-top:0.3rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--theme-primary, #36b7bd);
+        transition: color 0.15s ease;
+    }
+
+    .vndb-link:hover {
+        color: var(--theme-primaryHover, #17a4ab);
+        text-decoration: underline;
     }
 
     .tag-pill {
