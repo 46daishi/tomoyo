@@ -27,6 +27,7 @@
     });
 
     function handlePointerDown(e) {
+        if (e.target?.closest?.('[data-status-toggle]')) return;
         if (menuEl && !menuEl.contains(e.target)) {
             onClose();
         }

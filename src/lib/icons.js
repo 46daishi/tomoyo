@@ -49,4 +49,7 @@ export const ICONS = {
   github: "\ue709",
   twitter: "\uf099",
   bolt: "\uf0e7",
+  grid: "\udb81\udd70",
+  list: "\uf03a",
+  card: "\udb85\udff1",
 };

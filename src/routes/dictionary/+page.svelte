@@ -43,6 +43,8 @@
     let sentencesByWord = $state({});
 
     let activeTab = $state('words'); // 'words' | 'sentences' | 'frequent' | 'review'
+    let viewMode = $state('card'); // 'card' | 'grid' | 'list'
+    let expandedTranslations = $state(new Set());
     let allSentences = $state([]);
     let sentencesLoaded = $state(false);
 
@@ -227,6 +229,18 @@
         await updateSentenceTranslation({ sentenceText: sentence.sentence_text, translation });
     }
 
+    /** @param {Record<string, any>} sentence */
+    function toggleTranslation(sentence) {
+        const key = sentence.id ?? sentence.sentence_text;
+        const next = new Set(expandedTranslations);
+        if (next.has(key)) {
+            next.delete(key);
+        } else {
+            next.add(key);
+        }
+        expandedTranslations = next;
+    }
+
     $effect(() => {
         loadWords();
     });
@@ -265,6 +279,10 @@
     let statusMenuPos = $state({ x: 0, y: 0 });
 
     function openStatusMenu(word, event) {
+        if (statusMenuWordId === word.id) {
+            closeStatusMenu();
+            return;
+        }
         const rect = event.currentTarget.getBoundingClientRect();
         statusMenuPos = { x: rect.right + 8, y: rect.top };
         statusMenuWordId = word.id;
@@ -571,6 +589,31 @@
         >
             Review
         </button>
+        {#if activeTab === 'words' || activeTab === 'sentences'}
+            <div class="view-toggle">
+                <button
+                    type="button"
+                    class="view-toggle-btn"
+                    class:active={viewMode === 'card'}
+                    title="Card view"
+                    onclick={() => (viewMode = 'card')}
+                >{@html ICONS.card}</button>
+                <button
+                    type="button"
+                    class="view-toggle-btn"
+                    class:active={viewMode === 'grid'}
+                    title="Grid view"
+                    onclick={() => (viewMode = 'grid')}
+                >{@html ICONS.grid}</button>
+                <button
+                    type="button"
+                    class="view-toggle-btn"
+                    class:active={viewMode === 'list'}
+                    title="List view"
+                    onclick={() => (viewMode = 'list')}
+                >{@html ICONS.list}</button>
+            </div>
+        {/if}
     </div>
 
     <div class="dict-content">
@@ -578,12 +621,13 @@
             {#if filteredWords.length === 0}
             <p class="empty-notice">No words found.</p>
         {:else}
-            <div class="word-list">
+            <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
                 {#each filteredWords as word (word.id)}
-                    <div class="word-card">
+                    <div class="word-card" class:list-view={viewMode === 'list'}>
                         <button
                             type="button"
                             class="status-bar"
+                            data-status-toggle
                             style={`--status-color: ${STATUS_LEVELS[word.status ?? 0].color}`}
                             title={`Status: ${STATUS_LEVELS[word.status ?? 0].label} — click to change`}
                             aria-haspopup="menu"
@@ -620,7 +664,7 @@
                             </button>
                         </div>
                         <div class="entry-pos">{word.word_type}</div>
-                        <div class="word-definitions">
+                        <div class="word-definitions" title={parseDefinitions(word.definitions).join('; ')}>
                             {parseDefinitions(word.definitions).join('; ')}
                         </div>
                         <div class="notes-edit-row">
@@ -711,10 +755,13 @@
                 {allSentences.length === 0 ? 'No sentences found.' : 'No sentences match your search.'}
             </p>
         {:else}
-            <div class="word-list">
+            <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
                 {#each filteredSentences as sentence (sentence.id ?? sentence.sentence_text)}
-                    <div class="word-card sentence-card">
-                        <p class="sentence-text sentence-tab-text">{sentence.sentence_text}</p>
+                    <div class="word-card sentence-card" class:list-view={viewMode === 'list'}>
+                        <p class="sentence-text sentence-tab-text" title={sentence.sentence_text}>{sentence.sentence_text}</p>
+                        {#if viewMode === 'list' && sentence.translation && expandedTranslations.has(sentence.id ?? sentence.sentence_text)}
+                            <p class="sentence-translation list-translation">{sentence.translation}</p>
+                        {/if}
                         <div class="translation-edit-row">
                             <span class="translation-icon">{@html ICONS.translate}</span>
                             <input
@@ -738,6 +785,18 @@
                             </div>
                         {/if}
                 
+                        {#if viewMode === 'list' && sentence.translation}
+                            <button
+                                type="button"
+                                class="translation-toggle-btn"
+                                class:active={expandedTranslations.has(sentence.id ?? sentence.sentence_text)}
+                                onclick={() => toggleTranslation(sentence)}
+                                title="Toggle translation"
+                            >
+                                {@html ICONS.translate}
+                            </button>
+                        {/if}
+
                         <button
                             type="button"
                             class="sentence-delete-btn"
@@ -1100,6 +1159,203 @@
         flex-direction: column;
         gap: 0.75rem;
         max-width: 1200px;
+    }
+
+    .word-list.word-list-view {
+        max-width: none;
+        gap: 0.4rem;
+    }
+
+    .word-list.word-list-view .word-card {
+        display: grid;
+        grid-template-columns: 1rem 15rem minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 1rem;
+        padding: 0.4rem 0.9rem;
+    }
+
+    .word-list.word-list-view .word-card .sentences-panel {
+        grid-column: 1 / -1;
+        margin-top: 0.3rem;
+        padding-top: 0.4rem;
+    }
+
+    .word-list.word-list-view .word-card .sentences-list {
+        gap: 0.3rem;
+    }
+
+    .word-list.word-list-view .word-card .sentence-item {
+        padding: 0.25rem 0.5rem;
+    }
+
+    .word-list.word-list-view .word-card .sentence-text {
+        font-size: 0.9rem;
+    }
+
+    .word-list.word-list-view .word-card .sentence-translation {
+        margin-top: 0.1rem;
+        font-size: 0.72rem;
+    }
+
+    .word-list.word-list-view .word-card:hover {
+        transform: none;
+    }
+
+    .word-list.word-list-view .word-card .status-bar {
+        border-top-left-radius: 10px;
+        border-bottom-left-radius: 10px;
+    }
+
+    .word-list.word-list-view .word-main {
+        grid-column: 2;
+        min-width: 0;
+    }
+
+    .word-list.word-list-view .word-spelling,
+    .word-list.word-list-view .word-reading {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .word-list.word-list-view .word-spelling {
+        font-size: 1rem;
+    }
+
+    .word-list.word-list-view .word-reading {
+        font-size: 0.85rem;
+    }
+
+    .word-list.word-list-view .entry-pos,
+    .word-list.word-list-view .notes-edit-row,
+    .word-list.word-list-view .view-full-sentences-btn {
+        display: none;
+    }
+
+    .word-list.word-list-view .word-definitions {
+        grid-column: 3;
+        min-width: 0;
+        margin-top: 0;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .word-list.word-list-view .word-meta {
+        grid-column: 4;
+        flex-wrap: nowrap;
+    }
+
+    .word-list.word-list-view .sentence-count {
+        margin-left: 0;
+    }
+
+    .word-list.word-list-view .lookup-badge {
+        grid-column: 1;
+        position: static;
+        justify-self: start;
+        padding: 0;
+        font-size: 0.78rem;
+    }
+
+    .word-list.word-list-view .lookup-badge-icon {
+        display: none;
+    }
+
+    .word-list.word-list-view .sentence-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        column-gap: 1rem;
+        padding: 0.4rem 0.9rem;
+    }
+
+    .word-list.word-list-view .sentence-card .sentence-text {
+        grid-column: 1;
+        grid-row: 1;
+        font-size: 1rem;
+        line-height: 1.3rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .word-list.word-list-view .sentence-card .list-translation {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        margin-top: 0.2rem;
+        font-size: 0.85rem;
+        white-space: normal;
+    }
+
+    .word-list.word-list-view .sentence-card .translation-toggle-btn {
+        font-family: "Symbols Nerd Font";
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.1rem;
+        height: 1.1rem;
+        background: none;
+        border: none;
+        padding: 0;
+        color: var(--theme-textSecondary, #b3b3b3);
+        cursor: pointer;
+    }
+
+    .word-list.word-list-view .sentence-card .translation-toggle-btn:hover,
+    .word-list.word-list-view .sentence-card .translation-toggle-btn.active {
+        color: var(--theme-primary, #36b7bd);
+    }
+
+    .word-list.word-list-view .sentence-card .translation-edit-row,
+    .word-list.word-list-view .sentence-card .word-meta {
+        display: none;
+    }
+
+    .word-list.word-list-view .sentence-card .sentence-delete-btn {
+        grid-column: 3;
+        grid-row: 1;
+        position: static;
+        opacity: 1;
+    }
+
+    .view-toggle {
+        font-family: "Symbols Nerd Font";
+        display: flex;
+        align-items: center;
+        gap: 0.1rem;
+        margin-left: auto;
+        padding-left: 0.5rem;
+    }
+
+    .view-toggle-btn {
+        font-family: "Symbols Nerd Font";
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 28px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: var(--theme-textSecondary, #b3b3b3);
+        transition: color 0.15s ease;
+    }
+
+    .view-toggle-btn :global(svg) {
+        width: 15px;
+        height: 15px;
+    }
+
+    .view-toggle-btn:hover {
+        color: var(--theme-text, #f6f6f6);
+    }
+
+    .view-toggle-btn.active {
+        color: var(--theme-primary, #36b7bd);
     }
 
     .word-list.word-grid {
