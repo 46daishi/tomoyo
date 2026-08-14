@@ -274,6 +274,38 @@ fn lookup_from_position(
 // Increase depth from 3 to 5 to accommodate stacked causative-passive + desire + negative + past
 const MAX_DECONJUGATION_DEPTH: usize = 5;
 
+/// How an entry was reached for a given surface. Used as a tie-breaker so a
+/// direct spelling match outranks a homophone reached only through an
+/// alternate spelling or a reading — e.g. 前(まえ) beats 先(さき) when both
+/// match the surface 前, since 先 merely lists 前 as a secondary spelling.
+/// Ordering here (lower = better) is the sort precedence.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum MatchKind {
+    PrimarySpelling, // normalized surface == entry's primary (first) spelling
+    Spelling,        // normalized surface == some other spelling
+    Reading,         // normalized surface == a reading
+    Deconjugated,    // reached by deconjugating a conjugated surface
+}
+
+fn match_kind(entry: &DictEntry, key: &str) -> MatchKind {
+    let spellings: Vec<String> =
+        entry.spellings.iter().map(|s| normalize::normalize_text(s)).collect();
+    let readings: Vec<String> =
+        entry.readings.iter().map(|s| normalize::normalize_text(s)).collect();
+
+    if spellings.first().map(String::as_str) == Some(key) {
+        MatchKind::PrimarySpelling
+    } else if spellings.iter().any(|s| s == key) {
+        MatchKind::Spelling
+    } else if readings.iter().any(|s| s == key) {
+        MatchKind::Reading
+    } else {
+        // A literal match must have come from a spelling or reading, so this
+        // arm only fires for deconjugation-reached entries in practice.
+        MatchKind::Deconjugated
+    }
+}
+
 fn lookup_candidate(
     candidate: &str,
     index: &DictionaryIndex,
@@ -281,9 +313,11 @@ fn lookup_candidate(
 ) -> Option<(Vec<Arc<DictEntry>>, Option<String>)> {
     let variants = normalize_variants(candidate);
 
-    // (entry, chain_len, chain_description) — chain_len 0 and no description
-    // means "literal match," anything else means "reached via deconjugation."
-    let mut candidates: Vec<(Arc<DictEntry>, usize, Option<String>)> = Vec::new();
+    // (entry, chain_len, chain_description, kind) — chain_len 0 and no
+    // description means "literal match," anything else means "reached via
+    // deconjugation." kind records whether the literal hit came from the
+    // entry's primary spelling, another spelling, or a reading.
+    let mut candidates: Vec<(Arc<DictEntry>, usize, Option<String>, MatchKind)> = Vec::new();
     let mut seen_ids: HashSet<u32> = HashSet::new();
 
     // Literal matches first — inserted with chain_len 0, so they win ties
@@ -292,7 +326,8 @@ fn lookup_candidate(
         if let Some(entries) = index.by_text.get(key) {
             for e in entries {
                 if seen_ids.insert(e.id) {
-                    candidates.push((Arc::clone(e), 0, None));
+                    let kind = match_kind(e, key);
+                    candidates.push((Arc::clone(e), 0, None, kind));
                 }
             }
         }
@@ -309,7 +344,7 @@ fn lookup_candidate(
                 let chain_desc = form.rule_chain.join(" + ");
                 for e in entries {
                     if seen_ids.insert(e.id) {
-                        candidates.push((Arc::clone(e), chain_len, Some(chain_desc.clone())));
+                        candidates.push((Arc::clone(e), chain_len, Some(chain_desc.clone()), MatchKind::Deconjugated));
                     }
                 }
             }
@@ -320,19 +355,20 @@ fn lookup_candidate(
         return None;
     }
 
-    // Priority-tagged entries first; among ties, fewest deconjugation
-    // steps first (literal matches, at 0 steps, sort ahead of anything
-    // requiring inflection to reach).
+    // Priority-tagged entries first; among ties, the kind of match wins
+    // (direct spelling before alternate spelling before reading before
+    // deconjugated), then non-bound entries, then fewest deconjugation steps.
     candidates.sort_by(|a, b| {
         let a_prio = priority_score(&a.0);
         let b_prio = priority_score(&b.0);
         b_prio.cmp(&a_prio)
+            .then(a.3.cmp(&b.3))
             .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
             .then(a.1.cmp(&b.1))
     });
 
     let deconjugated_from = candidates[0].2.clone();
-    let entries: Vec<Arc<DictEntry>> = candidates.into_iter().map(|(e, _, _)| e).collect();
+    let entries: Vec<Arc<DictEntry>> = candidates.into_iter().map(|(e, _, _, _)| e).collect();
 
     Some((entries, deconjugated_from))
 }
