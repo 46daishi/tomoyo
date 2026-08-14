@@ -30,6 +30,10 @@ export async function scanSentenceSpans(text) {
         spans.push({
             start: result.start,
             end: result.end,
+            // All dictionary entries this span resolves to (may be several
+            // homophones). Kept alongside `wordId` (the top-ranked entry) so
+            // callers can check whether *any* of them is mined/known.
+            entryIds: result.entries.map((e) => e.id),
             wordId: result.entries.length > 0 ? result.entries[0].id : null,
         });
         pos = result.end;
@@ -39,7 +43,15 @@ export async function scanSentenceSpans(text) {
 
 export async function findKnownWordSpans(text, knownWordsMap) {
     const allSpans = await scanSentenceSpans(text);
-    return allSpans
-        .filter((s) => s.wordId !== null && knownWordsMap.has(s.wordId))
-        .map((s) => ({ ...s, status: knownWordsMap.get(s.wordId) }));
+    const spans = [];
+    for (const s of allSpans) {
+        // Highlight the span if *any* of its entries is a known word, not
+        // just the top-ranked one — otherwise mining 前(まえ) while 先(さき)
+        // ranks first would leave the word unhighlighted.
+        const knownId = (s.entryIds ?? []).find((id) => knownWordsMap.has(id));
+        if (knownId !== undefined) {
+            spans.push({ ...s, wordId: knownId, status: knownWordsMap.get(knownId) });
+        }
+    }
+    return spans;
 }

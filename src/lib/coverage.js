@@ -25,7 +25,8 @@ export async function getVocabularyCoverage(mediaId) {
 
     for (const { sentence_text } of sentences) {
         for (const span of await scanSentenceSpans(sentence_text)) {
-            const status = span.wordId !== null ? knownWordsMap.get(span.wordId) : undefined;
+            const knownId = (span.entryIds ?? []).find((id) => knownWordsMap.has(id));
+            const status = knownId !== undefined ? knownWordsMap.get(knownId) : undefined;
             totalWeight += status !== undefined ? STATUS_WEIGHT[status] : 0;
             totalOccurrences += 1;
         }
