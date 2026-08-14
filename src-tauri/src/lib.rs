@@ -4,7 +4,7 @@ mod discord_rpc;
 mod settings;
 
 use settings::{get_settings, save_settings, load_settings_from_disk, SettingsState};
-use deconjugate::{build_deconjugation_rules, deconjugate, DeconjRule};
+use deconjugate::{build_deconjugation_rules, deconjugate, DeconjRule, DeconjugatedForm};
 use normalize::normalize_variants;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -26,6 +26,23 @@ struct TokenOut {
 }
 
 struct TokenizerState(Mutex<Tokenizer>);
+
+/// A single morphological token (vibrato/MeCab) with the fields needed for
+/// lookups: character offsets, surface, dictionary base form, POS, and the
+/// normalized (hiragana) reading MeCab assigned in context.
+#[derive(Clone, serde::Serialize)]
+struct MorphToken {
+    start: usize,
+    end: usize,
+    surface: String,
+    base_form: String,
+    pos: String,
+    reading: String,
+}
+
+/// Cache of sentence -> morphological tokens, so repeated lookups against the
+/// same sentence (hover, cycle, scan) don't re-run the tokenizer.
+struct MorphCacheState(Mutex<HashMap<String, Vec<MorphToken>>>);
 
 #[derive(Deserialize, Serialize, Clone)]
 struct DictEntry {
@@ -210,6 +227,7 @@ fn lookup_from_position(
     skip: usize,
     index: &DictionaryIndex,
     decon_rules: &[DeconjRule],
+    tokens: &[MorphToken],
 ) -> Option<MatchSpan> {
     let chars: Vec<char> = text.chars().collect();
     let len = chars.len();
@@ -217,11 +235,81 @@ fn lookup_from_position(
         return None;
     }
 
-    let max_len = MAX_CHARS_COMBINED.min(len - position);
+    // The token at (or containing) the cursor gives the in-context reading,
+    // used to order kanji homographs (前 -> まえ in 前にある, ぜん inside 午前).
+    // The base form is only used when the cursor is at the very start of a
+    // verb token, since that's when the whole token's conjugation is what the
+    // user is looking at (e.g. the し of します -> する).
+    let token_at_pos = tokens.iter().find(|t| position >= t.start && position < t.end);
+    let context_reading = token_at_pos
+        .and_then(|t| {
+            if t.reading.is_empty() {
+                None
+            } else {
+                Some(t.reading.as_str())
+            }
+        });
+    let morph_base = tokens
+        .iter()
+        .find(|t| t.start == position)
+        .and_then(|t| {
+            if t.pos == "動詞" && t.base_form != t.surface {
+                Some(t.base_form.as_str())
+            } else {
+                None
+            }
+        });
+
+    // Punctuation never forms a span.
+    if let Some(t) = token_at_pos {
+        if t.pos == "記号" {
+            return None;
+        }
+    }
+
+    // Function words (particles が/を/は/も/に/の/と/で, auxiliaries
+    // ます/た/だ/ん/たい, conjunctions) are themselves dictionary entries
+    // (が -> 蛾, ます -> 鱒) and so stay lookup-able — but only as their own
+    // single token. They must never extend into the next word, which is what
+    // produced があ, をして, もできる, はしません, にさせたい, もない,
+    // はよ, のこと and なんだ -> 涙.
+    let function_word = token_at_pos
+        .map(|t| matches!(t.pos.as_str(), "助詞" | "助動詞" | "接続詞"))
+        .unwrap_or(false);
+
+    // Candidate spans are token-aligned: sub-spans inside the token at the
+    // cursor (so 今 can still be reached inside 今日 for the skip feature)
+    // plus whole-token extensions across following tokens. Spans never end
+    // mid-way through a later token, which is what produced があ / はよ /
+    // のこ. Function words never extend beyond their own token.
+    let mut ends: Vec<usize> = Vec::new();
+    if let Some(t) = token_at_pos {
+        for e in (position + 1)..=t.end.min(len) {
+            ends.push(e);
+        }
+        if !function_word {
+            for tok in tokens.iter().filter(|tok| tok.start > position) {
+                let e = tok.end.min(len);
+                if e > position {
+                    ends.push(e);
+                }
+            }
+        }
+    } else {
+        for e in (position + 1)..=len {
+            ends.push(e);
+        }
+    }
+    ends.sort_unstable();
+    ends.dedup();
+    ends.retain(|e| *e <= position + MAX_CHARS_COMBINED);
+
     let mut found = 0usize;
-    for span_len in (1..=max_len).rev() {
-        let candidate: String = chars[position..position + span_len].iter().collect();
-        if let Some((entries, deconj_info)) = lookup_candidate(&candidate, index, decon_rules) {
+    for &end in ends.iter().rev() {
+        let candidate: String = chars[position..end].iter().collect();
+        if let Some((entries, deconj_info)) =
+            lookup_candidate(&candidate, index, decon_rules, context_reading, morph_base, tokens, position)
+        {
             if found == skip {
                 // ── NEW: compute related entries before returning ──
                 let exact_ids: HashSet<u32> = entries.iter().map(|e| e.id).collect();
@@ -232,7 +320,7 @@ fn lookup_from_position(
 
                 return Some(MatchSpan {
                     start: position,
-                    end: position + span_len,
+                    end,
                     surface: candidate,
                     entries,
                     deconjugated_from: deconj_info,
@@ -284,6 +372,7 @@ enum MatchKind {
     PrimarySpelling, // normalized surface == entry's primary (first) spelling
     Spelling,        // normalized surface == some other spelling
     Reading,         // normalized surface == a reading
+    Morphological,   // reached via the tokenizer's base form (e.g. します -> する)
     Deconjugated,    // reached by deconjugating a conjugated surface
 }
 
@@ -306,18 +395,37 @@ fn match_kind(entry: &DictEntry, key: &str) -> MatchKind {
     }
 }
 
+/// Does any of this entry's readings match the reading the tokenizer assigned
+/// to the surface in context (e.g. 前 read まえ in 前にある vs ぜん in 午前)?
+fn reading_matches_context(entry: &DictEntry, context_reading: &str) -> bool {
+    entry
+        .readings
+        .iter()
+        .any(|r| normalize::normalize_text(r) == context_reading)
+}
+
 fn lookup_candidate(
     candidate: &str,
     index: &DictionaryIndex,
     decon_rules: &[DeconjRule],
+    context_reading: Option<&str>,
+    morph_base: Option<&str>,
+    tokens: &[MorphToken],
+    position: usize,
 ) -> Option<(Vec<Arc<DictEntry>>, Option<String>)> {
     let variants = normalize_variants(candidate);
+    let span_len = candidate.chars().count();
 
-    // (entry, chain_len, chain_description, kind) — chain_len 0 and no
-    // description means "literal match," anything else means "reached via
-    // deconjugation." kind records whether the literal hit came from the
-    // entry's primary spelling, another spelling, or a reading.
-    let mut candidates: Vec<(Arc<DictEntry>, usize, Option<String>, MatchKind)> = Vec::new();
+    // Rule-based deconjugation forms for this surface, computed once so the
+    // morphological candidate below can check whether the surface actually
+    // conjugates.
+    let deconj_forms: Vec<DeconjugatedForm> = variants
+        .iter()
+        .flat_map(|key| deconjugate(key, decon_rules, MAX_DECONJUGATION_DEPTH))
+        .collect();
+
+    // (entry, chain_len, chain_description, kind, context_match)
+    let mut candidates: Vec<(Arc<DictEntry>, usize, Option<String>, MatchKind, bool)> = Vec::new();
     let mut seen_ids: HashSet<u32> = HashSet::new();
 
     // Literal matches first — inserted with chain_len 0, so they win ties
@@ -327,25 +435,54 @@ fn lookup_candidate(
             for e in entries {
                 if seen_ids.insert(e.id) {
                     let kind = match_kind(e, key);
-                    candidates.push((Arc::clone(e), 0, None, kind));
+                    let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
+                    candidates.push((Arc::clone(e), 0, None, kind, ctx));
                 }
             }
         }
     }
 
-    // Deconjugated matches — no longer gated behind "only if no literal
-    // match exists." Entries already found literally are skipped via
-    // seen_ids, so a word never appears twice just because both paths
-    // happened to resolve to it.
-    for key in &variants {
-        for form in deconjugate(key, decon_rules, MAX_DECONJUGATION_DEPTH) {
-            if let Some(entries) = index.by_text.get(&form.text) {
-                let chain_len = form.rule_chain.len();
-                let chain_desc = form.rule_chain.join(" + ");
+    // Morphological matches — the tokenizer's base form for the verb at the
+    // cursor. High confidence because MeCab resolved the actual conjugation
+    // (します -> し -> する), so it outranks rule-based deconjugation, which can
+    // guess a wrong coincidental form (しる/知る for します). Two gates keep it
+    // from absorbing unrelated morphemes:
+    //   1. the base form is already a deconjugation result for this surface
+    //      (fixes します -> する over 知る, 食べられます -> 食べる);
+    //   2. or the candidate is the verb token followed only by
+    //      auxiliary/particle tokens (fixes kana きませんでした -> くる).
+    // 待ってみてください (no deconj) and 待ってみて (whose tail contains the
+    // content verb み) fail both gates and stay as-is.
+    if let Some(base) = morph_base {
+        let base_norm = normalize::normalize_text(base);
+        let via_deconj = deconj_forms.iter().any(|f| normalize::normalize_text(&f.text) == base_norm);
+        let via_aux_tail = tokens
+            .iter()
+            .filter(|t| t.start >= position && t.start < position + span_len && t.start != position)
+            .all(|t| matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞"));
+        if via_deconj || via_aux_tail {
+            if let Some(entries) = index.by_text.get(&base_norm) {
                 for e in entries {
                     if seen_ids.insert(e.id) {
-                        candidates.push((Arc::clone(e), chain_len, Some(chain_desc.clone()), MatchKind::Deconjugated));
+                        let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
+                        candidates.push((Arc::clone(e), 1, Some(base.to_string()), MatchKind::Morphological, ctx));
                     }
+                }
+            }
+        }
+    }
+
+    // Rule-based deconjugation — fallback beneath morphology. Entries already
+    // found via literal/morphological paths are skipped via seen_ids, so a
+    // word never appears twice just because both paths resolved to it.
+    for form in &deconj_forms {
+        if let Some(entries) = index.by_text.get(&form.text) {
+            let chain_len = form.rule_chain.len();
+            let chain_desc = form.rule_chain.join(" + ");
+            for e in entries {
+                if seen_ids.insert(e.id) {
+                    let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
+                    candidates.push((Arc::clone(e), chain_len, Some(chain_desc.clone()), MatchKind::Deconjugated, ctx));
                 }
             }
         }
@@ -355,35 +492,133 @@ fn lookup_candidate(
         return None;
     }
 
-    // Priority-tagged entries first; among ties, the kind of match wins
-    // (direct spelling before alternate spelling before reading before
-    // deconjugated), then non-bound entries, then fewest deconjugation steps.
+    // Sort: how the entry was reached (literal spelling > reading > morph
+    // base form > rule deconjugation) first, then whether its reading matches
+    // the in-context reading, then priority, then non-bound entries, then
+    // fewest deconjugation steps.
     candidates.sort_by(|a, b| {
         let a_prio = priority_score(&a.0);
         let b_prio = priority_score(&b.0);
-        b_prio.cmp(&a_prio)
-            .then(a.3.cmp(&b.3))
+        a.3.cmp(&b.3)
+            .then(b.4.cmp(&a.4)) // context-match: true first
+            .then(b_prio.cmp(&a_prio))
             .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
             .then(a.1.cmp(&b.1))
     });
 
     let deconjugated_from = candidates[0].2.clone();
-    let entries: Vec<Arc<DictEntry>> = candidates.into_iter().map(|(e, _, _, _)| e).collect();
+    let entries: Vec<Arc<DictEntry>> = candidates.into_iter().map(|(e, _, _, _, _)| e).collect();
 
     Some((entries, deconjugated_from))
 }
 
 struct DictState(DictionaryIndex);
 
+fn tokenize_tokens(tokenizer_mutex: &Mutex<Tokenizer>, text: &str) -> Vec<MorphToken> {
+    let tokenizer = tokenizer_mutex.lock().unwrap();
+    let mut worker = tokenizer.new_worker();
+    worker.reset_sentence(text);
+    worker.tokenize();
+
+    worker
+        .token_iter()
+        .map(|t| {
+            let range = t.range_char();
+            let feature = t.feature(); // comma-separated MeCab features
+            let fields: Vec<&str> = feature.split(',').collect();
+            MorphToken {
+                start: range.start,
+                end: range.end,
+                surface: t.surface().to_string(),
+                base_form: fields.get(6).map(|s| s.to_string()).unwrap_or_else(|| t.surface().to_string()),
+                pos: fields.get(0).unwrap_or(&"").to_string(),
+                // readings come out in katakana; normalize to hiragana so they
+                // can be compared against dictionary readings.
+                reading: normalize::normalize_text(fields.get(7).unwrap_or(&"")),
+            }
+        })
+        .collect()
+}
+
+fn tokenize_cached(
+    cache_state: &Mutex<HashMap<String, Vec<MorphToken>>>,
+    tokenizer_state: &Mutex<Tokenizer>,
+    text: &str,
+) -> Vec<MorphToken> {
+    if let Some(tokens) = cache_state.lock().unwrap().get(text) {
+        return tokens.clone();
+    }
+
+    let tokens = tokenize_tokens(tokenizer_state, text);
+
+    let mut cache = cache_state.lock().unwrap();
+    if cache.len() > 200 {
+        cache.clear();
+    }
+    cache.insert(text.to_string(), tokens.clone());
+    tokens
+}
+
 #[tauri::command]
 fn lookup_at_position(
     dict_state: tauri::State<DictState>,
     decon_state: tauri::State<DeconjRulesState>,
+    morph_cache: tauri::State<MorphCacheState>,
+    tokenizer_state: tauri::State<TokenizerState>,
     text: String,
     position: usize,
     skip: usize,
 ) -> Option<MatchSpan> {
-    lookup_from_position(&text, position, skip, &dict_state.0, &decon_state.0)
+    let tokens = tokenize_cached(&morph_cache.0, &tokenizer_state.0, &text);
+    lookup_from_position(&text, position, skip, &dict_state.0, &decon_state.0, &tokens)
+}
+
+/// Morphological tokens for a whole sentence (with char offsets), for
+/// frontend consumers that need grammar-aware segmentation.
+#[tauri::command]
+fn tokenize_sentence(
+    morph_cache: tauri::State<MorphCacheState>,
+    tokenizer_state: tauri::State<TokenizerState>,
+    text: String,
+) -> Vec<MorphToken> {
+    tokenize_cached(&morph_cache.0, &tokenizer_state.0, &text)
+}
+
+/// Scans a whole sentence into dictionary/deconjugation spans in one IPC
+/// round-trip, using the same longest-match resolution as hover but sharing a
+/// single tokenization. Replaces the frontend's per-character lookup loop.
+#[tauri::command]
+fn scan_sentence(
+    dict_state: tauri::State<DictState>,
+    decon_state: tauri::State<DeconjRulesState>,
+    morph_cache: tauri::State<MorphCacheState>,
+    tokenizer_state: tauri::State<TokenizerState>,
+    text: String,
+) -> Vec<MatchSpan> {
+    let tokens = tokenize_cached(&morph_cache.0, &tokenizer_state.0, &text);
+    let chars: Vec<char> = text.chars().collect();
+    let mut spans = Vec::new();
+    let mut pos = 0usize;
+    while pos < chars.len() {
+        if let Some(span) = lookup_from_position(&text, pos, 0, &dict_state.0, &decon_state.0, &tokens) {
+            if !span.entries.is_empty() {
+                let end = span.end;
+                spans.push(span);
+                pos = end.max(pos + 1);
+                continue;
+            }
+        }
+        // No useful span at this position (punctuation, or a no-match
+        // placeholder) — jump to the end of the token covering `pos` so a
+        // skipped function word never leaves a dangling mid-token cursor.
+        let next = tokens
+            .iter()
+            .find(|t| t.start <= pos && pos < t.end)
+            .or_else(|| tokens.iter().find(|t| t.start >= pos))
+            .map(|t| t.end);
+        pos = next.map(|e| e.max(pos + 1)).unwrap_or(pos + 1);
+    }
+    spans
 }
 
 #[tauri::command]
@@ -536,11 +771,12 @@ pub fn run() {
                 .build(),
         )
         .manage(DiscordState::new())
+        .manage(MorphCacheState(Mutex::new(HashMap::new())))
         .invoke_handler(tauri::generate_handler![
             discord_rpc::connect_discord,
             discord_rpc::update_discord_presence,
             discord_rpc::disconnect_discord,
-            tokenize_text, lookup_at_position,
+            tokenize_text, tokenize_sentence, scan_sentence, lookup_at_position,
             get_settings, save_settings,
             export_database, import_database, restart_app,
         ])
@@ -567,10 +803,11 @@ pub fn run() {
                     }
                 });
 
-            // ── Tokenizer (Vibrato) — still used by tokenize_text for
-            // per-word reading/POS/base-form breakdown. It is not used by
-            // lookup_at_position, which resolves matches purely from the
-            // dictionary index + deconjugation rules. ──
+            // ── Tokenizer (Vibrato) — used by tokenize_text/tokenize_sentence
+            // and (via the cached tokens + base-form/context-reading info)
+            // by lookup_at_position and scan_sentence. lookup_at_position
+            // still resolves spans from the dictionary index, but morphology
+            // informs the reading and base-form candidates. ──
             let resource_path = app
                 .path()
                 .resolve("resources/ipadic-mecab.dic.zst", tauri::path::BaseDirectory::Resource)?;
@@ -598,4 +835,253 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod lookup_tests {
+    use super::*;
+    use std::io::Read;
+    use vibrato::{Dictionary, Tokenizer};
+    use zstd::Decoder;
+
+    struct Harness {
+        index: DictionaryIndex,
+        rules: Vec<DeconjRule>,
+        tokenizer: Tokenizer,
+    }
+
+    impl Harness {
+        fn new() -> Self {
+            let file = std::fs::File::open("resources/ipadic-mecab.dic.zst").unwrap();
+            let mut reader = Decoder::new(file).unwrap();
+            let mut buf = Vec::new();
+            reader.read_to_end(&mut buf).unwrap();
+            let dict = Dictionary::read(&buf[..]).unwrap();
+            let tokenizer = Tokenizer::new(dict);
+
+            let jmdict_json = std::fs::read_to_string("resources/jmdict.json").unwrap();
+            let entries: Vec<DictEntry> = serde_json::from_str(&jmdict_json).unwrap();
+            let index = DictionaryIndex::build(entries);
+            let rules = build_deconjugation_rules();
+            Self { index, rules, tokenizer }
+        }
+
+        fn tokens(&self, text: &str) -> Vec<MorphToken> {
+            let mut worker = self.tokenizer.new_worker();
+            worker.reset_sentence(text);
+            worker.tokenize();
+            worker
+                .token_iter()
+                .map(|t| {
+                    let range = t.range_char();
+                    let fields: Vec<&str> = t.feature().split(',').collect();
+                    MorphToken {
+                        start: range.start,
+                        end: range.end,
+                        surface: t.surface().to_string(),
+                        base_form: fields.get(6).map(|s| s.to_string()).unwrap_or_else(|| t.surface().to_string()),
+                        pos: fields.get(0).unwrap_or(&"").to_string(),
+                        reading: normalize::normalize_text(fields.get(7).unwrap_or(&"")),
+                    }
+                })
+                .collect()
+        }
+
+        fn lookup(&self, text: &str, position: usize) -> MatchSpan {
+            let tokens = self.tokens(text);
+            lookup_from_position(text, position, 0, &self.index, &self.rules, &tokens).unwrap()
+        }
+    }
+
+    fn top_reading(span: &MatchSpan) -> String {
+        span.entries[0].readings[0].clone()
+    }
+
+    #[test]
+    fn shimasu_resolves_to_suru_not_shiru() {
+        let h = Harness::new();
+        let span = h.lookup("連絡します", 2); // position of し
+        assert_eq!(span.surface, "します");
+        assert_eq!(top_reading(&span), "する",
+            "first entry should read する (suru), got {:?}",
+            span.entries.iter().map(|e| &e.readings[0]).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn mae_context_orders_mae_before_zen() {
+        let h = Harness::new();
+        // 前 in 前にある is read まえ; 前(ぜん) is earlier in the dict, so
+        // only the context reading can put 前(まえ) first.
+        let span = h.lookup("前にある", 0);
+        assert_eq!(span.surface, "前");
+        assert_eq!(top_reading(&span), "まえ");
+    }
+
+    #[test]
+    fn overlong_candidate_does_not_absorb_auxiliaries() {
+        let h = Harness::new();
+        // 待ってみてください must resolve as 待って (-> 待つ), not swallow the
+        // whole phrase just because the 待っ token has base form 待つ.
+        let span = h.lookup("待ってみてください", 0);
+        assert_eq!(span.surface, "待って");
+        assert_eq!(top_reading(&span), "まつ");
+    }
+
+    #[test]
+    fn taberareru_resolves_to_taberu() {
+        let h = Harness::new();
+        let span = h.lookup("食べられます", 0);
+        assert_eq!(span.surface, "食べられます");
+        assert_eq!(top_reading(&span), "たべる");
+    }
+
+    #[test]
+    fn kana_kuru_negative_masu_still_resolves() {
+        let h = Harness::new();
+        // きませんでした: no kana deconjugation rule, but the き token's base
+        // form (くる) lets morphology resolve it instead of く/きる guesses.
+        let span = h.lookup("きませんでした", 0);
+        assert_eq!(span.surface, "きませんでした");
+        assert_eq!(top_reading(&span), "くる");
+    }
+
+    #[test]
+    fn plain_kana_lookup_unaffected() {
+        let h = Harness::new();
+        // No verb morphology involved; should resolve via reading priority.
+        let span = h.lookup("こんにちは", 0);
+        assert_eq!(span.surface, "こんにちは");
+        assert!(span.entries[0].readings[0] == "こんにちは");
+    }
+
+    #[test]
+    fn particles_match_as_single_tokens() {
+        let h = Harness::new();
+        // が/を/も/に/は/の are dictionary entries (蛾, を, 藻, 二, 歯, 野)
+        // and stay lookup-able, but only as their own token — never merged
+        // into the next word.
+        let cases = [
+            ("可能性があります", 3, "が"),
+            ("考え方をしている", 3, "を"),
+            ("意図もない", 2, "も"),
+            ("にさせたい", 0, "に"),
+            ("はしません", 0, "は"),
+            ("のことは", 0, "の"),
+            ("はよほどいい", 0, "は"),
+        ];
+        for (text, pos, want) in cases {
+            let span = h.lookup(text, pos);
+            assert_eq!(span.surface, want, "particle at {pos} in {text}");
+        }
+    }
+
+    #[test]
+    fn auxiliaries_match_as_single_tokens() {
+        let h = Harness::new();
+        // なんだ segments as な/ん/だ — な (助動詞) is limited to its own
+        // token, so なんだ never forms and 涙 (reading なんだ) is unreachable.
+        let span = h.lookup("そういう相手なんだ", 6); // な
+        assert_eq!(span.surface, "な");
+        assert_ne!(top_reading(&span), "なみだ");
+
+        let span = h.lookup("そういう相手なんだ", 8); // だ
+        assert_eq!(span.surface, "だ");
+
+        // ます as its own token still resolves (鱒/増す).
+        let span = h.lookup("可能性があります", 6); // ます
+        assert_eq!(span.surface, "ます");
+    }
+
+    #[test]
+    fn verbs_after_particles_resolve_correctly() {
+        let h = Harness::new();
+        // はしません -> する (not 走る via ichidan ません->る).
+        let span = h.lookup("はしません", 1); // し
+        assert_eq!(span.surface, "しません");
+        assert_eq!(top_reading(&span), "する");
+
+        // にさせたい -> する (not にる via causative recursion).
+        let span = h.lookup("にさせたい", 1); // さ
+        assert_eq!(span.surface, "させたい");
+        assert_eq!(top_reading(&span), "する");
+
+        // できる限り -> 出来る限り (real phrase), not 模する from もできる.
+        let span = h.lookup("できる限りのことはします", 0); // できる
+        assert_eq!(span.surface, "できる限り");
+        assert_eq!(top_reading(&span), "できるかぎり");
+
+        // 意図もない -> ない is the adjective 無い, not 盛る.
+        let span = h.lookup("意図もない", 3); // ない
+        assert_eq!(span.surface, "ない");
+        assert_eq!(top_reading(&span), "ない");
+
+        // はよほど -> よほど is the adverb 余程, not 早よ.
+        let span = h.lookup("はよほどいい", 1); // よほど
+        assert_eq!(span.surface, "よほど");
+        assert_eq!(top_reading(&span), "よほど");
+
+        // のこと -> こと (事/琴), not のこ (鋸).
+        let span = h.lookup("のことは", 1); // こと
+        assert_eq!(span.surface, "こと");
+        assert_eq!(top_reading(&span), "こと");
+    }
+
+    fn scan(h: &Harness, text: &str) -> Vec<MatchSpan> {
+        let tokens = h.tokens(text);
+        let chars: Vec<char> = text.chars().collect();
+        let mut spans = Vec::new();
+        let mut pos = 0usize;
+        while pos < chars.len() {
+            if let Some(span) = lookup_from_position(text, pos, 0, &h.index, &h.rules, &tokens) {
+                if !span.entries.is_empty() {
+                    let end = span.end;
+                    spans.push(span);
+                    pos = end.max(pos + 1);
+                    continue;
+                }
+            }
+            let next = tokens
+                .iter()
+                .find(|t| t.start <= pos && pos < t.end)
+                .or_else(|| tokens.iter().find(|t| t.start >= pos))
+                .map(|t| t.end);
+            pos = next.map(|e| e.max(pos + 1)).unwrap_or(pos + 1);
+        }
+        spans
+    }
+
+    #[test]
+    fn scan_respects_particle_boundaries() {
+        let h = Harness::new();
+        // A function-word token must never appear inside a longer span: every
+        // span that starts at a 助詞/助動詞 is exactly that one token.
+        for text in [
+            "可能性があります",
+            "考え方をしている",
+            "意図もない",
+            "にさせたい",
+            "はしません",
+            "のことは",
+            "はよほどいい",
+            "そういう相手なんだ",
+            "できる限りのことはします",
+        ] {
+            let tokens = h.tokens(text);
+            for span in scan(&h, text) {
+                let token = tokens
+                    .iter()
+                    .find(|t| span.start >= t.start && span.start < t.end)
+                    .unwrap();
+                if matches!(token.pos.as_str(), "助詞" | "助動詞") {
+                    assert_eq!(
+                        span.surface.chars().count(),
+                        1,
+                        "function word {} merged into {:?} in {text}",
+                        token.surface,
+                        span.surface
+                    );
+                }
+            }
+        }
+    }
 }

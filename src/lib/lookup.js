@@ -18,27 +18,28 @@ export async function lookupAtPosition(text, position, skip = 0) {
     return await invoke('lookup_at_position', { text, position, skip });
 }
 
+/**
+ * Morphological tokens (MeCab) for a whole sentence: { start, end, surface,
+ * base_form, pos, reading } with char offsets.
+ */
+export async function tokenizeSentence(text) {
+    return await invoke('tokenize_sentence', { text });
+}
+
 export async function scanSentenceSpans(text) {
     if (!text) return [];
-    const chars = [...text];
-    const spans = [];
-    let pos = 0;
-
-    while (pos < chars.length) {
-        const result = await lookupAtPosition(text, pos, 0);
-        if (!result) { pos += 1; continue; }
-        spans.push({
-            start: result.start,
-            end: result.end,
-            // All dictionary entries this span resolves to (may be several
-            // homophones). Kept alongside `wordId` (the top-ranked entry) so
-            // callers can check whether *any* of them is mined/known.
-            entryIds: result.entries.map((e) => e.id),
-            wordId: result.entries.length > 0 ? result.entries[0].id : null,
-        });
-        pos = result.end;
-    }
-    return spans;
+    // Server-side greedy longest-match in one IPC round-trip (shares a single
+    // tokenization across the whole scan, unlike per-character invokes).
+    const spans = await invoke('scan_sentence', { text });
+    return spans.map((s) => ({
+        start: s.start,
+        end: s.end,
+        // All dictionary entries this span resolves to (may be several
+        // homophones). Kept alongside `wordId` (the top-ranked entry) so
+        // callers can check whether *any* of them is mined/known.
+        entryIds: (s.entries ?? []).map((e) => e.id),
+        wordId: s.entries.length > 0 ? s.entries[0].id : null,
+    }));
 }
 
 export async function findKnownWordSpans(text, knownWordsMap) {
