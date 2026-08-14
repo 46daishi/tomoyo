@@ -3,8 +3,8 @@ mod normalize;
 mod discord_rpc;
 mod settings;
 
-use settings::{get_settings, save_settings, load_settings_from_disk, SettingsState};
-use deconjugate::{build_deconjugation_rules, deconjugate, DeconjRule, DeconjugatedForm};
+use settings::{get_settings, save_settings, SettingsState};
+use deconjugate::{Deconjugator, DeconjugatedForm};
 use normalize::normalize_variants;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -177,7 +177,7 @@ fn find_containing(query: &str, index: &DictionaryIndex, limit: usize) -> Vec<Ar
     results.into_iter().map(|(e, _)| e).collect()
 }
 
-struct DeconjRulesState(Vec<DeconjRule>);
+struct DeconjRulesState(Deconjugator);
 
 #[derive(serde::Serialize)]
 struct MatchSpan {
@@ -226,7 +226,7 @@ fn lookup_from_position(
     position: usize,
     skip: usize,
     index: &DictionaryIndex,
-    decon_rules: &[DeconjRule],
+    decon: &Deconjugator,
     tokens: &[MorphToken],
 ) -> Option<MatchSpan> {
     let chars: Vec<char> = text.chars().collect();
@@ -308,7 +308,7 @@ fn lookup_from_position(
     for &end in ends.iter().rev() {
         let candidate: String = chars[position..end].iter().collect();
         if let Some((entries, deconj_info)) =
-            lookup_candidate(&candidate, index, decon_rules, context_reading, morph_base, tokens, position)
+            lookup_candidate(&candidate, index, decon, context_reading, morph_base, tokens, position)
         {
             if found == skip {
                 // ── NEW: compute related entries before returning ──
@@ -355,12 +355,11 @@ fn lookup_from_position(
 /// Tries every normalized variant of `candidate` (there can be more than
 /// one due to chouonpu ambiguity — see normalize::chouonpu_variants)
 /// against the dictionary index: literal match first, then deconjugation.
-/// Among deconjugated hits, keeps the one with the *fewest* rule-chain
-/// steps, mirroring JL's "show only deconjugation processes with the
-/// fewest steps" behavior — otherwise rule iteration order can surface a
-/// bogus multi-step chain ahead of a correct one-step chain.
-// Increase depth from 3 to 5 to accommodate stacked causative-passive + desire + negative + past
-const MAX_DECONJUGATION_DEPTH: usize = 5;
+/// Deconjugation uses the JL/Nazeka engine, which records each resolved
+/// form with the fewest proper rule steps per (text, word class), and the
+/// resulting word class is validated against each entry's POS (JL's
+/// GetValidDeconjugatedResults) so a coincidental conjugation can't surface
+/// a wrong homograph.
 
 /// How an entry was reached for a given surface. Used as a tie-breaker so a
 /// direct spelling match outranks a homophone reached only through an
@@ -404,10 +403,49 @@ fn reading_matches_context(entry: &DictEntry, context_reading: &str) -> bool {
         .any(|r| normalize::normalize_text(r) == context_reading)
 }
 
+/// Maps a JL/Nazeka deconjugation tag to the JMdict English POS labels an
+/// entry must carry for the deconjugated result to be valid (JL's
+/// GetValidDeconjugatedResults). "any" (tomoyo's supplementary rules) and
+/// unknown tags are POS-unrestricted.
+fn deconj_tag_to_dict_pos(tag: &str) -> &'static [&'static str] {
+    match tag {
+        "v1" => &["Ichidan verb"],
+        "v1-s" => &["Ichidan verb - kureru special class"],
+        "v4r" => &["Yodan verb with 'ru' ending (archaic)"],
+        "v5aru" => &["Godan verb - -aru special class"],
+        "v5b" => &["Godan verb with 'bu' ending"],
+        "v5g" => &["Godan verb with 'gu' ending"],
+        "v5k" => &["Godan verb with 'ku' ending"],
+        "v5k-s" => &["Godan verb - Iku/Yuku special class"],
+        "v5m" => &["Godan verb with 'mu' ending"],
+        "v5n" => &["Godan verb with 'nu' ending"],
+        "v5r" => &["Godan verb with 'ru' ending"],
+        "v5r-i" => &["Godan verb with 'ru' ending (irregular verb)"],
+        "v5s" => &["Godan verb with 'su' ending"],
+        "v5t" => &["Godan verb with 'tsu' ending"],
+        "v5u" => &["Godan verb with 'u' ending"],
+        "v5u-s" => &["Godan verb with 'u' ending (special class)"],
+        "vk" => &["Kuru verb - special class"],
+        "vs-c" => &["su verb - precursor to the modern suru"],
+        "vs-i" => &["suru verb - included"],
+        "vs-s" => &["suru verb - special class"],
+        "vz" => &["Ichidan verb - zuru verb (alternative form of -jiru verbs)"],
+        "adj-i" => &["adjective (keiyoushi)"],
+        "adj-ix" => &["'ku' adjective (archaic)", "'shiku' adjective (archaic)"],
+        "cop" => &["copula"],
+        _ => &[],
+    }
+}
+
+fn deconj_tag_matches_entry(entry_pos: &[String], tag: &str) -> bool {
+    let allowed = deconj_tag_to_dict_pos(tag);
+    allowed.is_empty() || entry_pos.iter().any(|p| allowed.contains(&p.as_str()))
+}
+
 fn lookup_candidate(
     candidate: &str,
     index: &DictionaryIndex,
-    decon_rules: &[DeconjRule],
+    decon: &Deconjugator,
     context_reading: Option<&str>,
     morph_base: Option<&str>,
     tokens: &[MorphToken],
@@ -416,13 +454,31 @@ fn lookup_candidate(
     let variants = normalize_variants(candidate);
     let span_len = candidate.chars().count();
 
+    // The candidate's reading (concatenated token readings) when it is
+    // token-aligned. JL deconjugates the reading, not the surface, which is
+    // what keeps 入ってこない -> 入る resolving to the はいる reading instead
+    // of matching both homograph readings of 入る. Sub-span candidates that
+    // end inside the cursor token have no reading and fall back to surface
+    // deconjugation.
+    let span_reading: Option<String> = {
+        let in_span: Vec<&MorphToken> = tokens
+            .iter()
+            .filter(|t| t.start >= position && t.end <= position + span_len)
+            .collect();
+        if in_span.is_empty() {
+            None
+        } else {
+            Some(in_span.iter().map(|t| t.reading.as_str()).collect())
+        }
+    };
+
     // Rule-based deconjugation forms for this surface, computed once so the
     // morphological candidate below can check whether the surface actually
     // conjugates.
-    let deconj_forms: Vec<DeconjugatedForm> = variants
-        .iter()
-        .flat_map(|key| deconjugate(key, decon_rules, MAX_DECONJUGATION_DEPTH))
-        .collect();
+    let deconj_forms: Vec<DeconjugatedForm> = match &span_reading {
+        Some(reading) => decon.deconjugate(reading),
+        None => variants.iter().flat_map(|key| decon.deconjugate(key)).collect(),
+    };
 
     // (entry, chain_len, chain_description, kind, context_match)
     let mut candidates: Vec<(Arc<DictEntry>, usize, Option<String>, MatchKind, bool)> = Vec::new();
@@ -448,11 +504,9 @@ fn lookup_candidate(
     // guess a wrong coincidental form (しる/知る for します). Two gates keep it
     // from absorbing unrelated morphemes:
     //   1. the base form is already a deconjugation result for this surface
-    //      (fixes します -> する over 知る, 食べられます -> 食べる);
+    //      (fixes kana きませんでした -> くる);
     //   2. or the candidate is the verb token followed only by
-    //      auxiliary/particle tokens (fixes kana きませんでした -> くる).
-    // 待ってみてください (no deconj) and 待ってみて (whose tail contains the
-    // content verb み) fail both gates and stay as-is.
+    //      auxiliary/particle tokens (fixes 食べられます -> 食べる).
     if let Some(base) = morph_base {
         let base_norm = normalize::normalize_text(base);
         let via_deconj = deconj_forms.iter().any(|f| normalize::normalize_text(&f.text) == base_norm);
@@ -474,15 +528,24 @@ fn lookup_candidate(
 
     // Rule-based deconjugation — fallback beneath morphology. Entries already
     // found via literal/morphological paths are skipped via seen_ids, so a
-    // word never appears twice just because both paths resolved to it.
+    // word never appears twice just because both paths resolved to it. Each
+    // deconjugation result is also validated against the entry's POS (the
+    // rule's word class must appear among the entry's parts of speech), so a
+    // coincidental conjugation like しる -> 知る (v5r) never surfaces.
     for form in &deconj_forms {
-        if let Some(entries) = index.by_text.get(&form.text) {
-            let chain_len = form.rule_chain.len();
-            let chain_desc = form.rule_chain.join(" + ");
+        let key = normalize::normalize_text(&form.text);
+        if let Some(entries) = index.by_text.get(&key) {
+            let chain_desc = form.rule_chain.clone();
             for e in entries {
-                if seen_ids.insert(e.id) {
+                if deconj_tag_matches_entry(&e.pos, &form.tag) && seen_ids.insert(e.id) {
                     let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
-                    candidates.push((Arc::clone(e), chain_len, Some(chain_desc.clone()), MatchKind::Deconjugated, ctx));
+                    candidates.push((
+                        Arc::clone(e),
+                        form.proper_steps,
+                        chain_desc.clone(),
+                        MatchKind::Deconjugated,
+                        ctx,
+                    ));
                 }
             }
         }
@@ -495,7 +558,11 @@ fn lookup_candidate(
     // Sort: how the entry was reached (literal spelling > reading > morph
     // base form > rule deconjugation) first, then whether its reading matches
     // the in-context reading, then priority, then non-bound entries, then
-    // fewest deconjugation steps.
+    // fewest deconjugation steps. As a last tie-break, prefer the entry whose
+    // spelling matches the tokenizer's base form — JL resolves ties like
+    // 行かせられなかった (行く vs 生かす, both 4 steps) with its frequency data,
+    // and matching the independently-tokenized base form is the closest
+    // JL-faithful signal we have.
     candidates.sort_by(|a, b| {
         let a_prio = priority_score(&a.0);
         let b_prio = priority_score(&b.0);
@@ -504,6 +571,16 @@ fn lookup_candidate(
             .then(b_prio.cmp(&a_prio))
             .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
             .then(a.1.cmp(&b.1))
+            .then_with(|| match morph_base {
+                Some(base) => {
+                    let a_matches =
+                        a.0.spellings.iter().any(|s| normalize::normalize_text(s) == base);
+                    let b_matches =
+                        b.0.spellings.iter().any(|s| normalize::normalize_text(s) == base);
+                    b_matches.cmp(&a_matches)
+                }
+                None => std::cmp::Ordering::Equal,
+            })
     });
 
     let deconjugated_from = candidates[0].2.clone();
@@ -826,7 +903,9 @@ pub fn run() {
             let entries: Vec<DictEntry> = serde_json::from_str(&jmdict_json)?;
             let dictionary_index = DictionaryIndex::build(entries);
             app.manage(DictState(dictionary_index));
-            app.manage(DeconjRulesState(build_deconjugation_rules()));
+            app.manage(DeconjRulesState(Deconjugator::build(include_str!(
+                "../resources/deconjugation_rules.json"
+            ))));
 
             let initial_settings = settings::load_settings_from_disk(&app.handle());
             app.manage(SettingsState(Mutex::new(initial_settings)));
@@ -846,7 +925,7 @@ mod lookup_tests {
 
     struct Harness {
         index: DictionaryIndex,
-        rules: Vec<DeconjRule>,
+        decon: Deconjugator,
         tokenizer: Tokenizer,
     }
 
@@ -862,8 +941,8 @@ mod lookup_tests {
             let jmdict_json = std::fs::read_to_string("resources/jmdict.json").unwrap();
             let entries: Vec<DictEntry> = serde_json::from_str(&jmdict_json).unwrap();
             let index = DictionaryIndex::build(entries);
-            let rules = build_deconjugation_rules();
-            Self { index, rules, tokenizer }
+            let decon = Deconjugator::build(include_str!("../resources/deconjugation_rules.json"));
+            Self { index, decon, tokenizer }
         }
 
         fn tokens(&self, text: &str) -> Vec<MorphToken> {
@@ -889,7 +968,7 @@ mod lookup_tests {
 
         fn lookup(&self, text: &str, position: usize) -> MatchSpan {
             let tokens = self.tokens(text);
-            lookup_from_position(text, position, 0, &self.index, &self.rules, &tokens).unwrap()
+            lookup_from_position(text, position, 0, &self.index, &self.decon, &tokens).unwrap()
         }
     }
 
@@ -918,13 +997,55 @@ mod lookup_tests {
     }
 
     #[test]
-    fn overlong_candidate_does_not_absorb_auxiliaries() {
+    fn overlong_candidate_absorbs_auxiliaries_to_verb() {
         let h = Harness::new();
-        // 待ってみてください must resolve as 待って (-> 待つ), not swallow the
-        // whole phrase just because the 待っ token has base form 待つ.
+        // JL parity: 待ってみてください deconjugates through the ～てみる/～
+        // ください auxiliaries all the way to 待つ (JL does the same), so the
+        // whole phrase resolves instead of stopping at 待って.
         let span = h.lookup("待ってみてください", 0);
-        assert_eq!(span.surface, "待って");
+        assert_eq!(span.surface, "待ってみてください");
         assert_eq!(top_reading(&span), "まつ");
+    }
+
+    #[test]
+    fn jl_style_auxiliary_resolution() {
+        let h = Harness::new();
+        // ～てくる: 入ってこない -> 入る.
+        let span = h.lookup("入ってこない", 0);
+        assert_eq!(span.surface, "入ってこない");
+        assert_eq!(top_reading(&span), "はいる");
+
+        // causative-passive: 知らされなかった -> 知る.
+        let span = h.lookup("知らされなかった", 0);
+        assert_eq!(span.surface, "知らされなかった");
+        assert_eq!(top_reading(&span), "しる");
+
+        // ～てしまう: 食べてしまった -> 食べる.
+        let span = h.lookup("食べてしまった", 0);
+        assert_eq!(top_reading(&span), "たべる");
+
+        // stacked causative + passive + negative + past: 行かせられなかった -> 行く.
+        let span = h.lookup("行かせられなかった", 0);
+        assert_eq!(top_reading(&span), "いく");
+
+        // contracted ～ちゃう: 言っちゃった -> 言う.
+        let span = h.lookup("言っちゃった", 0);
+        assert_eq!(top_reading(&span), "いう");
+    }
+
+    #[test]
+    fn supplementary_must_and_copula_rules() {
+        let h = Harness::new();
+        // なければならない (JL's rules don't reduce this to the verb):
+        // 食べなければならない -> 食べる.
+        let span = h.lookup("食べなければならない", 0);
+        assert_eq!(span.surface, "食べなければならない");
+        assert_eq!(top_reading(&span), "たべる");
+
+        // noun + だった -> the noun: 学生だった -> 学生.
+        let span = h.lookup("学生だった", 0);
+        assert_eq!(span.surface, "学生だった");
+        assert_eq!(top_reading(&span), "がくせい");
     }
 
     #[test]
@@ -1032,7 +1153,7 @@ mod lookup_tests {
         let mut spans = Vec::new();
         let mut pos = 0usize;
         while pos < chars.len() {
-            if let Some(span) = lookup_from_position(text, pos, 0, &h.index, &h.rules, &tokens) {
+            if let Some(span) = lookup_from_position(text, pos, 0, &h.index, &h.decon, &tokens) {
                 if !span.entries.is_empty() {
                     let end = span.end;
                     spans.push(span);
