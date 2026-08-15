@@ -82,7 +82,8 @@ pub struct Deconjugator {
 /// recorded — only these final word classes are, plus tomoyo's POS-unrestricted
 /// supplement tag "any".
 const VALID_WORD_CLASSES: &[&str] = &[
-    "adj-i", "adj-ix", "cop", "v1", "v1-s", "v4r", "v5aru", "v5b", "v5g",
+    "adj-i", "adj-ix", "adj-na", "adj-t", "adj-no", // <-- Added missing adjective types
+    "cop", "v1", "v1-s", "v4r", "v5aru", "v5b", "v5g",
     "v5k", "v5k-s", "v5m", "v5n", "v5r", "v5r-i", "v5s", "v5t", "v5u",
     "v5u-s", "vk", "vs-c", "vs-i", "vs-s", "vz",
 ];
@@ -253,6 +254,53 @@ impl Deconjugator {
     }
 }
 
+impl Deconjugator {
+    /// The first (outermost) rule that applies to the raw surface, in engine
+    /// application order. Names the surface's conjugation even when every rule
+    /// path dead-ends before reaching a recordable dictionary form (e.g.
+    /// はじめます -> "polite": the polite rule strips ます, but はじめ is an
+    /// unrecordable stem class, so no deconjugation result carries the chain).
+    pub fn first_rule(&self, text: &str) -> Option<String> {
+        let form = FormState {
+            text: text.to_string(),
+            tag: None,
+            original: true,
+            proper_steps: 0,
+            chain: Vec::new(),
+        };
+        for rule in rules_for(self, &form) {
+            match rule.rule_type {
+                RuleKind::OnlyFinal => {}
+                RuleKind::NeverFinal => continue,
+                RuleKind::Rewrite => {
+                    if form.text != rule.con_end {
+                        continue;
+                    }
+                }
+                RuleKind::Std => {}
+            }
+            if form.text.len() == rule.con_end.len() && rule.dec_end.is_empty() {
+                continue;
+            }
+            if !form.text.ends_with(&rule.con_end) {
+                continue;
+            }
+            let detail = rule.detail.as_str();
+            if detail.is_empty() {
+                continue;
+            }
+            if detail.starts_with('(') {
+                if detail.len() >= 2 && detail.ends_with(')') {
+                    return Some(detail[1..detail.len() - 1].to_string());
+                }
+                return None;
+            }
+            return Some(detail.to_string());
+        }
+        None
+    }
+}
+
 fn rules_for<'a>(
     decon: &'a Deconjugator,
     form: &FormState,
@@ -295,8 +343,8 @@ struct FormState {
 }
 
 /// Formats JL's process-node chain (newest detail first). Parenthetical stem
-/// notes ("(mizenkei)") are shown stripped only when they are the very first
-/// applied rule; other parentheticals are skipped.
+/// notes ("(mizenkei)") are shown stripped when they are the first or the last
+/// applied rule; middle parentheticals are skipped.
 fn chain_description(chain: &[String]) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
     for (i, detail) in chain.iter().enumerate() {
@@ -304,7 +352,7 @@ fn chain_description(chain: &[String]) -> Option<String> {
             continue;
         }
         if detail.starts_with('(') {
-            if i == chain.len() - 1 && detail.len() >= 2 {
+            if (i == 0 || i == chain.len() - 1) && detail.len() >= 2 {
                 parts.push(detail[1..detail.len() - 1].to_string());
             }
         } else {
@@ -326,6 +374,9 @@ fn chain_description(chain: &[String]) -> Option<String> {
 fn supplemental_rules() -> Vec<VirtualRule> {
     let mut rules = Vec::new();
 
+    // Compound "must" suffixes (なければならない family, なくては/なくては
+    // いけない family, and ないといけない family), applied to the godan rows,
+    // ichidan, and suru.
     let godan_rows: &[(&str, &str)] = &[
         ("わ", "う"),
         ("か", "く"),
@@ -337,17 +388,29 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         ("ま", "む"),
         ("ら", "る"),
     ];
+    let must_suffixes: &[&str] = &[
+        "なければならない",
+        "なければならなかった",
+        "なければなりません",
+        "なければいけない",
+        "なければいけません",
+        "なければいけなかった",
+        "なくてはいけない",
+        "なくてはいけません",
+        "なくてはいけなかった",
+        "なくてはならない",
+        "なくてはなりません",
+        "なくてはならなかった",
+        "ないといけない",
+        "ないといけません",
+        "ないといけなかった",
+    ];
     for (a, dict_ending) in godan_rows {
-        for suffix in [
-            format!("{a}なければならない"),
-            format!("{a}なければならなかった"),
-            format!("{a}なければなりません"),
-            format!("{a}なくてはいけない"),
-        ] {
+        for suffix in must_suffixes {
             rules.push(VirtualRule {
                 rule_type: RuleKind::OnlyFinal,
                 dec_end: dict_ending.to_string(),
-                con_end: suffix,
+                con_end: format!("{a}{suffix}"),
                 dec_tag: "any".to_string(),
                 con_tag: String::new(),
                 detail: "must".to_string(),
@@ -355,12 +418,7 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         }
     }
 
-    for suffix in [
-        "なければならない",
-        "なければならなかった",
-        "なければなりません",
-        "なくてはいけない",
-    ] {
+    for suffix in must_suffixes {
         rules.push(VirtualRule {
             rule_type: RuleKind::OnlyFinal,
             dec_end: "る".to_string(),
@@ -371,21 +429,76 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         });
     }
 
-    for suffix in [
-        "しなければならない",
-        "しなければならなかった",
-        "しなければなりません",
-        "しなくてはいけない",
-    ] {
+    for suffix in must_suffixes {
         rules.push(VirtualRule {
             rule_type: RuleKind::OnlyFinal,
             dec_end: "する".to_string(),
-            con_end: suffix.to_string(),
+            con_end: format!("し{suffix}"),
             dec_tag: "any".to_string(),
             con_tag: String::new(),
             detail: "must".to_string(),
         });
     }
+
+    // "Even if (not)" — なくても and ても/でも/っても. JL has nothing for
+    // the も-ending te-form, so 急がなくても would otherwise fall back to
+    // naming an intermediate stem. OnlyFinal: the suffixes only ever apply
+    // to the raw surface.
+    for (a, dict_ending) in godan_rows {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: dict_ending.to_string(),
+            con_end: format!("{a}なくても"),
+            dec_tag: "any".to_string(),
+            con_tag: String::new(),
+            detail: "even if not".to_string(),
+        });
+    }
+    for suffix in ["なくても"] {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: "る".to_string(),
+            con_end: suffix.to_string(),
+            dec_tag: "any".to_string(),
+            con_tag: String::new(),
+            detail: "even if not".to_string(),
+        });
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: "する".to_string(),
+            con_end: format!("し{suffix}"),
+            dec_tag: "any".to_string(),
+            con_tag: String::new(),
+            detail: "even if not".to_string(),
+        });
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: "くる".to_string(),
+            con_end: format!("こ{suffix}"),
+            dec_tag: "any".to_string(),
+            con_tag: String::new(),
+            detail: "even if not".to_string(),
+        });
+    }
+    for (con_end, dec_end) in [("ても", "て"), ("でも", "で"), ("っても", "て")] {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: dec_end.to_string(),
+            con_end: con_end.to_string(),
+            dec_tag: "stem-te".to_string(),
+            con_tag: String::new(),
+            detail: "even if".to_string(),
+        });
+    }
+    // Adjective te-forms conjugate differently: 高くても -> 高く -> 高い.
+    rules.push(VirtualRule {
+        rule_type: RuleKind::OnlyFinal,
+        dec_end: "く".to_string(),
+        con_end: "くても".to_string(),
+        dec_tag: "stem-ku".to_string(),
+        con_tag: String::new(),
+        detail: "even if".to_string(),
+    });
 
     for suffix in [
         "じゃない",

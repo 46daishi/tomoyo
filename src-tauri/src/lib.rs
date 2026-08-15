@@ -104,6 +104,25 @@ fn is_bound_only(entry: &DictEntry) -> bool {
         && entry.pos.iter().all(|p| p.eq_ignore_ascii_case("suffix") || p.eq_ignore_ascii_case("prefix"))
 }
 
+/// True for characters that should never take part in a looked-up span:
+/// Japanese and ASCII punctuation plus whitespace. Excludes the katakana
+/// chouonpu ー and the nakaguro ・, which are word-internal (コーヒー,
+/// オブジェクト・指向). Used both to skip a cursor that lands on or after
+/// leading punctuation (e.g. the ".." in "..苦労") and to trim trailing
+/// punctuation from candidate spans.
+fn is_punct_char(c: char) -> bool {
+    matches!(
+        c,
+        '。' | '、' | '，' | '．' | '：' | '；' | '！' | '？' | '…' | '‥' | '〜' | '～'
+            | '「' | '」' | '『' | '』' | '【' | '】' | '（' | '）' | '〔' | '〕'
+            | '〈' | '〉' | '《' | '》' | '＝' | '＊' | '　'
+            | ' ' | '\t' | '\n' | '\r'
+            | ',' | '.' | ';' | ':' | '!' | '?' | '(' | ')' | '[' | ']' | '{' | '}'
+            | '<' | '>' | '"' | '\'' | '`' | '~' | '^' | '*' | '-' | '_' | '+' | '='
+            | '/' | '\\' | '|' | '@' | '#' | '$' | '%' | '&'
+    )
+}
+
 fn priority_score(entry: &DictEntry) -> u16 {
     let base = entry.priority.iter().map(|t| match t.as_str() {
         "ichi1" => 950,
@@ -223,7 +242,7 @@ const MAX_CHARS_COMBINED: usize = 16;
 /// one-character span with empty `entries`.
 fn lookup_from_position(
     text: &str,
-    position: usize,
+    mut position: usize,
     skip: usize,
     index: &DictionaryIndex,
     decon: &Deconjugator,
@@ -231,6 +250,17 @@ fn lookup_from_position(
 ) -> Option<MatchSpan> {
     let chars: Vec<char> = text.chars().collect();
     let len = chars.len();
+    if position >= len {
+        return None;
+    }
+
+    // Punctuation never participates in a span. If the cursor lands on or
+    // after leading punctuation (e.g. the ".." in "..苦労", a comma, an
+    // opening bracket), skip forward to the first content character so the
+    // span matches only the actual word.
+    while position < len && is_punct_char(chars[position]) {
+        position += 1;
+    }
     if position >= len {
         return None;
     }
@@ -289,6 +319,13 @@ fn lookup_from_position(
         }
         if !function_word {
             for tok in tokens.iter().filter(|tok| tok.start > position) {
+                // Trailing punctuation and unknown tokens (emphatic kana
+                // like ぅぇぁ, stray ー, dot runs, etc. — MeCab tags them
+                // base "*" with an empty reading) never extend a span; they
+                // only produced 疲れるぅ -> つく and 苦労…… -> 繰る.
+                if tok.pos == "記号" || tok.base_form == "*" {
+                    break;
+                }
                 let e = tok.end.min(len);
                 if e > position {
                     ends.push(e);
@@ -306,7 +343,17 @@ fn lookup_from_position(
 
     let mut found = 0usize;
     for &end in ends.iter().rev() {
-        let candidate: String = chars[position..end].iter().collect();
+        // Trim trailing punctuation so a candidate never ends in 記号/UNK
+        // characters absorbed into the cursor token (e.g. 苦労。 when MeCab
+        // merges them). This pairs with the forward-extension break above.
+        let mut eff_end = end;
+        while eff_end > position && is_punct_char(chars[eff_end - 1]) {
+            eff_end -= 1;
+        }
+        if eff_end <= position {
+            continue;
+        }
+        let candidate: String = chars[position..eff_end].iter().collect();
         if let Some((entries, deconj_info)) =
             lookup_candidate(&candidate, index, decon, context_reading, morph_base, tokens, position)
         {
@@ -320,7 +367,7 @@ fn lookup_from_position(
 
                 return Some(MatchSpan {
                     start: position,
-                    end,
+                    end: eff_end,
                     surface: candidate,
                     entries,
                     deconjugated_from: deconj_info,
@@ -370,8 +417,8 @@ fn lookup_from_position(
 enum MatchKind {
     PrimarySpelling, // normalized surface == entry's primary (first) spelling
     Spelling,        // normalized surface == some other spelling
-    Reading,         // normalized surface == a reading
     Morphological,   // reached via the tokenizer's base form (e.g. します -> する)
+    Reading,         // normalized surface == a reading
     Deconjugated,    // reached by deconjugating a conjugated surface
 }
 
@@ -442,6 +489,104 @@ fn deconj_tag_matches_entry(entry_pos: &[String], tag: &str) -> bool {
     allowed.is_empty() || entry_pos.iter().any(|p| allowed.contains(&p.as_str()))
 }
 
+/// Verb word classes the deconjugation rules can claim. Deconjugation
+/// results in one of these are only trusted when the span actually contains
+/// a 動詞 token — otherwise a noun/na-adjective + な (好きな) deconjugates
+/// through the imperative な rule into a coincidental verb (好く).
+fn is_verb_class(tag: &str) -> bool {
+    matches!(
+        tag,
+        "v1" | "v1-s"
+            | "v4r"
+            | "v5aru"
+            | "v5b"
+            | "v5g"
+            | "v5k"
+            | "v5k-s"
+            | "v5m"
+            | "v5n"
+            | "v5r"
+            | "v5r-i"
+            | "v5s"
+            | "v5t"
+            | "v5u"
+            | "v5u-s"
+            | "vk"
+            | "vs-c"
+            | "vs-i"
+            | "vs-s"
+            | "vz"
+    )
+}
+
+/// Jargon-y JL rule names for sound changes and auxiliary helpers that say
+/// nothing about the surface form — excluded from combined labels so
+/// してくれました reads "polite past" rather than "polite past +
+/// statement/request + unstressed infinitive".
+fn is_stem_jargon(detail: &str) -> bool {
+    matches!(
+        detail,
+        // Auxiliary helpers and sound changes that say nothing about the
+        // surface form.
+        "statement/request"
+            | "slurred"
+            | "slurred negative"
+            | "rough casual"
+            | "ksb"
+            | "contracted"
+            // JL's parenthetical stem notes, which chain_description has
+            // already stripped of their parentheses.
+            | "masu stem"
+            | "unstressed infinitive"
+            | "stem"
+            | "adverbial stem"
+            | "izenkei"
+            | "ka stem"
+            | "ke stem"
+            | "mizenkei"
+            | "'a' stem"
+    )
+}
+
+/// Shorter, plainer names for verbose JL rule details.
+fn curated_name(detail: &str) -> &str {
+    match detail {
+        "finish/completely/end up" => "ended up",
+        "passive/potential/honorific" | "passive/potential" => "potential",
+        "toku (for now)" => "in advance (casual)",
+        other => other,
+    }
+}
+
+/// Names the surface's conjugation from a deconjugation rule chain by
+/// combining every meaningful rule that applied, outermost first — e.g.
+/// 住んでいた -> "past + teiru", 忘れてしまった -> "past + ended up".
+/// Parenthetical stem notes ("(masu stem)") are skipped, except a leading
+/// one like (te) in 飲んで, which is the surface conjugation itself.
+fn combined_label(chain: &str) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    for (i, detail) in chain.split('→').enumerate() {
+        if detail.is_empty() {
+            continue;
+        }
+        if detail.starts_with('(') {
+            if i == 0 && detail.len() >= 2 && detail.ends_with(')') {
+                parts.push(detail[1..detail.len() - 1].to_string());
+            }
+            continue;
+        }
+        if is_stem_jargon(detail) {
+            continue;
+        }
+        parts.push(curated_name(detail).to_string());
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(" + "))
+    }
+}
+
 fn lookup_candidate(
     candidate: &str,
     index: &DictionaryIndex,
@@ -457,18 +602,26 @@ fn lookup_candidate(
     // The candidate's reading (concatenated token readings) when it is
     // token-aligned. JL deconjugates the reading, not the surface, which is
     // what keeps 入ってこない -> 入る resolving to the はいる reading instead
-    // of matching both homograph readings of 入る. Sub-span candidates that
-    // end inside the cursor token have no reading and fall back to surface
-    // deconjugation.
+    // of matching both homograph readings of 入る. The reading is only used
+    // when a token starts exactly at the cursor: a span that begins
+    // mid-token (e.g. the き of とき inside the single token とき) has no
+    // honest reading — deconjugating its tokens produced きました -> ます
+    // (増す) when the surface きました correctly resolves to くる. Sub-span
+    // candidates therefore fall back to surface deconjugation.
     let span_reading: Option<String> = {
-        let in_span: Vec<&MorphToken> = tokens
-            .iter()
-            .filter(|t| t.start >= position && t.end <= position + span_len)
-            .collect();
-        if in_span.is_empty() {
+        let starts_at_position = tokens.iter().any(|t| t.start == position);
+        if !starts_at_position {
             None
         } else {
-            Some(in_span.iter().map(|t| t.reading.as_str()).collect())
+            let in_span: Vec<&MorphToken> = tokens
+                .iter()
+                .filter(|t| t.start >= position && t.end <= position + span_len)
+                .collect();
+            if in_span.is_empty() {
+                None
+            } else {
+                Some(in_span.iter().map(|t| t.reading.as_str()).collect())
+            }
         }
     };
 
@@ -515,11 +668,82 @@ fn lookup_candidate(
             .filter(|t| t.start >= position && t.start < position + span_len && t.start != position)
             .all(|t| matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞"));
         if via_deconj || via_aux_tail {
+            // Name the deconjugation (e.g. した -> "past") rather than the bare
+            // base form in the tooltip. The deconjugation forms are kana while
+            // the base form may be kanji (のむ vs 飲む), so they are matched by
+            // the dictionary entry they resolve to, not by raw text.
+            let base_ids: HashSet<u32> = index
+                .by_text
+                .get(&base_norm)
+                .map(|es| es.iter().map(|e| e.id).collect())
+                .unwrap_or_default();
+            let resolves_to_base = |f: &DeconjugatedForm| {
+                index
+                    .by_text
+                    .get(&normalize::normalize_text(&f.text))
+                    .map_or(false, |es| es.iter().any(|e| base_ids.contains(&e.id)))
+            };
+            // The span reading, then the same reading with trailing particle
+            // tokens dropped (から in 飲んでから) so the te-form is still
+            // reachable for the label.
+            let mut label_readings: Vec<String> = Vec::new();
+            if let Some(reading) = &span_reading {
+                label_readings.push(reading.clone());
+                let mut in_span: Vec<&MorphToken> = tokens
+                    .iter()
+                    .filter(|t| t.start >= position && t.end <= position + span_len)
+                    .collect();
+                while let Some(&last) = in_span.last() {
+                    if last.pos != "助詞" {
+                        break;
+                    }
+                    // A 助詞 directly after a 動詞 token is the te-form て/で,
+                    // part of the conjugation — not a particle to strip.
+                    if in_span.iter().rev().skip(1).next().map_or(false, |t| t.pos == "動詞") {
+                        break;
+                    }
+                    in_span.pop();
+                }
+                let stripped: String = in_span.iter().map(|t| t.reading.as_str()).collect();
+                if stripped != *reading {
+                    label_readings.push(stripped);
+                }
+            }
+            let mut label: Option<String> = None;
+            for reading in &label_readings {
+                if let Some(chain) = decon
+                    .deconjugate(reading)
+                    .iter()
+                    .find(|f| resolves_to_base(f))
+                    .and_then(|f| f.rule_chain.as_deref())
+                {
+                    label = combined_label(chain);
+                    if label.is_some() {
+                        break;
+                    }
+                }
+            }
+            // てから / でから (te-form + the particle から) is a grammatical
+            // rule meaning "after doing" — it outranks the plain te-form name.
+            let te_kara = span_reading
+                .as_deref()
+                .map_or(false, |r| r.ends_with("てから") || r.ends_with("でから"));
+            let label = if te_kara {
+                "after doing".to_string()
+            } else {
+                // When no rule chain reaches the base form (はじめます ->
+                // はじめる dead-ends at the unrecordable ます-stem), still
+                // name the surface conjugation from the first rule applied
+                // (polite).
+                label
+                    .or_else(|| label_readings.last().and_then(|r| decon.first_rule(r)))
+                    .unwrap_or_else(|| base.to_string())
+            };
             if let Some(entries) = index.by_text.get(&base_norm) {
                 for e in entries {
                     if seen_ids.insert(e.id) {
                         let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
-                        candidates.push((Arc::clone(e), 1, Some(base.to_string()), MatchKind::Morphological, ctx));
+                        candidates.push((Arc::clone(e), 1, Some(label.clone()), MatchKind::Morphological, ctx));
                     }
                 }
             }
@@ -532,10 +756,22 @@ fn lookup_candidate(
     // deconjugation result is also validated against the entry's POS (the
     // rule's word class must appear among the entry's parts of speech), so a
     // coincidental conjugation like しる -> 知る (v5r) never surfaces.
+    let starts_at_position = tokens.iter().any(|t| t.start == position);
+    let span_has_verb_token = tokens
+        .iter()
+        .any(|t| t.start >= position && t.start < position + span_len && t.pos == "動詞");
     for form in &deconj_forms {
+        // Verb-class results need a real verb token backing them (see
+        // is_verb_class) — otherwise 好きな (名詞+な) resolves to 好く via the
+        // imperative な rule. Sub-span candidates (cursor mid-token, e.g. the
+        // き of きませんでした) are exempt: their tokens aren't aligned with
+        // the conjugation, so the deconjugation itself is the best evidence.
+        if starts_at_position && is_verb_class(&form.tag) && !span_has_verb_token {
+            continue;
+        }
         let key = normalize::normalize_text(&form.text);
         if let Some(entries) = index.by_text.get(&key) {
-            let chain_desc = form.rule_chain.clone();
+            let chain_desc = form.rule_chain.as_deref().and_then(combined_label);
             for e in entries {
                 if deconj_tag_matches_entry(&e.pos, &form.tag) && seen_ids.insert(e.id) {
                     let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
@@ -555,32 +791,40 @@ fn lookup_candidate(
         return None;
     }
 
-    // Sort: how the entry was reached (literal spelling > reading > morph
-    // base form > rule deconjugation) first, then whether its reading matches
-    // the in-context reading, then priority, then non-bound entries, then
-    // fewest deconjugation steps. As a last tie-break, prefer the entry whose
-    // spelling matches the tokenizer's base form — JL resolves ties like
-    // 行かせられなかった (行く vs 生かす, both 4 steps) with its frequency data,
-    // and matching the independently-tokenized base form is the closest
-    // JL-faithful signal we have.
+    // Sort: how the entry was reached (literal spelling > morphological
+    // base form > reading > rule deconjugation) first, then whether its
+    // reading matches the in-context reading. Among the remaining ties,
+    // entries with no dictionary priority at all ("orphans" like the
+    // intermediate potential 食べられる or the causative homophone 知らす)
+    // never beat a common word — they're coincidental deconjugation results,
+    // so 食べられます -> 食べる and 知らされなかった -> 知る keep winning by
+    // frequency. Among common words, fewest deconjugation steps decides (JL
+    // ranks MinDeconjugationProcessStepCount before frequency), which is what
+    // gives 惹かれております -> 惹かれる over the higher-frequency 光る/引く
+    // (ひかれる 3 steps vs ひかる/ひく 4). Then priority, then whether the
+    // entry's spelling matches the tokenizer's base form (行かせられなかった
+    // -> 行く, where 行く and 生かす tie on steps and priority), then
+    // non-bound entries.
     candidates.sort_by(|a, b| {
         let a_prio = priority_score(&a.0);
         let b_prio = priority_score(&b.0);
+        let a_orphan = a_prio == 0;
+        let b_orphan = b_prio == 0;
+        let a_base_match = match morph_base {
+            Some(base) => a.0.spellings.iter().any(|s| normalize::normalize_text(s) == base),
+            None => false,
+        };
+        let b_base_match = match morph_base {
+            Some(base) => b.0.spellings.iter().any(|s| normalize::normalize_text(s) == base),
+            None => false,
+        };
         a.3.cmp(&b.3)
             .then(b.4.cmp(&a.4)) // context-match: true first
+            .then(a_orphan.cmp(&b_orphan)) // common word first
+            .then(a.1.cmp(&b.1)) // fewest deconj steps first
             .then(b_prio.cmp(&a_prio))
+            .then(b_base_match.cmp(&a_base_match)) // morph-base spelling: true first
             .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
-            .then(a.1.cmp(&b.1))
-            .then_with(|| match morph_base {
-                Some(base) => {
-                    let a_matches =
-                        a.0.spellings.iter().any(|s| normalize::normalize_text(s) == base);
-                    let b_matches =
-                        b.0.spellings.iter().any(|s| normalize::normalize_text(s) == base);
-                    b_matches.cmp(&a_matches)
-                }
-                None => std::cmp::Ordering::Equal,
-            })
     });
 
     let deconjugated_from = candidates[0].2.clone();
@@ -923,14 +1167,14 @@ mod lookup_tests {
     use vibrato::{Dictionary, Tokenizer};
     use zstd::Decoder;
 
-    struct Harness {
-        index: DictionaryIndex,
-        decon: Deconjugator,
-        tokenizer: Tokenizer,
+    pub(crate) struct Harness {
+        pub(crate) index: DictionaryIndex,
+        pub(crate) decon: Deconjugator,
+        pub(crate) tokenizer: Tokenizer,
     }
 
     impl Harness {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             let file = std::fs::File::open("resources/ipadic-mecab.dic.zst").unwrap();
             let mut reader = Decoder::new(file).unwrap();
             let mut buf = Vec::new();
@@ -945,7 +1189,7 @@ mod lookup_tests {
             Self { index, decon, tokenizer }
         }
 
-        fn tokens(&self, text: &str) -> Vec<MorphToken> {
+        pub(crate) fn tokens(&self, text: &str) -> Vec<MorphToken> {
             let mut worker = self.tokenizer.new_worker();
             worker.reset_sentence(text);
             worker.tokenize();
@@ -1205,4 +1449,237 @@ mod lookup_tests {
             }
         }
     }
+
+    #[test]
+    fn reading_deconj_beats_priority_for_homographs() {
+        let h = Harness::new();
+        // ひかれております is 惹かれる's te-form; JL ranks fewer deconj steps
+        // before frequency, so 惹かれる (3 steps) beats 光る/引く (4 steps)
+        // even though both are ichi1-frequency while 惹かれる is only spec1.
+        let span = h.lookup("あなたに惹かれております", 4);
+        assert_eq!(span.surface, "惹かれております");
+        assert_eq!(top_reading(&span), "ひかれる");
+    }
+
+    #[test]
+    fn mid_token_span_falls_back_to_surface_deconj() {
+        let h = Harness::new();
+        // The き of とき sits inside the single token とき (とく verb), so the
+        // span きました has no honest token reading (its tokens read ました)
+        // and must deconjugate the surface instead: きました -> 来る, not ます.
+        let span = h.lookup("ときましたかぁ", 1);
+        assert_eq!(span.surface, "きました");
+        assert_eq!(top_reading(&span), "くる");
+    }
+
+    #[test]
+    fn suru_contraction_beats_reading_homophones() {
+        let h = Harness::new();
+        // してん (する+て+ん) must resolve to する via the tokenizer's base
+        // form, not to the してん reading-homophones 支店/視点.
+        let span = h.lookup("顔してんの!", 1);
+        assert_eq!(span.surface, "してん");
+        assert_eq!(top_reading(&span), "する");
+    }
+
+    #[test]
+    fn leading_and_trailing_punctuation_never_enters_span() {
+        let h = Harness::new();
+        // Leading dots: the cursor lands on "......" (an unknown 名詞 token),
+        // but the span must snap forward to the actual word 苦労.
+        let span = h.lookup("......苦労しているのも", 0);
+        assert_eq!(span.surface, "苦労");
+        assert_eq!(span.start, 6);
+        assert_eq!(top_reading(&span), "くろう");
+
+        // Trailing 記号: the span stops before 〜.
+        let span = h.lookup("苦労〜", 0);
+        assert_eq!(span.surface, "苦労");
+    }
+
+    #[test]
+    fn unknown_tokens_do_not_extend_spans() {
+        let h = Harness::new();
+        // ぅ is an unknown token with an empty reading; without the break it
+        // extended 疲れるぅ whose reading つかれる deconjugated to つく. The
+        // span must stop at 疲れる so the literal spelling wins.
+        let span = h.lookup("こっちの人格疲れるぅ〜......", 6);
+        assert_eq!(span.surface, "疲れる");
+        assert_eq!(top_reading(&span), "つかれる");
+    }
+
+    #[test]
+    fn kire_resolves_to_kireru_in_context() {
+        let h = Harness::new();
+        // キレてる -> 切れる (the キレる slang), with 切る as the secondary
+        // candidate rather than a coincidental deconj homophone outranking it.
+        let span = h.lookup("キレてる", 0);
+        assert_eq!(span.surface, "キレてる");
+        assert_eq!(top_reading(&span), "きれる");
+    }
+
+    #[test]
+    fn na_adjective_na_stays_with_the_noun() {
+        let h = Harness::new();
+        // The imperative な rule deconjugates 好きな -> 好く (すく), but a
+        // verb-class result with no verb token in the span is coincidental.
+        let span = h.lookup("好きな", 0);
+        assert_eq!(span.surface, "好き");
+        assert_eq!(top_reading(&span), "すき");
+        let span = h.lookup("真面目な", 0);
+        assert_eq!(span.surface, "真面目");
+        assert_eq!(top_reading(&span), "まじめ");
+    }
+
+    #[test]
+    fn deconj_labels_name_the_surface_conjugation() {
+        let h = Harness::new();
+        for (text, expected) in [
+            ("した", "past"),
+            ("高かった", "past"),
+            ("面白くない", "negative"),
+            ("呼んでいる", "teiru"),
+            ("しなければならない", "must"),
+            ("来てください", "polite request"),
+        ] {
+            let span = h.lookup(text, 0);
+            assert_eq!(
+                span.deconjugated_from.as_deref(),
+                Some(expected),
+                "{text} should be labeled {expected}, got {:?}",
+                span.deconjugated_from
+            );
+        }
+    }
+
+    #[test]
+    fn nai_to_ikemasen_detects_must() {
+        let h = Harness::new();
+        for (text, base) in [
+            ("洗わないといけません", "あらう"),
+            ("洗わなければなりません", "あらう"),
+            ("食べないといけない", "たべる"),
+            ("食べなくてはいけません", "たべる"),
+            ("しないといけません", "する"),
+            ("しなければいけない", "する"),
+        ] {
+            let span = h.lookup(text, 0);
+            assert_eq!(top_reading(&span), base, "{text} should resolve to {base}");
+            assert_eq!(
+                span.deconjugated_from.as_deref(),
+                Some("must"),
+                "{text} should be labeled must, got {:?}",
+                span.deconjugated_from
+            );
+        }
+    }
+
+    #[test]
+    fn toire_sentence_spans() {
+        let h = Harness::new();
+        let spans = scan(&h, "トイレを使ってから、手を洗わないといけません。");
+        let mut pairs: Vec<(String, String)> = spans
+            .iter()
+            .map(|s| (s.surface.clone(), s.deconjugated_from.clone().unwrap_or_default()))
+            .collect();
+        pairs.retain(|(s, _)| !s.is_empty());
+        assert_eq!(
+            pairs,
+            vec![
+                ("トイレ".to_string(), String::new()),
+                ("を".to_string(), String::new()),
+                ("使ってから".to_string(), "after doing".to_string()),
+                ("手".to_string(), String::new()),
+                ("を".to_string(), String::new()),
+                ("洗わないといけません".to_string(), "must".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn morph_labels_name_conjugations_for_kanji_bases() {
+        let h = Harness::new();
+        // The label comes from the deconjugation of the span reading, matched
+        // to the base by dictionary entry (のむ == 飲む), never the bare base
+        // form. から is a trailing particle, so 飲んでから still reaches the
+        // te-form; 始めます dead-ends at the unrecordable ます-stem but is
+        // still named by the first rule applied.
+        for (text, base, expected) in [
+            ("飲んで", "のむ", "te"),
+            ("飲んでから", "のむ", "after doing"),
+            ("食べてから", "たべる", "after doing"),
+            ("飲んでいる", "のむ", "teiru"),
+            ("食べています", "たべる", "polite + teiru"),
+            ("始めます", "はじめる", "polite"),
+            ("始めませんでした", "はじめる", "polite past negative"),
+            ("言いませんでした", "いう", "polite past negative"),
+        ] {
+            let span = h.lookup(text, 0);
+            assert_eq!(
+                span.deconjugated_from.as_deref(),
+                Some(expected),
+                "{text} should be labeled {expected}, got {:?}",
+                span.deconjugated_from
+            );
+            assert_eq!(top_reading(&span), base, "{text} should resolve to {base}");
+        }
+    }
+
+    #[test]
+    fn combined_labels_name_all_meaningful_rules() {
+        let h = Harness::new();
+        // Labels combine every meaningful rule applied to the surface,
+        // outermost first, skipping JL's intermediate-stem jargon — so
+        // 住んでいた reads "past + teiru" rather than "past" and
+        // 忘れてしまった reads "past + ended up" rather than "past".
+        for (text, base, expected) in [
+            ("住んでいた", "すむ", "past + teiru"),
+            ("食べています", "たべる", "polite + teiru"),
+            ("忘れてしまった", "わすれる", "past + ended up"),
+            ("食べてしまった", "たべる", "past + ended up"),
+            ("食べさせられてしまった", "たべる", "past + ended up + potential + causative"),
+            ("食べられます", "たべる", "polite + potential"),
+            ("しておきました", "する", "polite past + for now"),
+            ("しておく", "する", "for now"),
+            ("してくれました", "する", "polite past"),
+            ("知らされなかった", "しる", "past + negative + causative passive"),
+            ("言っちゃった", "いう", "past + ended up"),
+        ] {
+            let span = h.lookup(text, 0);
+            assert_eq!(
+                span.deconjugated_from.as_deref(),
+                Some(expected),
+                "{text} should be labeled {expected}, got {:?}",
+                span.deconjugated_from
+            );
+            assert_eq!(top_reading(&span), base, "{text} should resolve to {base}");
+        }
+    }
+
+    #[test]
+    fn even_if_rules_name_the_condition() {
+        let h = Harness::new();
+        // JL has no rules for the も-ending te-form, so 急がなくても used to
+        // fall back to naming an intermediate stem ("adverbial stem").
+        for (text, base, expected) in [
+            ("急がなくても", "いそぐ", "even if not"),
+            ("食べなくても", "たべる", "even if not"),
+            ("行かなくても", "いく", "even if not"),
+            ("しなくても", "する", "even if not"),
+            ("食べても", "たべる", "even if"),
+            ("行っても", "いく", "even if"),
+            ("飲んでも", "のむ", "even if"),
+            ("高くても", "たかい", "even if"),
+        ] {
+            let span = h.lookup(text, 0);
+            assert_eq!(
+                span.deconjugated_from.as_deref(),
+                Some(expected),
+                "{text} should be labeled {expected}, got {:?}",
+                span.deconjugated_from
+            );
+            assert_eq!(top_reading(&span), base, "{text} should resolve to {base}");
+        }
+    }
 }
+
