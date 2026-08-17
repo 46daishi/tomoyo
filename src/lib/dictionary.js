@@ -27,6 +27,10 @@ export async function mineWord({
 
     if (existing.length > 0) {
         wordId = existing[0].id;
+        await db.execute(
+            'UPDATE words SET spelling = $1 WHERE id = $2',
+            [spelling, wordId]
+        );
     } else {
         await db.execute(
             'INSERT INTO words (id, spelling, reading, definitions, word_type) VALUES ($1, $2, $3, $4, $5)',
@@ -58,6 +62,10 @@ export async function mineWordWithTags({ dictId, spelling, reading, definitions,
 
     if (existing.length > 0) {
         wordId = existing[0].id;
+        await db.execute(
+            'UPDATE words SET spelling = $1 WHERE id = $2',
+            [spelling, wordId]
+        );
     } else {
         await db.execute(
             'INSERT INTO words (id, spelling, reading, definitions, word_type) VALUES ($1, $2, $3, $4, $5)',

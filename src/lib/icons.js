@@ -52,4 +52,5 @@ export const ICONS = {
   grid: "\udb81\udd70",
   list: "\uf03a",
   card: "\udb85\udff1",
+  hiragana: "\udb84\udf34",
 };

@@ -338,12 +338,12 @@
     }
 
 
-    async function handleMineWord(span, entry) {
+    async function handleMineWord(span, entry, spelling) {
         if (!span || !entry) return;
 
         await mineWord({
             dictId: entry.id,
-            spelling: entry.spellings[0] ?? span.surface,
+            spelling: spelling ?? entry.spellings[0] ?? span.surface,
             reading: entry.readings[0] ?? '',
             definitions: entry.definitions,
             wordType: entry.pos.join(', '),
@@ -355,7 +355,7 @@
 
         mineStatuses = { ...mineStatuses, [entry.id]: 'same' };
 
-        const label = entry.spellings[0] ?? span.surface;
+        const label = spelling ?? entry.spellings[0] ?? span.surface;
         const reading = entry.readings[0];
         showMineToast(reading && reading !== label ? `Mined ${label} (${reading})` : `Mined ${label}`);
 
@@ -452,7 +452,7 @@
                 {tooltipY}
                 {tooltipMaxHeight}
                 {mineStatuses}
-                onMine={(entry) => handleMineWord(tooltipSpan, entry)}
+                onMine={(entry, spelling) => handleMineWord(tooltipSpan, entry, spelling)}
                 onMouseLeave={(e) => {
                     if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {
                         closeHoverTooltip();

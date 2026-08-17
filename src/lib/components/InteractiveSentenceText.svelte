@@ -126,11 +126,11 @@
         hoveredSpan = null;
     }
 
-    async function handleMine(entry) {
+    async function handleMine(entry, spelling) {
         if (!tooltipSpan || !entry) return;
         await mineWord({
             dictId: entry.id,
-            spelling: entry.spellings[0] ?? tooltipSpan.surface,
+            spelling: spelling ?? entry.spellings[0] ?? tooltipSpan.surface,
             reading: entry.readings[0] ?? '',
             definitions: entry.definitions,
             wordType: entry.pos.join(', '),

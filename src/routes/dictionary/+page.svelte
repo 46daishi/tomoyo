@@ -203,11 +203,29 @@
         frequentLoaded = true;
     }
 
-    async function mineFrequentWord(item) {
+    // Distinct spellings a word can be mined as: its primary (kanji) form and
+    // its kana reading. Collapses to a single choice for pure-kana words.
+    function spellingChoices(entry, surface) {
+        const spelling = entry?.spellings?.[0] ?? surface;
+        const reading = entry?.readings?.[0];
+        const choices = [];
+        if (spelling) choices.push({ label: spelling, value: spelling });
+        if (reading && reading !== spelling) choices.push({ label: reading, value: reading });
+        return choices;
+    }
+
+    // Native <select> preselects its first option, which would swallow the
+    // first choice's change event. Deselect everything so picking any option
+    // (including the first) fires onchange.
+    function deselect(node) {
+        node.selectedIndex = -1;
+    }
+
+    async function mineFrequentWord(item, spelling) {
         const { entry, surfaceText, mediaIds } = item;
         await mineWordWithTags({
             dictId: entry.id,
-            spelling: entry.spellings[0] ?? surfaceText,
+            spelling: spelling ?? entry.spellings[0] ?? surfaceText,
             reading: entry.readings[0] ?? '',
             definitions: entry.definitions,
             wordType: entry.pos.join(', '),
@@ -821,6 +839,7 @@
         {:else}
             <div class="word-list word-grid">
                 {#each filteredFrequentWords as item (item.entry.id)}
+                    {@const forms = spellingChoices(item.entry, item.surfaceText)}
                     <div class="word-card">
                         <div class="lookup-badge frequent-badge">
                             <span class="lookup-badge-count">{item.count}</span>
@@ -843,17 +862,37 @@
                                     #{tag}
                                 </span>
                             {/each}
-                            <button type="button" class="mine-btn" onclick={() => mineFrequentWord(item)}>
-                                {ICONS.plus}
-                            </button>
-                            <button
-                                type="button"
-                                class="dismiss-btn"
-                                onclick={() => dismissFrequentWord(item)}
-                                title="Dismiss — stop tracking this word's lookups"
-                            >
-                                {ICONS.minus}
-                            </button>
+                            <div class="frequent-mine-buttons">
+                                <div class="mine-select">
+                                    <ActionButton
+                                        icon={ICONS.plus}
+                                        size="tiny"
+                                        onAction={() => mineFrequentWord(item, forms[0].value)}
+                                    />
+                                    {#if forms.length > 1}
+                                        <select
+                                            class="mine-native"
+                                            aria-label="Mine word"
+                                            use:deselect
+                                            onchange={(e) => {
+                                                const value = e.currentTarget.value;
+                                                e.currentTarget.selectedIndex = -1;
+                                                mineFrequentWord(item, value);
+                                            }}
+                                        >
+                                            {#each forms as form}
+                                                <option value={form.value}>{form.label}</option>
+                                            {/each}
+                                        </select>
+                                    {/if}
+                                </div>
+                            </div>
+                            <ActionButton
+                                icon={ICONS.minus}
+                                variant="secondary"
+                                size="tiny"
+                                onAction={() => dismissFrequentWord(item)}
+                            />
                         </div>
                     </div>
                 {/each}
@@ -1029,11 +1068,6 @@
 </main>
 
 <style>
-    button.mine-btn,
-    button.dismiss-btn {
-        font-family: "Symbols Nerd Font";
-    }
-
     .dictionary-page {
         padding: 2rem;
         box-sizing: border-box;
@@ -1428,6 +1462,7 @@
     }
 
     .word-reading {
+        font-family: "Noto Sans JP", Inter, sans-serif;
         font-size: 1rem;
         color: var(--theme-textSecondary, #b3b3b3);
     }
@@ -1513,43 +1548,41 @@
         color: var(--theme-text, #f6f6f6);
     }
 
-    .mine-btn {
-        font-family: "Symbols Nerd Font";
-        background: color-mix(in srgb, var(--theme-primary, #36b7bd) 18%, transparent);
-        border: 1px solid color-mix(in srgb, var(--theme-primary, #36b7bd) 40%, transparent);
-        color: var(--theme-primary, #36b7bd);
-        font: inherit;
-        font-size: 0.78rem;
-        font-weight: 600;
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        cursor: pointer;
+    .frequent-mine-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
         margin-left: auto;
-        transition: background 0.15s ease, color 0.15s ease;
     }
 
-    .mine-btn:hover {
-        background: var(--theme-primary, #36b7bd);
-        color: var(--theme-surface, #1e1e2e);
+    .mine-select {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
     }
 
-    .dismiss-btn {
-        background: color-mix(in srgb, var(--theme-textSecondary, #b3b3b3) 12%, transparent);
-        border: 1px solid color-mix(in srgb, var(--theme-textSecondary, #b3b3b3) 35%, transparent);
-        color: var(--theme-textSecondary, #b3b3b3);
-        font: inherit;
-        font-size: 0.78rem;
-        font-weight: 600;
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
+    /* The transparent <select> overlay intercepts pointer events, so the
+       button's own :hover never fires; drive the hover from the container.
+       :global() is required because .action-button is scoped to ActionButton. */
+    .mine-select:hover :global(.action-button.primary) {
+        background-color: var(--theme-primaryHover, #17a4ab);
+        border-color: var(--theme-primaryHover, #17a4ab);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px var(--theme-shadow, rgba(0, 0, 0, 0.3));
+    }
+    .mine-select:hover :global(.action-button.secondary) {
+        background-color: var(--theme-button, #1a1a1a);
+    }
+
+    .mine-native {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
         cursor: pointer;
-        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    }
-    
-    .dismiss-btn:hover {
-        background: color-mix(in srgb, var(--theme-textSecondary, #b3b3b3) 25%, transparent);
-        color: var(--theme-text, #f6f6f6);
-        border-color: var(--theme-textSecondary, #b3b3b3);
+        border: none;
+        background: transparent;
     }
 
     .sentences-panel {
