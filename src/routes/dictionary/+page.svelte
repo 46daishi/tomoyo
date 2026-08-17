@@ -607,7 +607,7 @@
         >
             Review
         </button>
-        {#if activeTab === 'words' || activeTab === 'sentences'}
+        {#if activeTab === 'words' || activeTab === 'sentences' || activeTab === 'frequent'}
             <div class="view-toggle">
                 <button
                     type="button"
@@ -837,10 +837,10 @@
                     : 'No results match your search.'}
             </p>
         {:else}
-            <div class="word-list word-grid">
+            <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
                 {#each filteredFrequentWords as item (item.entry.id)}
                     {@const forms = spellingChoices(item.entry, item.surfaceText)}
-                    <div class="word-card">
+                    <div class="word-card frequent-card" class:list-view={viewMode === 'list'}>
                         <div class="lookup-badge frequent-badge">
                             <span class="lookup-badge-count">{item.count}</span>
                             <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
@@ -866,7 +866,7 @@
                                 <div class="mine-select">
                                     <ActionButton
                                         icon={ICONS.plus}
-                                        size="tiny"
+                                        size="mini"
                                         onAction={() => mineFrequentWord(item, forms[0].value)}
                                     />
                                     {#if forms.length > 1}
@@ -890,7 +890,7 @@
                             <ActionButton
                                 icon={ICONS.minus}
                                 variant="secondary"
-                                size="tiny"
+                                size="mini"
                                 onAction={() => dismissFrequentWord(item)}
                             />
                         </div>
