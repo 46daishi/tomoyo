@@ -179,6 +179,12 @@
     onAction={() => goto(`/dictionary`)}
   />
   <ActionButton
+    icon={ICONS.history}
+    variant="secondary"
+    size="small"
+    onAction={() => goto('/log')}
+  />
+  <ActionButton
     icon={ICONS.settings}
     variant="secondary"
     size="small"

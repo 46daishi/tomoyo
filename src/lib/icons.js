@@ -53,4 +53,5 @@ export const ICONS = {
   list: "\uf03a",
   card: "\udb85\udff1",
   hiragana: "\udb84\udf34",
+  history: "\uf1da",
 };

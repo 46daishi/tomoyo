@@ -1078,6 +1078,12 @@ pub fn run() {
             sql: include_str!("../migrations/0012_vndb_id.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 13,
+            description: "session_links",
+            sql: include_str!("../migrations/0013_session_links.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

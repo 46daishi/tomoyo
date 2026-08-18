@@ -18,7 +18,7 @@ export function parseDefinitions(definitions) {
 
 export async function mineWord({
     dictId, spelling, reading, definitions, wordType,
-    mediaId = null, sentenceText, highlightStart, highlightEnd, translation = null,
+    mediaId = null, sessionId = null, sentenceText, highlightStart, highlightEnd, translation = null,
 }) {
     const db = await getDb();
 
@@ -47,8 +47,8 @@ export async function mineWord({
     }
 
     await db.execute(
-        'INSERT INTO word_sentences (word_id, sentence_text, highlight_start, highlight_end, media_id, translation) VALUES ($1, $2, $3, $4, $5, $6)',
-        [wordId, sentenceText, highlightStart, highlightEnd, mediaId, translation]
+        'INSERT INTO word_sentences (word_id, sentence_text, highlight_start, highlight_end, media_id, session_id, translation) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [wordId, sentenceText, highlightStart, highlightEnd, mediaId, sessionId, translation]
     );
 
     return wordId;

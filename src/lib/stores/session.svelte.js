@@ -48,6 +48,7 @@ export function createSessionStore(mediaId) {
     return {
         get running() { return running; },
         get seconds() { return seconds; },
+        get sessionId() { return sessionId; },
         get formattedTime() { return formatTime(seconds); },
         toggle,
         recordSentence,

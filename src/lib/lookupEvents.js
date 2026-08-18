@@ -1,10 +1,10 @@
 import { getDb } from '$lib/db';
 
-export async function logLookupEvent({ mediaId = null, wordId = null, surfaceText }) {
+export async function logLookupEvent({ mediaId = null, wordId = null, surfaceText, sessionId = null }) {
     const db = await getDb();
     await db.execute(
-        'INSERT INTO lookup_events (media_id, word_id, surface_text) VALUES ($1, $2, $3)',
-        [mediaId, wordId, surfaceText]
+        'INSERT INTO lookup_events (media_id, word_id, surface_text, session_id) VALUES ($1, $2, $3, $4)',
+        [mediaId, wordId, surfaceText, sessionId]
     );
 }
 

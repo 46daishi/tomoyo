@@ -124,6 +124,12 @@
     onAction={() => goto(`/dictionary?media=${mediaId}`)}
   />
   <ActionButton
+    icon={ICONS.history}
+    variant="secondary"
+    size="small"
+    onAction={() => goto(`/log?media=${mediaId}`)}
+  />
+  <ActionButton
     icon={ICONS.settings}
     variant="secondary"
     size="small"

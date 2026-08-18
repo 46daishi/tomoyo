@@ -9,7 +9,7 @@
     import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
 
-    let { text, settings, mediaId = null } = $props();
+    let { text, settings, mediaId = null, sessionId = null } = $props();
 
     let chars = $derived([...text]);
     let containerEl = $state(null);
@@ -47,7 +47,7 @@
     function openTooltip(span, charEl) {
         tooltipSpan = span;
         tooltipVisible = true;
-        logLookupEvent({ mediaId, wordId: span.entries[0]?.id ?? null, surfaceText: span.surface });
+        logLookupEvent({ mediaId, wordId: span.entries[0]?.id ?? null, surfaceText: span.surface, sessionId });
         positionTooltip(charEl);
     }
 
@@ -135,6 +135,7 @@
             definitions: entry.definitions,
             wordType: entry.pos.join(', '),
             mediaId,
+            sessionId,
             sentenceText: text,
             highlightStart: tooltipSpan.start,
             highlightEnd: tooltipSpan.end,

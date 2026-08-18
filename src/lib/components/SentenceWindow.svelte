@@ -170,6 +170,7 @@
             mediaId,
             wordId: span.entries[0]?.id ?? null,
             surfaceText: span.surface,
+            sessionId: session?.sessionId ?? null,
         });
 
         positionTooltipUnderChar(charEl);
@@ -351,6 +352,7 @@
             highlightStart: span.start,
             highlightEnd: span.end,
             mediaId,
+            sessionId: session?.sessionId ?? null,
         });
 
         mineStatuses = { ...mineStatuses, [entry.id]: 'same' };
