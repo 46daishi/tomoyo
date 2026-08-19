@@ -13,7 +13,7 @@
 
     import { STATUS_LEVELS } from '$lib/constants';
 
-    let { settings, miniMode, session, mediaId, mediaTag } = $props();
+    let { settings, miniMode, session, mediaId, mediaTag, onMined, wordStatusVersion = 0, onStatusChanged } = $props();
 
     let currentText = $state('');
     let historyEntries = $state([]);
@@ -361,6 +361,8 @@
         const reading = entry.readings[0];
         showMineToast(reading && reading !== label ? `Mined ${label} (${reading})` : `Mined ${label}`);
 
+        onMined?.(entry.id, label);
+
         await loadKnownWords();
         await rescanKnownWords();
     }
@@ -392,6 +394,13 @@
     onMount(() => {
         loadKnownWords();
     });
+
+    // Reload known-word statuses when the page reports a status change
+    // (e.g. via the mined-word cards' status bars).
+    $effect(() => {
+        wordStatusVersion;
+        loadKnownWords();
+    });
     
     function getKnownSpanAt(index) {
         return knownSpans.find((s) => index >= s.start && index < s.end) ?? null;
@@ -410,6 +419,7 @@
             s.wordId === statusMenu.wordId ? { ...s, status: newStatus } : s
         );
         statusMenu = null;
+        onStatusChanged?.();
     }
     
     function closeStatusMenu() {
