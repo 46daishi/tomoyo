@@ -1,6 +1,6 @@
 <script>
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
-    import { lookupAtPosition, findKnownWordSpans } from '$lib/lookup.js';
+    import { lookupAtPosition, findHighlightedWordSpans } from '$lib/lookup.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { startWebsocketListener, stopWebsocketListener } from '$lib/websocketListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
@@ -261,7 +261,7 @@
 
     function handleCharClick(index, event) {
       const knownSpan = getKnownSpanAt(index);
-          if (knownSpan) {
+          if (knownSpan && knownSpan.status != null) {
               const rect = event.currentTarget.getBoundingClientRect();
               const clickedNearBottom = event.clientY - rect.top > rect.height - 6;
               if (clickedNearBottom) {
@@ -378,16 +378,18 @@
     }
     
     async function rescanKnownWords() {
-        if (!settings?.highlight_known_words || !displayedText) {
+        const mode = settings?.highlight_mode ?? 'none';
+        if (mode === 'none' || !displayedText) {
             knownSpans = [];
             return;
         }
-        knownSpans = await findKnownWordSpans(displayedText, knownWordsMap);
+        knownSpans = await findHighlightedWordSpans(displayedText, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false);
     }
     
     $effect(() => {
         displayedText;
-        settings?.highlight_known_words;
+        settings?.highlight_mode;
+        settings?.treat_new_as_unknown;
         rescanKnownWords();
     });
     
@@ -451,7 +453,7 @@
                     class:no-match={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end && hoveredSpan.entries.length === 0 && settings?.word_highlight_enabled}
                     onmouseenter={(event) => handleCharHover(i, event)}
                     onclick={(event) => handleCharClick(i, event)}
-                    style={getKnownSpanAt(i) ? `--status-color: ${STATUS_LEVELS[getKnownSpanAt(i).status]?.color ?? ''}` : ''}
+                    style={getKnownSpanAt(i) ? `--status-color: ${getKnownSpanAt(i).status != null ? (STATUS_LEVELS[getKnownSpanAt(i).status]?.color ?? '') : '#f38ba8'}` : ''}
                 >{char}</span>
             {/each}
         </p>

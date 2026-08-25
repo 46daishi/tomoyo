@@ -28,7 +28,8 @@ pub struct AppSettings {
     pub unknown_words_count: u32,
     pub unknown_words_min_lookups: u32,
 
-    pub highlight_known_words: bool,
+    pub highlight_mode: String, // "none" | "known" | "unknown"
+    pub treat_new_as_unknown: bool,
 
     // ── Input & History ──
     pub input_mode: String, // "clipboard" | "websocket"
@@ -80,7 +81,8 @@ impl Default for AppSettings {
             unknown_words_count: 10,
             unknown_words_min_lookups: 1,
 
-            highlight_known_words: false,
+            highlight_mode: "none".into(),
+            treat_new_as_unknown: false,
 
             input_mode: "clipboard".into(),
             websocket_address: "ws://127.0.0.1:6677".into(),

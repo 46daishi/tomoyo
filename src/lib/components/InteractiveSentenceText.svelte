@@ -3,7 +3,7 @@
     import { lookupAtPosition } from '$lib/lookup.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
     import { mineWord, getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
-    import { findKnownWordSpans } from '$lib/lookup.js';
+    import { findHighlightedWordSpans } from '$lib/lookup.js';
     import { STATUS_LEVELS } from '$lib/constants.js';
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
     import StatusMenu from '$lib/components/StatusMenu.svelte';
@@ -90,7 +90,7 @@
 
     function handleCharClick(index, event) {
         const knownSpan = getKnownSpanAt(index);
-        if (knownSpan) {
+        if (knownSpan && knownSpan.status != null) {
             const rect = event.currentTarget.getBoundingClientRect();
             const clickedNearBottom = event.clientY - rect.top > rect.height - 6;
             if (clickedNearBottom) {
@@ -150,16 +150,18 @@
     }
 
     async function rescanKnownWords() {
-        if (!settings?.highlight_known_words || !text) {
+        const mode = settings?.highlight_mode ?? 'none';
+        if (mode === 'none' || !text) {
             knownSpans = [];
             return;
         }
-        knownSpans = await findKnownWordSpans(text, knownWordsMap);
+        knownSpans = await findHighlightedWordSpans(text, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false);
     }
 
     $effect(() => {
         text;
-        settings?.highlight_known_words;
+        settings?.highlight_mode;
+        settings?.treat_new_as_unknown;
         rescanKnownWords();
     });
 
@@ -183,7 +185,7 @@
             class:hovered={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end}
             class:no-match={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end && hoveredSpan.entries.length === 0}
             class:known-word={getKnownSpanAt(i) !== null}
-            style={getKnownSpanAt(i) ? `--status-color: ${STATUS_LEVELS[getKnownSpanAt(i).status]?.color ?? ''}` : ''}
+            style={getKnownSpanAt(i) ? `--status-color: ${getKnownSpanAt(i).status != null ? (STATUS_LEVELS[getKnownSpanAt(i).status]?.color ?? '') : '#f38ba8'}` : ''}
             onmouseenter={(e) => handleCharHover(i, e)}
             onclick={(e) => handleCharClick(i, e)}
         >{char}</span>

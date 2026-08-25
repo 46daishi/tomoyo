@@ -56,3 +56,37 @@ export async function findKnownWordSpans(text, knownWordsMap) {
     }
     return spans;
 }
+
+/**
+ * Find word spans to underline based on highlight mode.
+ * - "none": return nothing
+ * - "known": underline if any entry is in the dictionary (existing behavior)
+ * - "unknown": underline only if ALL entries are unknown
+ *   (not in dictionary, or in dictionary with status 0 when treatNewAsUnknown)
+ */
+export async function findHighlightedWordSpans(text, knownWordsMap, mode, treatNewAsUnknown) {
+    if (mode === 'none' || !text) return [];
+    if (mode === 'known') return findKnownWordSpans(text, knownWordsMap);
+
+    // unknown mode
+    const allSpans = await scanSentenceSpans(text);
+    const spans = [];
+    for (const s of allSpans) {
+        const entryIds = s.entryIds ?? [];
+        if (entryIds.length === 0) {
+            // No dictionary entries at all — truly unknown
+            spans.push({ ...s, wordId: null, status: null });
+            continue;
+        }
+        const allUnknown = entryIds.every((id) => {
+            const status = knownWordsMap.get(id);
+            if (status === undefined) return true;           // not in dict
+            if (treatNewAsUnknown && status === 0) return true; // status NEW
+            return false;
+        });
+        if (allUnknown) {
+            spans.push({ ...s, wordId: entryIds[0], status: knownWordsMap.get(entryIds[0]) ?? null });
+        }
+    }
+    return spans;
+}
