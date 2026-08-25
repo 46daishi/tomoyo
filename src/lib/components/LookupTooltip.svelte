@@ -1,14 +1,59 @@
 <script>
     import { fly } from 'svelte/transition';
     import ActionButton from '$lib/components/ActionButton.svelte';
+    import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
+    import { STATUS_LEVELS } from '$lib/constants';
+    import { getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
 
-    let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {} } = $props();
+    let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {}, onStatusChanged } = $props();
     
     let positionStyle = $derived(
         (tooltipX !== null && tooltipY !== null ? `left: ${tooltipX}px; top: ${tooltipY}px;` : '') +
         (tooltipMaxHeight !== null ? ` max-height: ${tooltipMaxHeight}px;` : '')
     );
+
+    let knownWordsMap = $state(new Map());
+    let statusMenu = $state(null);
+
+    async function loadKnownWords() {
+        if (!settings?.underline_mined_words) {
+            knownWordsMap = new Map();
+            return;
+        }
+        knownWordsMap = await getKnownWordsMap();
+    }
+
+    $effect(() => {
+        settings?.underline_mined_words;
+        loadKnownWords();
+    });
+
+    function getEntryStatus(entryId) {
+        if (!settings?.underline_mined_words) return null;
+        return knownWordsMap.get(entryId) ?? null;
+    }
+
+    function handleEntryReadingClick(entry, event) {
+        if (!settings?.underline_mined_words) return;
+        const status = getEntryStatus(entry.id);
+        if (status == null) return;
+        event.stopPropagation();
+        const rect = event.currentTarget.getBoundingClientRect();
+        statusMenu = { x: rect.left, y: rect.bottom + 4, wordId: entry.id, current: status };
+    }
+
+    async function handleStatusSelect(newStatus) {
+        if (!statusMenu) return;
+        await updateWordStatus({ wordId: statusMenu.wordId, status: newStatus });
+        knownWordsMap.set(statusMenu.wordId, newStatus);
+        statusMenu = null;
+        onStatusChanged?.();
+    }
+
+    function closeStatusMenu() {
+        statusMenu = null;
+    }
 
     // Maps an entry's mine status to how its action button should look:
     // not mined yet -> primary "add" button
@@ -61,11 +106,17 @@
                         {#each [...tooltipSpan.entries, ...(settings?.show_related_entries ? tooltipSpan.related_entries : [])] as entry}
                             {@const btnState = mineButtonState(entry.id)}
                             {@const forms = spellingChoices(entry, tooltipSpan.surface)}
+                            {@const entryStatus = getEntryStatus(entry.id)}
                             <li>
                                 <div class="entry-row">
                                     <div class="entry-body">
                                         <span class="entry-readings">
-                                            {entry.spellings[0] ?? entry.readings[0]}
+                                            <span
+                                                class="entry-spelling"
+                                                class:known-word={entryStatus != null}
+                                                style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
+                                                onclick={(e) => handleEntryReadingClick(entry, e)}
+                                            >{entry.spellings[0] ?? entry.readings[0]}</span>
                                             {#if entry.readings[0] && entry.spellings.length > 0}
                                                 <span class="entry-reading-kana">{entry.readings[0]}</span>
                                             {/if}
@@ -105,6 +156,17 @@
         </ul>
     {:else}
         <div class="tooltip-no-match">No dictionary entry found.</div>
+    {/if}
+
+    {#if statusMenu}
+        <StatusMenu
+            x={statusMenu.x}
+            y={statusMenu.y}
+            levels={STATUS_LEVELS}
+            current={statusMenu.current}
+            onSelect={handleStatusSelect}
+            onClose={closeStatusMenu}
+        />
     {/if}
 </div>
 
@@ -159,5 +221,10 @@
         cursor: pointer;
         border: none;
         background: transparent;
+    }
+
+    .entry-spelling.known-word {
+        border-bottom: 2px solid var(--status-color, transparent);
+        padding-bottom: 1px;
     }
 </style>

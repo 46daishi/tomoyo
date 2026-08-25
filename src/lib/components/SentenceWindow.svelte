@@ -467,6 +467,7 @@
                 {tooltipMaxHeight}
                 {mineStatuses}
                 onMine={(entry, spelling) => handleMineWord(tooltipSpan, entry, spelling)}
+                {onStatusChanged}
                 onMouseLeave={(e) => {
                     if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {
                         closeHoverTooltip();

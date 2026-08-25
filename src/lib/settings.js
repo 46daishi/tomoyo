@@ -125,6 +125,7 @@ export const SETTINGS_SCHEMA = [
                 showIf: (s) => s.lookup_limit_enabled,
             },
             { key: 'show_related_entries', label: 'Show related entries in tooltip', type: 'checkbox' },
+            { key: 'underline_mined_words', label: 'Underline mined words in tooltip', type: 'checkbox' },
         ],
   },
   {
