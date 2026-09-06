@@ -317,6 +317,20 @@ fn lookup_from_position(
         for e in (position + 1)..=t.end.min(len) {
             ends.push(e);
         }
+        // If the cursor is on an unknown token (empty reading — katakana slang
+        // like マズ), allow the span to continue character-by-character into the
+        // next token so a real literal word can still form across the false
+        // boundary: マズ + い -> マズい (まずい). Normally spans never end
+        // mid-token, but an unknown cursor token is a safe exception: the
+        // empty-reading fallback already routes resolution through surface
+        // deconjugation, so no function-word merge (があ / はよ / のこ) can appear.
+        if t.reading.is_empty() {
+            if let Some(next) = tokens.iter().find(|tok| tok.start > position) {
+                for e in (t.end + 1)..=next.end.min(len) {
+                    ends.push(e);
+                }
+            }
+        }
         if !function_word {
             for tok in tokens.iter().filter(|tok| tok.start > position) {
                 // Trailing punctuation and unknown tokens (emphatic kana
@@ -613,14 +627,26 @@ fn lookup_candidate(
         if !starts_at_position {
             None
         } else {
-            let in_span: Vec<&MorphToken> = tokens
-                .iter()
-                .filter(|t| t.start >= position && t.end <= position + span_len)
-                .collect();
-            if in_span.is_empty() {
+            // If the token at the cursor is unknown (MeCab gives it no reading
+            // because it isn't in its dictionary — katakana names/slang like
+            // ジイ or マズ), the concatenated span reading silently drops that
+            // prefix and deconjugates just the tail, producing dishonest
+            // results (ジイさんじゃない -> さん, マズいんだ -> いぬ). Falls back to
+            // surface deconjugation on the full normalized form instead, which
+            // resolves じいさん (爺さん) / まずい (不味い) correctly.
+            let cursor_tok = tokens.iter().find(|t| t.start == position);
+            if cursor_tok.map_or(false, |t| t.reading.is_empty()) {
                 None
             } else {
-                Some(in_span.iter().map(|t| t.reading.as_str()).collect())
+                let in_span: Vec<&MorphToken> = tokens
+                    .iter()
+                    .filter(|t| t.start >= position && t.end <= position + span_len)
+                    .collect();
+                if in_span.is_empty() {
+                    None
+                } else {
+                    Some(in_span.iter().map(|t| t.reading.as_str()).collect())
+                }
             }
         }
     };
@@ -746,6 +772,65 @@ fn lookup_candidate(
                         candidates.push((Arc::clone(e), 1, Some(label.clone()), MatchKind::Morphological, ctx));
                     }
                 }
+            }
+        }
+    }
+
+    // Suru-verb nouns — a 名詞 (調査) followed by the suru verb (する/し/して/
+    // している) and then only auxiliaries/particles. The dictionary headword
+    // is the noun itself ("調査" carries "noun or participle which takes the
+    // aux. verb suru"), so 調査している must resolve to 調査 rather than a
+    // coincidental rule-based deconjugation of the whole katakana reading —
+    // ちょうさしている also yields ちょうする (弔する/徴する), which is wrong.
+    // The noun's own POS validates the suru construction, mirroring how the
+    // verb case above trusts the tokenizer's base form.
+    let noun_pos_entries: Vec<Arc<DictEntry>> = {
+        let noun_tok = tokens.iter().find(|t| t.start == position);
+        match noun_tok {
+            Some(noun) if noun.pos == "名詞" => {
+                let noun_norm = normalize::normalize_text(&noun.surface);
+                let entries = index.by_text.get(&noun_norm).cloned().unwrap_or_default();
+                if entries.iter().any(|e| e.pos.iter().any(|p| p.contains("takes the aux. verb suru") || p.contains("suru verb"))) {
+                    let suru_start = noun.end;
+                    let suru = tokens.iter().find(|t| t.start == suru_start);
+                    match suru {
+                        Some(s) if s.base_form == "する" => {
+                            let tail_ok = tokens
+                                .iter()
+                                .filter(|t| t.start > suru_start && t.start < position + span_len)
+                                .all(|t| matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞" | "動詞"));
+                            if tail_ok { entries } else { Vec::new() }
+                        }
+                        _ => Vec::new(),
+                    }
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        }
+    };
+    if !noun_pos_entries.is_empty() {
+        // Label the suru construction by deconjugating the reading from the
+        // suru token onward (し+て+いる -> "teiru", し+た -> "past", ...),
+        // excluding the leading noun token itself.
+        let suru_reading: String = tokens
+            .iter()
+            .filter(|t| t.start >= position && t.end <= position + span_len)
+            .skip_while(|t| t.base_form != "する")
+            .map(|t| t.reading.as_str())
+            .collect();
+        let label = decon
+            .deconjugate(&suru_reading)
+            .iter()
+            .find(|f| normalize::normalize_text(&f.text) == "する")
+            .and_then(|f| f.rule_chain.as_deref())
+            .and_then(combined_label)
+            .unwrap_or_else(|| "suru".to_string());
+        for e in noun_pos_entries {
+            if seen_ids.insert(e.id) {
+                let ctx = context_reading.map_or(false, |r| reading_matches_context(&e, r));
+                candidates.push((Arc::clone(&e), 1, Some(label.clone()), MatchKind::Morphological, ctx));
             }
         }
     }
@@ -1492,15 +1577,19 @@ mod lookup_tests {
     fn leading_and_trailing_punctuation_never_enters_span() {
         let h = Harness::new();
         // Leading dots: the cursor lands on "......" (an unknown 名詞 token),
-        // but the span must snap forward to the actual word 苦労.
+        // but the span must snap forward to the actual word 苦労. 苦労 is a
+        // suru-verb noun followed by している, so the whole economy resolves to
+        // 苦労 (teiru) — exactly like 調査している -> 調査.
         let span = h.lookup("......苦労しているのも", 0);
-        assert_eq!(span.surface, "苦労");
+        assert_eq!(span.surface, "苦労している");
         assert_eq!(span.start, 6);
         assert_eq!(top_reading(&span), "くろう");
+        assert_eq!(span.deconjugated_from.as_deref(), Some("teiru"));
 
         // Trailing 記号: the span stops before 〜.
         let span = h.lookup("苦労〜", 0);
         assert_eq!(span.surface, "苦労");
+        assert_eq!(top_reading(&span), "くろう");
     }
 
     #[test]
@@ -1660,6 +1749,48 @@ mod lookup_tests {
             );
             assert_eq!(top_reading(&span), base, "{text} should resolve to {base}");
         }
+    }
+
+    #[test]
+    fn suru_noun_phrases_resolve_to_the_noun() {
+        let h = Harness::new();
+        // 調査 + している is the suru verb 調査 doing teiru; the dictionary
+        // headword is the noun 調査, not a literal 調査する or the coincidental
+        // homophone 弔する (ちょうする) that whole-reading deconjugation finds.
+        for (text, want_label) in [
+            ("調査している", "teiru"),
+            ("調査していた", "past + teiru"),
+            ("調査して", "te"),
+        ] {
+            let span = h.lookup(text, 0);
+            assert_eq!(span.surface, text);
+            assert_eq!(top_reading(&span), "ちょうさ", "{text} should resolve to 調査");
+            assert_eq!(
+                span.deconjugated_from.as_deref(),
+                Some(want_label),
+                "{text} should be labeled {want_label}, got {:?}",
+                span.deconjugated_from
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_leading_token_deconjugates_surface_not_truncated_reading() {
+        let h = Harness::new();
+        // One-liner: ジイさんじゃない. The ジイ token is unknown (empty reading),
+        // so the concatenated reading "さんじゃない" would misfire to さん. The
+        // full surface じいさんじゃない deconjugates to じいさん (爺さん) instead.
+        let span = h.lookup("ジイさんじゃない。", 0);
+        assert_eq!(span.surface, "ジイさんじゃない");
+        assert_eq!(top_reading(&span), "じいさん");
+        assert_eq!(span.deconjugated_from.as_deref(), Some("copula"));
+
+        // マズいんだ: the unknown katakana マズ must not collapse to the tail's
+        // deconjugation (いんだ -> いぬ); instead the false maz/boundary is
+        // crossed to form the real word マズい (= 不味い, まずい).
+        let span = h.lookup("マズいんだ", 0);
+        assert_eq!(span.surface, "マズい");
+        assert_eq!(top_reading(&span), "まずい");
     }
 
     #[test]
