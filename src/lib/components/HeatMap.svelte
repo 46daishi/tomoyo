@@ -18,19 +18,17 @@
      export let year = /** @type {number | null} */ (null);
      export let formatValue = formatMinutes;
          
-     // Dynamically generate a 9-step palette using modern CSS color-mix()
-     // It mixes your primary color with the background for lower intensities, 
-     // and with black to deepen the highest intensities.
+     // 4-stage palette of the theme/media primary color, where brighter =
+     // more activity. The low end is a dim, clearly-tinted primary over the
+     // theme surface (so even low counts are visible against a zero day), each
+     // step saturates toward the full primary, and the peak is the pure,
+     // vivid media color — never washing out to white.
      $: palette = [
-        "var(--theme-border, #333333)",                                               // 0: No focus time
-        `color-mix(in srgb, ${primaryColor}, var(--theme-background, #1a1a1a) 85%)`, // 1: Very low
-        `color-mix(in srgb, ${primaryColor}, var(--theme-background, #1a1a1a) 70%)`, // 2
-        `color-mix(in srgb, ${primaryColor}, var(--theme-background, #1a1a1a) 55%)`, // 3
-        `color-mix(in srgb, ${primaryColor}, var(--theme-background, #1a1a1a) 38%)`, // 4
-        `color-mix(in srgb, ${primaryColor}, var(--theme-background, #1a1a1a) 22%)`, // 5
-        `color-mix(in srgb, ${primaryColor}, var(--theme-background, #1a1a1a) 10%)`, // 6
-        primaryColor,                                                                 // 7
-        primaryColor,                                                                 // 8: Max activity
+        "var(--theme-border, #333333)",                                             // 0: No focus time
+        `color-mix(in srgb, ${primaryColor} 40%, var(--theme-surface, #2d2d2d))`, // 1: Low
+        `color-mix(in srgb, ${primaryColor} 65%, var(--theme-surface, #2d2d2d))`, // 2
+        `color-mix(in srgb, ${primaryColor} 88%, var(--theme-surface, #2d2d2d))`, // 3
+        primaryColor,                                                               // 4: Peak
      ];
 
     import { onMount } from "svelte";
