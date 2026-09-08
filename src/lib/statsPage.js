@@ -318,9 +318,12 @@ export async function getVocabularyGrowth(mediaId = null, days = 365) {
 
     const result = [];
     let running = 0;
+    let started = false;
     for (let i = days - 1; i >= 0; i--) {
         const key = localDayKey(new Date(Date.now() - i * 86400000));
         running += byDay[key] ?? 0;
+        if (!started && running === 0) continue;
+        started = true;
         result.push({ key, total: running });
     }
     return result;

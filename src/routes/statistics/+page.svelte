@@ -13,7 +13,7 @@
     import DonutChart from '$lib/components/DonutChart.svelte';
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS, STATUS_COLORS } from '$lib/constants.js';
-    import { formatMinutes } from '$lib/utils/chartFormatters.js';
+    import { formatMinutes, formatTick } from '$lib/utils/chartFormatters.js';
     import { getMediaStats } from '$lib/sessions.js';
     import { getVocabularyCoverage } from '$lib/coverage.js';
     import { getVn, formatVnLength, formatVnRating, vndbUrl } from '$lib/vndb.js';
@@ -602,9 +602,10 @@
                     data={dailyMoji}
                     series={[
                     { key: 'moji', color: 'var(--theme-primary, #36b7bd)', label: '文字', formatValue: formatMoji },
-                    { key: 'minutes', color: 'var(--theme-accent, #8fb2e8)', label: 'Minutes', formatValue: formatMinutes }
+                    { key: 'minutes', color: 'var(--theme-accent, #8fb2e8)', label: 'Minutes', formatValue: formatMinutes, axisFormat: (v) => formatTick(v, 'm') }
                 ]}
                 formatLabel={formatDayLabel}
+                showYAxis
                 />
             </div>
             <div class="panel chart-panel">
@@ -617,9 +618,10 @@
                     data={monthlyMoji}
                     series={[
                     { key: 'moji', color: 'var(--theme-primary, #36b7bd)', label: '文字', formatValue: formatMoji },
-                    { key: 'minutes', color: 'var(--theme-accent, #8fb2e8)', label: 'Minutes', formatValue: formatMinutes }
+                    { key: 'minutes', color: 'var(--theme-accent, #8fb2e8)', label: 'Minutes', formatValue: formatMinutes, axisFormat: (v) => formatTick(v, 'm') }
                 ]}
                 formatLabel={formatMonthLabel}
+                showYAxis
                 />
             </div>
 
@@ -634,6 +636,7 @@
                         series={[{ key: 'mined', color: 'var(--theme-primary, #36b7bd)', label: 'Words mined', formatValue: formatWords }]}
                         formatLabel={formatDayLabel}
                         showAxisLabels={false}
+                        showYAxis
                     />
                 </div>
                 <div class="panel chart-panel">
@@ -654,6 +657,7 @@
                         series={[{ key: 'total', color: 'var(--theme-primary, #36b7bd)', label: 'Total words', formatValue: formatWords }]}
                         formatLabel={formatDayLabel}
                         showAxisLabels={false}
+                        showYAxis
                     />
                 </div>
                 <div class="panel chart-panel">
@@ -666,6 +670,7 @@
                         series={[{ key: 'reviews', color: 'var(--theme-accent, #8fb2e8)', label: 'Reviews', formatValue: formatReviews }]}
                         formatLabel={formatDayLabel}
                         showAxisLabels={false}
+                        showYAxis
                     />
                 </div>
             </div>

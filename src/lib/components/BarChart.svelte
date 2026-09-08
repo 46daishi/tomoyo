@@ -1,14 +1,15 @@
 <script>
-    import { calculateLabelStep } from '$lib/utils/chartFormatters.js';
+    import { calculateLabelStep, calculateNiceMax, formatTick } from '$lib/utils/chartFormatters.js';
 
     /**
      * @type {{
      *   data?: Array<Record<string, any>>,
-     *   series?: Array<{ key: string, color: string, label: string, formatValue?: (v: number) => string }>,
+     *   series?: Array<{ key: string, color: string, label: string, formatValue?: (v: number) => string, axisFormat?: (v: number) => string }>,
      *   color?: string,
      *   formatValue?: (v: number) => string,
      *   formatLabel?: (k: string) => string,
      *   showAxisLabels?: boolean,
+     *   showYAxis?: boolean,
      * }}
      */
     let {
@@ -18,21 +19,60 @@
         formatValue = (v) => v.toLocaleString(),
         formatLabel = (k) => k,
         showAxisLabels = true,
+        showYAxis = false,
     } = $props();
 
     let chartWidth = $state(400);
     const height = 230;
-    const padding = { top: 16, right: 10, bottom: 34, left: 10 };
+
+    const axisTicks = 4;
+    const labelGap = 8;
+    const charWidth = 5.6;
+
+    let hasYAxis = $derived(showYAxis && series.length > 0);
+    let hasRightAxis = $derived(hasYAxis && series.length > 1);
+
+    /** @param {number} si */
+    function axisLabelsFor(si) {
+        return ticksFor(si).map((t) => formatAxis(si, t));
+    }
+
+    let leftLabels = $derived(hasYAxis ? axisLabelsFor(0) : []);
+    let rightLabels = $derived(hasRightAxis ? axisLabelsFor(1) : []);
+    let widestLeft = $derived(Math.max(0, ...leftLabels.map((s) => s.length)));
+    let widestRight = $derived(Math.max(0, ...rightLabels.map((s) => s.length)));
+    let leftGutter = $derived(hasYAxis ? Math.min(52, Math.max(26, widestLeft * charWidth + labelGap)) : 2);
+    let rightGutter = $derived(hasRightAxis ? Math.min(52, Math.max(26, widestRight * charWidth + labelGap)) : 2);
+
+    let padding = $derived({
+        top: 2,
+        right: rightGutter,
+        bottom: 24,
+        left: leftGutter,
+    });
 
     let plotW = $derived(Math.max(0, chartWidth - padding.left - padding.right));
-    const plotH = height - padding.top - padding.bottom;
-    const baseY = padding.top + plotH;
+    const plotH = $derived(height - padding.top - padding.bottom);
+    const baseY = $derived(padding.top + plotH);
 
     let chartSeries = $derived(
         series.length > 0 ? series : [{ key: 'value', color, label: '' }]
     );
     let maxes = $derived(chartSeries.map((s) => Math.max(1, ...data.map((d) => d[s.key] ?? 0))));
+    let axisMaxes = $derived(chartSeries.map((s) => calculateNiceMax(Math.max(1, ...data.map((d) => d[s.key] ?? 0)))));
     let labelStep = $derived(calculateLabelStep(data.length));
+
+    /** @param {number} si */
+    function ticksFor(si) {
+        const step = axisMaxes[si] / axisTicks;
+        return Array.from({ length: axisTicks + 1 }, (_, i) => i * step);
+    }
+
+    /** @param {number} si @param {number} v */
+    function formatAxis(si, v) {
+        const f = chartSeries[si].axisFormat;
+        return f ? f(v) : formatTick(v);
+    }
 
     let hovered = $state(/** @type {number | null} */ (null));
 
@@ -73,6 +113,24 @@
             <!-- Baseline -->
             <line x1={padding.left} y1={baseY} x2={chartWidth - padding.right} y2={baseY} class="grid-line" />
 
+            {#if hasYAxis}
+                {#each chartSeries as s, si}
+                    {#each ticksFor(si) as t}
+                        {@const y = baseY - (t / axisMaxes[si]) * plotH}
+                        {#if si === 0}
+                            <line x1={padding.left} y1={y} x2={chartWidth - padding.right} y2={y} class="grid-line faint" />
+                            <text x={padding.left - labelGap} y={y + 3} class="axis-label" text-anchor="end">
+                                {formatAxis(si, t)}
+                            </text>
+                        {:else}
+                            <text x={chartWidth - padding.right + labelGap} y={y + 3} class="axis-label" text-anchor="start">
+                                {formatAxis(si, t)}
+                            </text>
+                        {/if}
+                    {/each}
+                {/each}
+            {/if}
+
                 {#each data as point, i}
                     {@const slot = plotW / data.length}
                     {@const inner = slot / chartSeries.length}
@@ -80,7 +138,7 @@
 
                     {#each chartSeries as s, si}
                         {@const x = padding.left + i * slot + si * inner + (inner - bw) / 2}
-                        {@const barH = ((point[s.key] ?? 0) / maxes[si]) * plotH}
+                        {@const barH = ((point[s.key] ?? 0) / axisMaxes[si]) * plotH}
                         {@const y = baseY - barH}
 
                         <!-- +1 height overdraws the baseline so the bottom stays square while the top rounds -->
@@ -170,6 +228,10 @@
     .grid-line {
         stroke: color-mix(in srgb, var(--theme-border, #404040) 60%, transparent);
         stroke-width: 1;
+    }
+
+    .grid-line.faint {
+        stroke: color-mix(in srgb, var(--theme-border, #404040) 30%, transparent);
     }
 
     .axis-label {
