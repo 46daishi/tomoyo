@@ -8,6 +8,13 @@
 //! IMPORTANT: these are *lookup key* normalizations, not display
 //! transforms. Keep the original surface text for display; only use these
 //! outputs for HashMap keys / equality checks.
+//!
+//! Number normalization is also applied here: Arabic numeral runs (half or
+//! full width) are folded to Japanese kanji numerals (1 -> 一, 35 -> 三十五,
+//! 10000 -> 一万), so that words written with numerals (1匹, 3階, ４回) can
+//! resolve to the same dictionary headword as their kanji spelling (一匹, 三階,
+//! 四回). These are lookup keys only — the original surface is kept for
+//! display.
 
 /// Halfwidth katakana block (U+FF61..=U+FF9F) -> base fullwidth
 /// katakana/punctuation. Voicing marks (ﾞ/ﾟ) expand to the standalone
@@ -63,6 +70,105 @@ fn katakana_to_hiragana(c: char) -> char {
         _ => c,
     }
 }
+
+fn kanji_digit(d: u32) -> char {
+    match d {
+        1 => '一', 2 => '二', 3 => '三', 4 => '四', 5 => '五',
+        6 => '六', 7 => '七', 8 => '八', 9 => '九',
+        _ => '〇',
+    }
+}
+
+/// Returns the half-width ASCII digit for either an ASCII or a full-width
+/// (U+FF10..=U+FF19) digit character, or `None` for anything else.
+fn ascii_digit(c: char) -> Option<u32> {
+    if let Some(d) = c.to_digit(10) {
+        return Some(d);
+    }
+    match c {
+        '\u{FF10}'..='\u{FF19}' => Some(c as u32 - 0xFF10),
+        _ => None,
+    }
+}
+
+/// Converts a run of digits (all ASCII by the time this is called) into its
+/// Japanese kanji numeral representation: "1" -> 一, "12" -> 十二,
+/// "35" -> 三十五, "108" -> 百八, "40000" -> 四万, "100000000" -> 一億.
+/// Standard Japanese convention drops the 一 before 十/百/千 (十, 百, 千 not
+/// 一十/一百/一千) and uses 万/億/兆/京/垓 as the repeating big-unit blocks.
+fn digit_run_to_kanji(s: &str) -> String {
+    let digits: Vec<u32> = s.chars().filter_map(ascii_digit).collect();
+    if digits.is_empty() || digits.iter().all(|&d| d == 0) {
+        return "〇".into();
+    }
+
+    const BIG: [char; 6] = [' ', '万', '億', '兆', '京', '垓'];
+    const SMALL: [u32; 4] = [1000, 100, 10, 1];
+
+    // Pad the digit string on the left to a multiple of 4 so each 4-digit
+    // group is aligned to a big unit (万/億/兆...) boundary.
+    let pad = (4 - digits.len() % 4) % 4;
+    let mut bits: Vec<u32> = vec![0; pad];
+    bits.extend(&digits);
+    let n_groups = bits.len() / 4;
+
+    let mut out = String::new();
+    for gi in 0..n_groups {
+        let group = &bits[gi * 4..gi * 4 + 4];
+        let val: u32 = group.iter().zip(SMALL.iter()).map(|(d, m)| d * m).sum();
+        if val == 0 {
+            continue;
+        }
+        let (k, h, t, o) = (group[0], group[1], group[2], group[3]);
+        if k != 0 {
+            if k != 1 { out.push(kanji_digit(k)); }
+            out.push('千');
+        }
+        if h != 0 {
+            if h != 1 { out.push(kanji_digit(h)); }
+            out.push('百');
+        }
+        if t != 0 {
+            if t != 1 { out.push(kanji_digit(t)); }
+            out.push('十');
+        }
+        if o != 0 {
+            out.push(kanji_digit(o));
+        }
+        let big = n_groups - 1 - gi;
+        if big < BIG.len() && BIG[big] != ' ' {
+            out.push(BIG[big]);
+        }
+    }
+    out
+}
+
+/// Folds any run of Arabic digits (half or full width) in the input into its
+/// kanji numeral equivalent. Non-digit characters are passed through
+/// unchanged, and the display surface is not affected (this is key-only).
+fn fold_number_runs(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut started: Option<usize> = None;
+
+    for (i, c) in input.char_indices() {
+        if ascii_digit(c).is_some() {
+            if started.is_none() {
+                started = Some(i);
+            }
+        } else {
+            if let Some(st) = started.take() {
+                let end = i;
+                out.push_str(&digit_run_to_kanji(&input[st..end]));
+            }
+            out.push(c);
+        }
+    }
+    if let Some(st) = started.take() {
+        out.push_str(&digit_run_to_kanji(&input[st..]));
+    }
+    out
+}
+
 
 enum Row { A, I, U, E, O }
 
@@ -129,7 +235,9 @@ pub fn normalize_text(input: &str) -> String {
         out.push(resolved.unwrap_or(c));
     }
 
-    out.into_iter().collect()
+    // Pass 4: fold Arabic numeral runs to kanji numerals, so 1匹 and 一匹
+    // (and ４回 for 四回) become the same lookup key. Key-only, not display.
+    fold_number_runs(&out.into_iter().collect::<String>())
 }
 
 /// Given the output of `normalize_text`, returns every plausible
@@ -225,5 +333,30 @@ mod tests {
     #[test]
     fn no_chouonpu_single_variant() {
         assert_eq!(normalize_variants("こんにちは"), vec!["こんにちは".to_string()]);
+    }
+
+    #[test]
+    fn arabic_numeral_folds_to_kanji() {
+        assert_eq!(normalize_text("1匹"), "一匹");
+        assert_eq!(normalize_text("35階"), "三十五階");
+        assert_eq!(normalize_text("４回"), "四回");
+    }
+
+    #[test]
+    fn arabic_numeral_full_width_folds_to_kanji() {
+        assert_eq!(normalize_text("１００円"), "百円");
+    }
+
+    #[test]
+    fn number_run_without_word_passes_through_key_only() {
+        // Key normalization applies to digit runs regardless of surroundings.
+        assert_eq!(normalize_text("2024"), "二千二十四");
+        assert_eq!(normalize_text("10000"), "一万");
+        assert_eq!(normalize_text("0"), "〇");
+    }
+
+    #[test]
+    fn numeral_variants_match_kanji_headword() {
+        assert_eq!(normalize_variants("1匹"), vec!["一匹".to_string()]);
     }
 }
