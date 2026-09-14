@@ -500,6 +500,42 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         detail: "even if".to_string(),
     });
 
+    // Prohibitive "don't" (verb + んじゃない) and its past counterpart
+    // "shouldn't have" (verb + んじゃなかった). ん is the explanatory の and
+    // じゃ the では contraction, attached directly to the dictionary form:
+    // 買うんじゃない -> 買う. OnlyFinal so the suffix only ever applies to the
+    // raw surface, never to an intermediate deconjugated form, and "any"
+    // keeps them POS-unrestricted at lookup time.
+    let prohibitive: &[(&str, &str)] = &[
+        ("んじゃない", "don't"),
+        ("んじゃなかった", "shouldn't have"),
+    ];
+    for (_, dict_ending) in godan_rows {
+        for (suffix, label) in prohibitive {
+            rules.push(VirtualRule {
+                rule_type: RuleKind::OnlyFinal,
+                dec_end: dict_ending.to_string(),
+                con_end: format!("{dict_ending}{suffix}"),
+                dec_tag: "any".to_string(),
+                con_tag: String::new(),
+                detail: label.to_string(),
+            });
+        }
+    }
+    for (suffix, label) in prohibitive {
+        // ichidan る, suru する, and kuru くる.
+        for dict_ending in ["る", "する", "くる"] {
+            rules.push(VirtualRule {
+                rule_type: RuleKind::OnlyFinal,
+                dec_end: dict_ending.to_string(),
+                con_end: format!("{dict_ending}{suffix}"),
+                dec_tag: "any".to_string(),
+                con_tag: String::new(),
+                detail: label.to_string(),
+            });
+        }
+    }
+
     for suffix in [
         "じゃない",
         "ではない",
