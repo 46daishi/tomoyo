@@ -439,6 +439,13 @@ fn lookup_from_position(
             // the verb is itself a dictionary entry (気になる, できる限り).
             let mut crossed_separator = false;
             let mut in_te_aux_chain = false;
+            // A negation + conditional particle opens a "must" construction
+            // (なければ|いけない, ないと|いけない, なくては|...): the following
+            // いく/いける/なる verb continues it instead of starting a phrase.
+            // Without this, noun-start spans (宿題をしなければいけない) get cut
+            // before いけない and the tail becomes its own span. Colloquial
+            // negations (なきゃ/なくちゃ/ねば) open the chain directly.
+            let mut in_must_chain = false;
             // A suru-noun cursor (調査, 会議, 解除, 交信, 消失, 完了) absorbs
             // する-inflections directly: せる/させる (causative), れる
             // (passive), できる (potential), てる (contraction).
@@ -492,6 +499,35 @@ fn lookup_from_position(
                 if tok.pos == "助詞" && (tok.surface == "て" || tok.surface == "で") {
                     in_te_aux_chain = true;
                 }
+                // Must-chain tracking: ば/と/は/では right after a negation
+                // (ない/なけれ/なく…, base ない), ては/では after なく/ない,
+                // or a colloquial negation token on its own.
+                const MUST_NEG_READINGS: &[&str] = &["なきゃ", "なくちゃ", "なくっちゃ", "ねば"];
+                let is_neg_token = |t: &MorphToken| {
+                    t.base_form == "ない" || MUST_NEG_READINGS.contains(&t.reading.as_str())
+                };
+                if ["なきゃ", "なくちゃ", "なくっちゃ", "ねば"].contains(&tok.reading.as_str()) {
+                    in_must_chain = true;
+                }
+                if tok.pos == "助詞"
+                    && matches!(tok.surface.as_str(), "ば" | "と" | "は" | "では")
+                {
+                    let prev_tok = tokens.iter().filter(|t| t.end <= tok.start).last();
+                    let prev_neg =
+                        prev_tok.map_or(false, |p| is_neg_token(p));
+                    let tewa_neg = tok.surface == "は"
+                        && prev_tok.map_or(false, |p| p.surface == "て" || p.surface == "で")
+                        && prev_tok
+                            .and_then(|p| {
+                                tokens.iter().filter(|t| t.end <= p.start).last()
+                            })
+                            .map_or(false, |p| is_neg_token(p));
+                    if prev_neg || tewa_neg {
+                        in_must_chain = true;
+                    }
+                }
+                let tok_is_must_aux = tok.pos == "動詞"
+                    && matches!(tok.base_form.as_str(), "いく" | "いける" | "なる");
                 let tok_is_te_aux = tok.pos == "動詞"
                     && (TE_AUX_VERBS.contains(&tok.base_form.as_str())
                         || tok.base_form == "てる"
@@ -512,12 +548,14 @@ fn lookup_from_position(
                     && tok.base_form != "する"
                     && !tok_is_bound
                     && !(in_te_aux_chain && tok_is_te_aux)
+                    && !(in_must_chain && tok_is_must_aux)
                 {
                     break;
                 }
                 // Noun-start spans never absorb a following content verb
                 // directly (今泣いてる -> 今 + 泣いてる): verbs that continue
-                // a te-auxiliary chain, the suru verb, a suru-noun inflection,
+                // a te-auxiliary chain, a must construction (宿題をしなければ
+                // いけない), the suru verb, a suru-noun inflection,
                 // the bound てる, or a real dictionary compound (気になる)
                 // still extend.
                 if !cursor_is_verb
@@ -526,6 +564,7 @@ fn lookup_from_position(
                     && !tok_is_bound
                     && !tok_is_suru_infl
                     && !(in_te_aux_chain && tok_is_te_aux)
+                    && !(in_must_chain && tok_is_must_aux)
                 {
                     let compound: String = chars[position..tok.end].iter().collect();
                     let compound_known = normalize::normalize_variants(&compound)
@@ -537,6 +576,12 @@ fn lookup_from_position(
                 }
                 if tok.pos == "動詞" && !tok_is_te_aux && tok.base_form != "する" {
                     in_te_aux_chain = false;
+                }
+                // A content word ends the must construction (the exempted
+                // いく/いける/なる above already consumed it; conditionals
+                // like なければきっと行く must still split).
+                if matches!(tok.pos.as_str(), "動詞" | "名詞" | "形容詞" | "副詞") {
+                    in_must_chain = false;
                 }
                 if cursor_is_verb && tok.pos == "名詞" {
                     // ん followed by だ is the explanatory copula んだ (= のだ),
@@ -2875,6 +2920,45 @@ mod lookup_tests {
         let deshita = spans.iter().find(|s| s.surface == "でした").unwrap();
         assert_eq!(top_reading(deshita), "です");
         assert_eq!(deshita.deconjugated_from.as_deref(), Some("past"));
+    }
+
+    #[test]
+    fn must_construction_variants_stay_whole() {
+        let h = Harness::new();
+        // Polite past, colloquial stems, ねば, では, and kuru: the いけない/
+        // ならない tail must not split into its own span.
+        for (text, pos, surface, base) in [
+            ("食べなければいけませんでした", 0, "食べなければいけませんでした", "たべる"),
+            ("宿題をしなければいけない", 3, "しなければいけない", "する"),
+            ("行かなきゃいけない", 0, "行かなきゃいけない", "いく"),
+            ("しなくちゃいけない", 0, "しなくちゃいけない", "する"),
+            ("来なければいけない", 0, "来なければいけない", "くる"),
+            ("行かねばならない", 0, "行かねばならない", "いく"),
+            ("食べなくっちゃいけない", 0, "食べなくっちゃいけない", "たべる"),
+            ("行かないといけませんでした", 0, "行かないといけませんでした", "いく"),
+        ] {
+            let span = h.lookup(text, pos);
+            assert_eq!(span.surface, surface, "{text} should stay one span");
+            assert_eq!(top_reading(&span), base, "{text} should resolve to {base}");
+            assert_eq!(
+                span.deconjugated_from.as_deref(),
+                Some("must"),
+                "{text} should be labeled must, got {:?}",
+                span.deconjugated_from
+            );
+        }
+    }
+
+    #[test]
+    fn must_tail_does_not_swallow_following_verb() {
+        let h = Harness::new();
+        // A conditional followed by an unrelated verb is not a must
+        // construction: なければ opens the chain, but 食べる is not a
+        // must-auxiliary (いく/いける/なる), so it must still split.
+        let spans = scan(&h, "行かなければ食べる。");
+        assert!(spans.iter().all(|s| s.surface != "行かなければ食べる"));
+        let nake = spans.iter().find(|s| s.surface == "行かなければ").unwrap();
+        assert_eq!(top_reading(nake), "いく");
     }
 
     #[test]

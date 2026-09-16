@@ -376,7 +376,10 @@ fn supplemental_rules() -> Vec<VirtualRule> {
 
     // Compound "must" suffixes (なければならない family, なくては/なくては
     // いけない family, and ないといけない family), applied to the godan rows,
-    // ichidan, and suru.
+    // ichidan, suru, and kuru. Extended beyond the formal set with polite-past
+    // forms (いけませんでした), colloquial stems (なきゃ/なくちゃ/なくっちゃ/
+    // ねば), and ないでは variants — otherwise the tail (いけない/ならない)
+    // falls off into its own span in real sentences.
     let godan_rows: &[(&str, &str)] = &[
         ("わ", "う"),
         ("か", "く"),
@@ -405,8 +408,62 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         "ないといけません",
         "ないといけなかった",
     ];
+    // Polite-past and なかったです forms missing from the formal set.
+    let must_suffixes_polite: &[&str] = &[
+        "なければなりませんでした",
+        "なければいけませんでした",
+        "なければならなかったです",
+        "なくてはなりませんでした",
+        "なくてはいけませんでした",
+        "なくてはならなかったです",
+        "ないといけませんでした",
+    ];
+    // Colloquial negative stems x standard endings. The godan/ichidan/suru
+    // loops below attach these exactly like the formal ones (a-row kana +
+    // suffix, bare suffix, し + suffix).
+    let must_suffixes_colloquial: &[&str] = &[
+        "なきゃいけない",
+        "なきゃいけません",
+        "なきゃいけなかった",
+        "なきゃならない",
+        "なきゃなりません",
+        "なきゃならなかった",
+        "なくちゃいけない",
+        "なくちゃいけません",
+        "なくちゃいけなかった",
+        "なくちゃならない",
+        "なくちゃなりません",
+        "なくちゃならなかった",
+        "なくっちゃいけない",
+        "なくっちゃいけません",
+        "なくっちゃいけなかった",
+        "なくっちゃならない",
+        "なくっちゃなりません",
+        "なくっちゃならなかった",
+        "ねばいけない",
+        "ねばいけません",
+        "ねばいけなかった",
+        "ねばならない",
+        "ねばなりません",
+        "ねばならなかった",
+    ];
+    // ないでは variants (ないではいけない ≃ なくてはいけない).
+    let must_suffixes_dewa: &[&str] = &[
+        "ではいけない",
+        "ではいけません",
+        "ではいけなかった",
+        "ではならない",
+        "ではなりません",
+        "ではならなかった",
+    ];
     for (a, dict_ending) in godan_rows {
-        for suffix in must_suffixes {
+        for suffix in must_suffixes
+            .iter()
+            .chain(must_suffixes_polite.iter())
+            .chain(must_suffixes_colloquial.iter())
+            .chain(must_suffixes_dewa.iter())
+        {
+            let suffix: &str = suffix;
             rules.push(VirtualRule {
                 rule_type: RuleKind::OnlyFinal,
                 dec_end: dict_ending.to_string(),
@@ -418,7 +475,13 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         }
     }
 
-    for suffix in must_suffixes {
+    for suffix in must_suffixes
+        .iter()
+        .chain(must_suffixes_polite.iter())
+        .chain(must_suffixes_colloquial.iter())
+        .chain(must_suffixes_dewa.iter())
+    {
+        let suffix: &str = suffix;
         rules.push(VirtualRule {
             rule_type: RuleKind::OnlyFinal,
             dec_end: "る".to_string(),
@@ -429,11 +492,36 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         });
     }
 
-    for suffix in must_suffixes {
+    for suffix in must_suffixes
+        .iter()
+        .chain(must_suffixes_polite.iter())
+        .chain(must_suffixes_colloquial.iter())
+        .chain(must_suffixes_dewa.iter())
+    {
+        let suffix: &str = suffix;
         rules.push(VirtualRule {
             rule_type: RuleKind::OnlyFinal,
             dec_end: "する".to_string(),
             con_end: format!("し{suffix}"),
+            dec_tag: "any".to_string(),
+            con_tag: String::new(),
+            detail: "must".to_string(),
+        });
+    }
+
+    // Kuru takes こ + suffix (来なければいけない etc.). The bare-suffix
+    // ichidan loop above would otherwise resolve these to junk (こる).
+    for suffix in must_suffixes
+        .iter()
+        .chain(must_suffixes_polite.iter())
+        .chain(must_suffixes_colloquial.iter())
+        .chain(must_suffixes_dewa.iter())
+    {
+        let suffix: &str = suffix;
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: "くる".to_string(),
+            con_end: format!("こ{suffix}"),
             dec_tag: "any".to_string(),
             con_tag: String::new(),
             detail: "must".to_string(),
