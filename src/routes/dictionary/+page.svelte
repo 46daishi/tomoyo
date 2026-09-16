@@ -48,6 +48,18 @@
     let allSentences = $state([]);
     let sentencesLoaded = $state(false);
 
+    // Client-side pagination: search/sort/filters run over the full arrays
+    // (so results stay global), and only the current page renders. This is
+    // what makes a few thousand mined words/sentences usable — the SQLite
+    // queries are single GROUP BYs, the DOM was the bottleneck. Sentence
+    // cards are much heavier (full text + translation inputs), so they page
+    // smaller.
+    const WORDS_PAGE_SIZE = 500;
+    const SENTENCES_PAGE_SIZE = 100;
+    let wordsPage = $state(1);
+    let sentencesPage = $state(1);
+    let pageEl = $state(/** @type {HTMLElement | null} */ (null));
+
     let frequentWords = $state([]);
     let frequentLoaded = $state(false);
     let frequentLimit = $state(10);
@@ -390,6 +402,48 @@
 
     let filteredSentences = $derived(allSentences.filter(sentenceMatchesQuery));
 
+    let wordsPageCount = $derived(Math.max(1, Math.ceil(filteredWords.length / WORDS_PAGE_SIZE)));
+    let sentencesPageCount = $derived(Math.max(1, Math.ceil(filteredSentences.length / SENTENCES_PAGE_SIZE)));
+    // Clamp (deletes/filters can strand the page past the end).
+    let safeWordsPage = $derived(Math.min(Math.max(1, wordsPage), wordsPageCount));
+    let safeSentencesPage = $derived(Math.min(Math.max(1, sentencesPage), sentencesPageCount));
+    let pagedWords = $derived(
+        filteredWords.slice((safeWordsPage - 1) * WORDS_PAGE_SIZE, safeWordsPage * WORDS_PAGE_SIZE)
+    );
+    let pagedSentences = $derived(
+        filteredSentences.slice((safeSentencesPage - 1) * SENTENCES_PAGE_SIZE, safeSentencesPage * SENTENCES_PAGE_SIZE)
+    );
+
+    // Reset to page 1 whenever the result set identity changes.
+    $effect(() => {
+        searchQuery;
+        statusFilter;
+        sortBy;
+        mediaFilter;
+        activeTab;
+        words;
+        wordsPage = 1;
+    });
+    $effect(() => {
+        searchQuery;
+        mediaFilter;
+        activeTab;
+        allSentences;
+        sentencesPage = 1;
+    });
+
+    /** @param {number} p */
+    function gotoWordsPage(p) {
+        wordsPage = Math.min(Math.max(1, p), wordsPageCount);
+        pageEl?.scrollTo({ top: 0 });
+    }
+
+    /** @param {number} p */
+    function gotoSentencesPage(p) {
+        sentencesPage = Math.min(Math.max(1, p), sentencesPageCount);
+        pageEl?.scrollTo({ top: 0 });
+    }
+
     let sentenceLimit = $derived(settings?.word_sentence_count || 5);
 
     let filteredFrequentWords = $derived(
@@ -536,7 +590,7 @@
     }
 </script>
 
-<main class="page dictionary-page">
+<main class="page dictionary-page" bind:this={pageEl}>
     <div class="dict-header">
         <ActionButton icon={ICONS.back} variant="primary" size="small" onAction={() => history.back()} />
         <h1>Dictionary</h1>
@@ -640,7 +694,7 @@
             <p class="empty-notice">No words found.</p>
         {:else}
             <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
-                {#each filteredWords as word (word.id)}
+                {#each pagedWords as word (word.id)}
                     <div class="word-card" class:list-view={viewMode === 'list'}>
                         <button
                             type="button"
@@ -764,6 +818,15 @@
                     </div>
                 {/each}
             </div>
+            {#if wordsPageCount > 1}
+                <div class="pager">
+                    <button type="button" class="pager-btn" disabled={safeWordsPage <= 1} onclick={() => gotoWordsPage(1)} title="First page">«</button>
+                    <button type="button" class="pager-btn" disabled={safeWordsPage <= 1} onclick={() => gotoWordsPage(safeWordsPage - 1)} title="Previous page">‹</button>
+                    <span class="pager-info">Page {safeWordsPage} of {wordsPageCount} · {filteredWords.length} words</span>
+                    <button type="button" class="pager-btn" disabled={safeWordsPage >= wordsPageCount} onclick={() => gotoWordsPage(safeWordsPage + 1)} title="Next page">›</button>
+                    <button type="button" class="pager-btn" disabled={safeWordsPage >= wordsPageCount} onclick={() => gotoWordsPage(wordsPageCount)} title="Last page">»</button>
+                </div>
+            {/if}
         {/if}
     {:else if activeTab === 'sentences'}
         {#if !sentencesLoaded}
@@ -774,7 +837,7 @@
             </p>
         {:else}
             <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
-                {#each filteredSentences as sentence (sentence.id ?? sentence.sentence_text)}
+                {#each pagedSentences as sentence (sentence.id ?? sentence.sentence_text)}
                     <div class="word-card sentence-card" class:list-view={viewMode === 'list'}>
                         <p class="sentence-text sentence-tab-text" title={sentence.sentence_text}>{sentence.sentence_text}</p>
                         {#if viewMode === 'list' && sentence.translation && expandedTranslations.has(sentence.id ?? sentence.sentence_text)}
@@ -826,6 +889,15 @@
                     </div>
                 {/each}
             </div>
+            {#if sentencesPageCount > 1}
+                <div class="pager">
+                    <button type="button" class="pager-btn" disabled={safeSentencesPage <= 1} onclick={() => gotoSentencesPage(1)} title="First page">«</button>
+                    <button type="button" class="pager-btn" disabled={safeSentencesPage <= 1} onclick={() => gotoSentencesPage(safeSentencesPage - 1)} title="Previous page">‹</button>
+                    <span class="pager-info">Page {safeSentencesPage} of {sentencesPageCount} · {filteredSentences.length} sentences</span>
+                    <button type="button" class="pager-btn" disabled={safeSentencesPage >= sentencesPageCount} onclick={() => gotoSentencesPage(safeSentencesPage + 1)} title="Next page">›</button>
+                    <button type="button" class="pager-btn" disabled={safeSentencesPage >= sentencesPageCount} onclick={() => gotoSentencesPage(sentencesPageCount)} title="Last page">»</button>
+                </div>
+            {/if}
         {/if}
     {:else if activeTab === 'frequent'}
         {#if !frequentLoaded}
@@ -1687,6 +1759,50 @@
         color: var(--theme-textSecondary, #b3b3b3);
         text-align: center;
         margin-top: 2rem;
+    }
+
+    .pager {
+        position: sticky;
+        bottom: -2px;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        margin: 1rem 0 0;
+        padding: 0.6rem 0.5rem;
+        background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 92%, #000);
+        border-top: 1px solid color-mix(in srgb, var(--theme-border, #404040) 60%, transparent);
+    }
+
+    .pager-btn {
+        font-family: "Symbols Nerd Font", inherit;
+        min-width: 2rem;
+        height: 2rem;
+        padding: 0 0.5rem;
+        border-radius: 8px;
+        border: 1px solid var(--theme-border, #404040);
+        background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 70%, #000);
+        color: var(--theme-text, #f6f6f6);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+
+    .pager-btn:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--theme-primary, #36b7bd) 25%, #000);
+    }
+
+    .pager-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+    }
+
+    .pager-info {
+        font-size: 0.85rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        margin: 0 0.4rem;
+        font-variant-numeric: tabular-nums;
     }
 
     .sentence-delete-btn {
