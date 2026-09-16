@@ -1,6 +1,6 @@
 <script>
     import { onMount } from 'svelte';
-    import { lookupAtPosition } from '$lib/lookup.js';
+    import { lookupAtPosition, scanSentenceSpans } from '$lib/lookup.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
     import { mineWord, getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
     import { findHighlightedWordSpans } from '$lib/lookup.js';
@@ -20,9 +20,14 @@
     let tooltipY = $state(0);
     let tooltipMaxHeight = $state(300);
     let hoverRequestId = 0;
+    let cycleSkip = 0;
 
     let knownWordsMap = $state(new Map());
     let knownSpans = $state([]);
+    // Full greedy scan (all dictionary words, not just known) used to snap
+    // mid-word hovers to the word start so highlight and tooltip agree.
+    /** @type {any[]} */
+    let allSpans = $state([]);
     let statusMenu = $state(null); // { x, y, wordId, current } | null
 
     function isSameSpan(a, b) {
@@ -55,13 +60,49 @@
         const charEl = event.currentTarget;
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) return;
 
+        // Snap mid-word hovers to the scanned word start (e.g. 船 inside 風船
+        // looks up 風船, not 船) so the tooltip matches the underline.
+        const snapped = allSpans.find((s) => index >= s.start && index < s.end)?.start ?? index;
+
+        cycleSkip = 0;
         const requestId = ++hoverRequestId;
-        const result = await lookupAtPosition(text, index);
+        const result = await lookupAtPosition(text, snapped);
         if (requestId !== hoverRequestId) return;
         hoveredSpan = result;
 
         if (result && settings?.lookup_mode === 'hover') {
             openTooltip(result, charEl);
+        }
+    }
+
+    async function handleCycleShorter() {
+        if (!hoveredSpan) return;
+
+        const anchorPos = hoveredSpan.start;
+        const nextSkip = cycleSkip + 1;
+        const requestId = ++hoverRequestId;
+        let result = await lookupAtPosition(text, anchorPos, nextSkip);
+        if (requestId !== hoverRequestId) return;
+
+        if (result) {
+            cycleSkip = nextSkip;
+            hoveredSpan = result;
+        } else {
+            cycleSkip = 0;
+            result = await lookupAtPosition(text, anchorPos, 0);
+            if (requestId !== hoverRequestId) return;
+            hoveredSpan = result;
+        }
+
+        if (result && tooltipVisible) {
+            tooltipSpan = result;
+        }
+    }
+
+    function handleGlobalKeydown(event) {
+        if (settings?.cycle_key && event.code === settings.cycle_key && !event.repeat) {
+            event.preventDefault();
+            handleCycleShorter();
         }
     }
 
@@ -112,6 +153,7 @@
 
     function handleLeave() {
         hoveredSpan = null;
+        cycleSkip = 0;
     }
 
     function isRelatedTargetInSentenceArea(/** @type {EventTarget | null} */ relatedTarget) {
@@ -124,6 +166,7 @@
         tooltipSpan = null;
         tooltipVisible = false;
         hoveredSpan = null;
+        cycleSkip = 0;
     }
 
     async function handleMine(entry, spelling) {
@@ -158,6 +201,18 @@
         knownSpans = await findHighlightedWordSpans(text, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false);
     }
 
+    async function rescanAllSpans() {
+        if (!text) {
+            allSpans = [];
+            return;
+        }
+        try {
+            allSpans = await scanSentenceSpans(text);
+        } catch {
+            allSpans = [];
+        }
+    }
+
     $effect(() => {
         text;
         settings?.highlight_mode;
@@ -165,12 +220,17 @@
         rescanKnownWords();
     });
 
+    $effect(() => {
+        text;
+        rescanAllSpans();
+    });
+
     onMount(() => {
         loadKnownWords();
     });
 </script>
 
-<svelte:window onclick={() => (tooltipVisible = false)} />
+<svelte:window onclick={() => (tooltipVisible = false)} onkeydown={handleGlobalKeydown} />
 
 <div class="interactive-sentence" bind:this={containerEl} onmouseleave={(e) => {
         if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {

@@ -194,8 +194,21 @@ fn kana_row(c: char) -> Option<Row> {
 /// alternatives rather than a single answer.
 pub fn normalize_text(input: &str) -> String {
     // Pass 1: halfwidth -> fullwidth, combining trailing voicing marks.
+    // Fullwidth ASCII (U+FF01..=U+FF5E, e.g. Ａ, １, ！) is folded to plain
+    // ASCII so fullwidth spellings share keys with their halfwidth forms.
+    // The tokenizer (IPADIC) only ever produces JMdict spellings here — the
+    // dictionary entries themselves always stay JMdict; this is key-only.
     let mut pass1: Vec<char> = Vec::with_capacity(input.chars().count());
     for c in input.chars() {
+        // Fullwidth ASCII + fullwidth space folds first, before the katakana table.
+        if ('\u{FF01}'..='\u{FF5E}').contains(&c) {
+            pass1.push(char::from_u32(c as u32 - 0xFEE0).unwrap_or(c));
+            continue;
+        }
+        if c == '\u{3000}' {
+            pass1.push(' ');
+            continue;
+        }
         let base = halfwidth_to_fullwidth_base(c).unwrap_or(c);
         match base {
             '゛' => {
@@ -224,12 +237,14 @@ pub fn normalize_text(input: &str) -> String {
     let pass2: Vec<char> = pass1.into_iter().map(katakana_to_hiragana).collect();
 
     // Pass 3: iteration marks, resolved against the output buffer built
-    // so far (so chained marks like 々々 work).
+    // so far (so chained marks like 々々 work). Covers kanji (々/〻) and both
+    // hiragana (ゝ/ゞ) and katakana (ヽ/ヾ) repeats — katakana repeats resolve
+    // against the already hiragana-folded buffer from pass 2.
     let mut out: Vec<char> = Vec::with_capacity(pass2.len());
     for c in pass2 {
         let resolved = match c {
-            '々' | '〻' | 'ゝ' => out.last().copied(),
-            'ゞ' => out.last().and_then(|&last| add_dakuten_hiragana(last)),
+            '々' | '〻' | 'ゝ' | 'ヽ' => out.last().copied(),
+            'ゞ' | 'ヾ' => out.last().and_then(|&last| add_dakuten_hiragana(last)),
             other => Some(other),
         };
         out.push(resolved.unwrap_or(c));
@@ -358,5 +373,18 @@ mod tests {
     #[test]
     fn numeral_variants_match_kanji_headword() {
         assert_eq!(normalize_variants("1匹"), vec!["一匹".to_string()]);
+    }
+
+    #[test]
+    fn fullwidth_ascii_folds_to_halfwidth() {
+        assert_eq!(normalize_text("ＡＢＣ"), "ABC");
+        assert_eq!(normalize_text("ｺｰﾋｰ"), "こーひー");
+    }
+
+    #[test]
+    fn katakana_iteration_marks_resolve() {
+        // ヽ repeats the previous kana (already hiragana-folded), ヾ the voiced copy.
+        assert_eq!(normalize_text("クヽ"), "くく");
+        assert_eq!(normalize_text("クヾ"), "くぐ");
     }
 }
