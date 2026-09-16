@@ -213,6 +213,9 @@
                                         />
                                     {/if}
                                     <span class="mined-word-spelling">{word.spelling}</span>
+                                    {#if word.reading && word.reading !== word.spelling}
+                                        <span class="mined-word-reading">{word.reading}</span>
+                                    {/if}
                                     {#if word.definitions.length > 0}
                                         <span class="mined-word-definition">{word.definitions[0]}</span>
                                     {/if}
@@ -418,7 +421,7 @@
         padding: 0.5rem 0.7rem 0.55rem 0.85rem;
         display: flex;
         flex-direction: column;
-        gap: 0.2rem;
+        gap: 0.1rem;
         min-width: 0;
     }
 
@@ -448,6 +451,15 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .mined-word-reading {
+        font-size: 0.75rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+
     }
 
     .mined-word-definition {
