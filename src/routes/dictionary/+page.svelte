@@ -15,6 +15,7 @@
     import { getReviewStats, getReviewActivityByDay } from '$lib/reviewStats.js';
     import { goto, afterNavigate } from '$app/navigation';
     import CustomReviewModal from '$lib/components/CustomReviewModal.svelte';
+    import WordImportModal from '$lib/components/WordImportModal.svelte';
     import Toast from '$lib/components/Toast.svelte';
     import HeatMap from '$lib/components/HeatMap.svelte';
 
@@ -65,6 +66,7 @@
     let frequentLimit = $state(10);
 
     let showCustomReviewModal = $state(false);
+    let showImportModal = $state(false);
 
     const STAT_COLORS = {
         wordCount: '#36b7bd',
@@ -518,6 +520,10 @@
         await loadWords();
     }
 
+    async function handleImportDone() {
+        await loadWords();
+    }
+
     async function loadReviewStats() {
         const my = ++reviewStatsRequestId;
         const next = await getReviewStats(mediaFilter);
@@ -661,6 +667,11 @@
         >
             Review
         </button>
+        {#if activeTab === 'words'}
+            <button type="button" class="tab-btn import-btn" onclick={() => (showImportModal = true)}>
+                Import
+            </button>
+        {/if}
         {#if activeTab === 'words' || activeTab === 'sentences' || activeTab === 'frequent'}
             <div class="view-toggle">
                 <button
@@ -1137,6 +1148,7 @@
         </div>
         {/if}
     </div>
+    <WordImportModal bind:show={showImportModal} onImported={handleImportDone} />
 </main>
 
 <style>
@@ -1258,6 +1270,10 @@
     .tab-btn.active {
         color: var(--theme-primary, #36b7bd);
         border-bottom-color: var(--theme-primary, #36b7bd);
+    }
+
+    .tab-btn.import-btn {
+        color: var(--theme-primary, #36b7bd);
     }
 
     .word-list {
