@@ -624,6 +624,60 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         }
     }
 
+    // Casual-contracted imperatives ～ちゃいな/じゃいな (準備しちゃいなよ)
+    // and their full ～ちゃいなさい/じゃいなさい forms: てしまいなさい
+    // with the いなさい compressed. Reduce straight to てしまう/
+    // でしまう (v5u, like JL's own ちゃう rule) so the chain continues to
+    // the verb normally (しちゃいな -> してしまう -> する).
+    for (con_end, dec_end, detail) in [
+        ("ちゃいな", "てしまう", "contracted + casual imperative"),
+        ("じゃいな", "でしまう", "contracted + casual imperative"),
+        ("ちゃいなさい", "てしまう", "contracted + polite imperative"),
+        ("じゃいなさい", "でしまう", "contracted + polite imperative"),
+    ] {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: dec_end.to_string(),
+            con_end: con_end.to_string(),
+            dec_tag: "v5u".to_string(),
+            con_tag: String::new(),
+            detail: detail.to_string(),
+        });
+    }
+
+    // Adjective causative/passive (悪くさせて -> 悪い): the ku-stem +
+    // させる/される family. The causative auxiliary inflects as ichidan,
+    // so every common inflection needs its own suffix; all reduce to the
+    // bare い stem (POS-validated to adjectives at lookup time, tag
+    // adj-i). しく-stems are covered automatically (美しくさせる ends in
+    // くさせる -> 美しい), as is よく (よくさせる -> よい).
+    for (con_end, detail) in [
+        ("くさせる", "causative"),
+        ("くさせて", "causative + te"),
+        ("くさせた", "causative + past"),
+        ("くさせない", "causative + negative"),
+        ("くさせます", "causative + polite"),
+        ("くさせよう", "causative + volitional"),
+        ("くさせろ", "causative + imperative"),
+        ("くさせるな", "causative + prohibitive"),
+        ("くさせたい", "causative + want to"),
+        ("くさせられる", "causative + passive/potential"),
+        ("くさせられた", "causative + passive/potential + past"),
+        ("くされる", "passive"),
+        ("くされて", "passive + te"),
+        ("くされた", "passive + past"),
+        ("くされない", "passive + negative"),
+    ] {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: "い".to_string(),
+            con_end: con_end.to_string(),
+            dec_tag: "adj-i".to_string(),
+            con_tag: String::new(),
+            detail: detail.to_string(),
+        });
+    }
+
     for suffix in [
         "じゃない",
         "ではない",

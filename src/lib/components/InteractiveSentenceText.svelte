@@ -1,6 +1,6 @@
 <script>
     import { onMount } from 'svelte';
-    import { lookupAtPosition, scanSentenceSpans } from '$lib/lookup.js';
+    import { lookupAtPosition } from '$lib/lookup.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
     import { mineWord, getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
     import { findHighlightedWordSpans } from '$lib/lookup.js';
@@ -24,10 +24,6 @@
 
     let knownWordsMap = $state(new Map());
     let knownSpans = $state([]);
-    // Full greedy scan (all dictionary words, not just known) used to snap
-    // mid-word hovers to the word start so highlight and tooltip agree.
-    /** @type {any[]} */
-    let allSpans = $state([]);
     let statusMenu = $state(null); // { x, y, wordId, current } | null
 
     function isSameSpan(a, b) {
@@ -60,13 +56,9 @@
         const charEl = event.currentTarget;
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) return;
 
-        // Snap mid-word hovers to the scanned word start (e.g. 船 inside 風船
-        // looks up 風船, not 船) so the tooltip matches the underline.
-        const snapped = allSpans.find((s) => index >= s.start && index < s.end)?.start ?? index;
-
         cycleSkip = 0;
         const requestId = ++hoverRequestId;
-        const result = await lookupAtPosition(text, snapped);
+        const result = await lookupAtPosition(text, index);
         if (requestId !== hoverRequestId) return;
         hoveredSpan = result;
 
@@ -201,28 +193,11 @@
         knownSpans = await findHighlightedWordSpans(text, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false);
     }
 
-    async function rescanAllSpans() {
-        if (!text) {
-            allSpans = [];
-            return;
-        }
-        try {
-            allSpans = await scanSentenceSpans(text);
-        } catch {
-            allSpans = [];
-        }
-    }
-
     $effect(() => {
         text;
         settings?.highlight_mode;
         settings?.treat_new_as_unknown;
         rescanKnownWords();
-    });
-
-    $effect(() => {
-        text;
-        rescanAllSpans();
     });
 
     onMount(() => {

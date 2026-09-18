@@ -1,6 +1,6 @@
 <script>
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
-    import { lookupAtPosition, findHighlightedWordSpans, scanSentenceSpans } from '$lib/lookup.js';
+    import { lookupAtPosition, findHighlightedWordSpans } from '$lib/lookup.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { startWebsocketListener, stopWebsocketListener } from '$lib/websocketListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
@@ -48,10 +48,6 @@
     
     let knownWordsMap = $state(new Map());
     let knownSpans = $state([]);
-    // Full greedy scan (all dictionary words) used to snap mid-word hovers
-    // to the word start so highlight and tooltip never disagree.
-    /** @type {any[]} */
-    let allSpans = $state([]);
     let statusMenu = $state(null); // { x, y, wordId, current } | null
 
     $effect(() => {
@@ -191,13 +187,9 @@
 
         if (hoveredSpan && index >= hoveredSpan.start && index < hoveredSpan.end) return;
 
-        // Snap mid-word hovers to the scanned word start so the tooltip
-        // matches the underline (船 inside 風船 looks up 風船, not 船).
-        const snapped = allSpans.find((s) => index >= s.start && index < s.end)?.start ?? index;
-
         cycleSkip = 0;
         const requestId = ++hoverRequestId;
-        const result = await lookupAtPosition(displayedText, snapped);
+        const result = await lookupAtPosition(displayedText, index);
         if (requestId !== hoverRequestId) return;
 
         hoveredSpan = result;
@@ -394,28 +386,11 @@
         knownSpans = await findHighlightedWordSpans(displayedText, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false);
     }
 
-    async function rescanAllSpans() {
-        if (!displayedText) {
-            allSpans = [];
-            return;
-        }
-        try {
-            allSpans = await scanSentenceSpans(displayedText);
-        } catch {
-            allSpans = [];
-        }
-    }
-    
     $effect(() => {
         displayedText;
         settings?.highlight_mode;
         settings?.treat_new_as_unknown;
         rescanKnownWords();
-    });
-
-    $effect(() => {
-        displayedText;
-        rescanAllSpans();
     });
     
     onMount(() => {
