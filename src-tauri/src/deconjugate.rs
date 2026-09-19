@@ -678,6 +678,37 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         });
     }
 
+    // Negative-hearsay なさそう (考えてなさそう -> 考える): ない-stem
+    // な + さ + hearsay そう, for which JL has no rule. Three
+    // non-overlapping surface forms so verb te-stems, verb masu-stems,
+    // and adjective ku-stems each continue through their own JL rules
+    // without label pollution: 考えて (stem-te), 食べ (stem-ren),
+    // 寒く -> 寒い (adj-i, like the adjective-causative rules).
+    let nasa_suffixes: &[(&str, &str)] = &[
+        ("", "negative + hearsay"),
+        ("だ", "negative + hearsay"),
+        ("だった", "negative + hearsay + past"),
+        ("です", "negative + hearsay + polite"),
+        ("な", "negative + hearsay"),
+        ("に", "negative + hearsay"),
+    ];
+    for (base, dec_end, dec_tag) in [
+        ("てなさそう", "て", "stem-te"),
+        ("なさそう", "", "stem-ren"),
+        ("くなさそう", "い", "adj-i"),
+    ] {
+        for (suffix, detail) in nasa_suffixes {
+            rules.push(VirtualRule {
+                rule_type: RuleKind::OnlyFinal,
+                dec_end: dec_end.to_string(),
+                con_end: format!("{base}{suffix}"),
+                dec_tag: dec_tag.to_string(),
+                con_tag: String::new(),
+                detail: detail.to_string(),
+            });
+        }
+    }
+
     for suffix in [
         "じゃない",
         "ではない",
