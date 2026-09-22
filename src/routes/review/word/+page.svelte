@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation';
     import { onMount, onDestroy } from 'svelte';
     import ActionButton from '$lib/components/ActionButton.svelte';
-    import WordImageButton from '$lib/components/WordImageButton.svelte';
+    import { coverSrc } from '$lib/db';
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS } from '$lib/constants.js';
     import { loadSettings } from '$lib/settings.js';
@@ -201,19 +201,16 @@
 
             <div class="review-word">{currentWord.spelling}</div>
 
-            <div class="review-image-row">
-                <WordImageButton
-                    wordId={currentWord.id}
-                    imagePath={currentWord.image_path ?? null}
-                    onSaved={(path) => (currentWord.image_path = path)}
-                />
-            </div>
-
             {#if isRevealed}
                 {#if currentWord.reading && currentWord.reading !== currentWord.spelling}
                     <div class="review-reading">{currentWord.reading}</div>
                 {/if}
                 <div class="review-definitions">{parseDefinitions(currentWord.definitions).join('; ')}</div>
+                {#if currentWord.image_path}
+                    <div class="review-image-row">
+                        <img class="review-image" src={coverSrc(currentWord.image_path)} alt="" />
+                    </div>
+                {/if}
                 {#if currentSentence}
                     <div class="review-sentence-wrap">
                         {#if splitHighlighted(currentSentence)}
@@ -376,6 +373,16 @@
         display: flex;
         justify-content: center;
         margin-top: 0.6rem;
+    }
+
+    .review-image {
+        max-width: min(420px, 80vw);
+        max-height: 60vh;
+        border-radius: 12px;
+        border: 1px solid var(--theme-border, #404040);
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
     }
 
     .review-reading {
