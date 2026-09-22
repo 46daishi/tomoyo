@@ -709,6 +709,24 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         }
     }
 
+    // なさい after non-verb stems (ゴメンなさい): JL's version decays to a
+    // masu-stem tag, which only continues for verb stems — a noun stem
+    // dead-ends invisibly. This reduces to an empty stem with an
+    // unrestricted tag so the noun itself resolves (ゴメン -> 御免); verb
+    // stems are unaffected (ます-stem paths still win, and し-stems resolve
+    // via morphology first, outranking by kind). Detail mirrors JL's own
+    // rule so labels stay consistent by path. (ください deliberately left
+    // out: 教えてください already resolves, and an any-stem ください would
+    // let 教え-noun outstep 教える on fewer steps.)
+    rules.push(VirtualRule {
+        rule_type: RuleKind::OnlyFinal,
+        dec_end: String::new(),
+        con_end: "なさい".to_string(),
+        dec_tag: "any".to_string(),
+        con_tag: String::new(),
+        detail: "polite imperative".to_string(),
+    });
+
     for suffix in [
         "じゃない",
         "ではない",

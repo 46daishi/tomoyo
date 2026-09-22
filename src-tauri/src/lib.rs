@@ -99,6 +99,24 @@ impl DictionaryIndex {
                         by_bigram.entry(gram).or_default().insert(entry.id);
                     }
                 }
+                // Also index katakana script forms raw (シャイ under シャイ,
+                // not just しゃい): normalization folds katakana away, so an
+                // exact-script match outranks normalized-only homophones at
+                // lookup time (シャイ the loanword beats 謝意/社医 for
+                // katakana シャイ). Hiragana/kanji raw forms are skipped —
+                // their normalized keys already reach the same entries, and
+                // re-ranking those would dethrone morphological winners
+                // (しろ imperative -> する must beat 白).
+                let has_katakana = spelling
+                    .chars()
+                    .any(|c| ('\u{30A0}'..='\u{30FF}').contains(&c));
+                if has_katakana
+                    && normalize::normalize_variants(spelling)
+                        .iter()
+                        .all(|k| k != spelling)
+                {
+                    by_text.entry(spelling.clone()).or_default().push(Arc::clone(&entry));
+                }
             }
 
             by_id.insert(entry.id, Arc::clone(&entry));
@@ -129,6 +147,8 @@ const CONTRACTION_AUX_VERBS: &[&str] = &["ちゃう", "じゃう", "ちまう", 
 const CONTRACTION_SURFACES: &[&str] = &[
     "ちゃう", "ちゃっ", "ちゃい", "ちゃえ", "ちゃお", "ちゃわ", "ちゃいな", "ちゃいなさい",
     "じゃう", "じゃっ", "じゃい", "じゃえ", "じゃお", "じゃわ", "じゃいな", "じゃいなさい",
+    "ちまう", "ちまっ", "ちまい", "ちまえ", "ちまお", "ちまわ",
+    "じまう", "じまっ", "じまい", "じまえ", "じまお", "じまわ",
 ];
 
 fn is_bound_only(entry: &DictEntry) -> bool {
@@ -205,9 +225,6 @@ fn find_containing(query: &str, index: &DictionaryIndex, limit: usize) -> Vec<Ar
         let mut candidates: HashSet<u32> = posting_sets[0].clone();
         for set in &posting_sets[1..] {
             candidates.retain(|id| set.contains(id));
-            if candidates.is_empty() {
-                break;
-            }
         }
         candidate_ids.extend(candidates);
     }
@@ -367,15 +384,19 @@ fn lookup_from_position(
         }
         // Fixed-expression completions across token splits: なんで ("why")
         // split as な|んで, だった as だっ|た, でした as でし|た, になると
-        // as に|なる|と, そういえば as そう|いえ|ば. The heads are either
-        // locked to a single token (function words) or cut off by a verb
-        // guard (そう + いえ) — but the merged forms are real entries, so
-        // allow exactly the merged span; longest-first lookup falls back to
-        // the pieces when it doesn't apply. Exact-match only (never
-        // prefixes): 相手なんだ splits as な|ん|だ, where な+ん ("なん")
-        // must NOT merge. Tails may span several tokens (いえ|ば).
-        let mut merged_ranges: Vec<(usize, usize)> = Vec::new();
-        if position == t.start {
+        // as に|なる|と, そういえば as そう|いえ|ば (or そう|言え|ば),
+        // なさい as な|さ|いね. The heads are either locked to a single
+        // token (function words) or cut off by a verb guard (そう + いえ)
+        // — but the merged forms are real entries, so allow exactly the
+        // merged span; longest-first lookup falls back to the pieces when
+        // it doesn't apply. Exact-match only (never prefixes): 相手なんだ
+        // splits as な|ん|だ, where な+ん ("なん") must NOT merge. Tails may
+        // span several tokens (いえ|ば), may match normalized surfaces
+        // (言え|ば), and may complete mid-token (な|さ|いね for ゴメンなさい
+        // の さい). Function-head pairs also run at later token boundaries
+        // (ゴメン|な|さ|いね from a ゴメン cursor), so fixed expressions
+        // stay reachable wherever the user points inside them.
+        let mut push_completion = |head_tok: &MorphToken, sai_only: bool| {
             const COMPLETIONS: &[(&str, &str, bool)] = &[
                 // (head, tail, function_head_only)
                 ("な", "んで", true),
@@ -384,28 +405,47 @@ fn lookup_from_position(
                 ("でし", "た", true),
                 ("に", "なる", true),
                 ("そう", "いえば", false),
+                ("そう", "いや", false),
+                ("な", "さい", true),
             ];
+            let head_is_function = matches!(
+                head_tok.pos.as_str(),
+                "助詞" | "助動詞" | "接続詞"
+            );
             for (head, tail, fn_only) in COMPLETIONS {
-                if *head != t.surface || (*fn_only && !function_word) {
+                if *head != head_tok.surface {
                     continue;
                 }
-                let mut end = t.end;
+                if sai_only && *tail != "さい" {
+                    continue;
+                }
+                if *fn_only && !head_is_function {
+                    continue;
+                }
+                // Normalized once per token: readings first (言えば matches
+                // いえば — normalization never maps kanji to readings), with
+                // normalized-surface fallback for unknown/empty readings.
+                let tail_norm = normalize::normalize_text(tail);
+                let mut end = head_tok.end;
                 let mut acc = String::new();
-                for tok in tokens.iter().filter(|tok| tok.start >= t.end) {
+                for tok in tokens.iter().filter(|tok| tok.start >= head_tok.end) {
                     if tok.start != end {
                         break;
                     }
-                    acc.push_str(&tok.surface);
+                    // Length-safe: the per-token contribution is measured in
+                    // the same space it is appended in.
+                    let cur = if tok.reading.is_empty() {
+                        normalize::normalize_text(&tok.surface)
+                    } else {
+                        tok.reading.clone()
+                    };
+                    let before = acc.chars().count();
+                    acc.push_str(&cur);
                     end = tok.end;
-                    if acc == *tail {
+                    if acc == tail_norm {
                         let mut nend = end.min(len);
                         if nend > position {
                             ends.push(nend);
-                            // The tail may itself trip a verb guard (なる in
-                            // になると): remember the merged range so the
-                            // extension loop below walks through it instead
-                            // of breaking, letting later tokens (と) join.
-                            merged_ranges.push((t.end, nend));
                         }
                         // Absorb immediately-following particles (になると's
                         // と): function-word heads have no extension loop of
@@ -425,18 +465,50 @@ fn lookup_from_position(
                         }
                         break;
                     }
-                    if !tail.starts_with(&acc) {
-                        break;
+                    if tail_norm.starts_with(&acc) {
+                        continue;
                     }
+                    // Mid-token completion (ゴメン|な|さ|いね, tail さい):
+                    // the tail completes inside the current token. Only when
+                    // the token's two spaces agree in length (kana), so the
+                    // end lands on the right character.
+                    if acc.starts_with(&tail_norm)
+                        && cur.chars().count() == tok.surface.chars().count()
+                    {
+                        let extra = tail_norm.chars().count() - before;
+                        let nend = (tok.start + extra).min(len);
+                        if nend > position {
+                            ends.push(nend);
+                        }
+                    }
+                    break;
                 }
             }
+        };
+        if position == t.start {
+            push_completion(t, false);
+            // (sai_only=false: all pairs, original head-anchored semantics.)
+        }
+        // Function-head pairs at later boundaries (bounded window).
+        // Restricted to the さい pair (ゴメン|な|さ|いね from a ゴメン
+        // cursor): other pairs stay head-anchored, otherwise a completion
+        // end attributed to the cursor's span could swallow an independent
+        // neighbor word (から|だっ|た from a から cursor -> からだった,
+        // losing the だった span).
+        for t2 in tokens.iter().filter(|tok| {
+            tok.start > position
+                && tok.start <= position + MAX_CHARS_COMBINED
+                && tok.surface == "な"
+        }) {
+            push_completion(t2, true);
         }
         // If the cursor is on an unknown token (empty reading — katakana slang
-        // like マズ) or a filler token (フィラー — often mis-analyzed tokens
-        // like ともう being one token), allow the span to continue
-        // character-by-character into the next token so a real literal word can
-        // still form across the false boundary.
-        if t.reading.is_empty() || t.pos == "フィラー" {
+        // like マズ), a filler token (フィラー — often mis-analyzed tokens
+        // like ともう being one token), or a prefix (接頭詞 like す in すぐ,
+        // which only ever forms words together with what follows), allow the
+        // span to continue character-by-character into the next token so a
+        // real literal word can still form across the false boundary.
+        if t.reading.is_empty() || t.pos == "フィラー" || t.pos == "接頭詞" {
             if let Some(next) = tokens.iter().find(|tok| tok.start > position) {
                 for e in (t.end + 1)..=next.end.min(len) {
                     ends.push(e);
@@ -633,6 +705,18 @@ fn lookup_from_position(
                         })
             });
             for tok in tokens.iter().filter(|tok| tok.start > position) {
+                // Sentence-final う glued into a mis-split token
+                // (帰りましょうかっ -> 帰り|ましょ|うかっ): allow ending
+                // right after the う so the volitional still resolves.
+                // Shorter than the token end, so longest-first only reaches
+                // it when longer spans fail. (か is deliberately excluded:
+                // マジ|かっ would otherwise resolve to マジか/間近 instead
+                // of マジ.)
+                if let Some(&c) = chars.get(tok.start) {
+                    if c == 'う' && tok.start + 1 > position && tok.start + 1 < tok.end.min(len) {
+                        ends.push(tok.start + 1);
+                    }
+                }
                 // Trailing punctuation and unknown tokens (emphatic kana
                 // like ぅぇぁ, stray ー, dot runs, etc. — MeCab tags them
                 // base "*" with an empty reading) never extend a span; they
@@ -647,18 +731,59 @@ fn lookup_from_position(
                 if tok.pos == "記号" {
                     break;
                 }
-                // Completion-merged tails (なる in になると): walk through
-                // them without tripping verb guards, so later tokens (と)
-                // can still join the span.
-                if merged_ranges
-                    .iter()
-                    .any(|(s, e)| tok.start >= *s && tok.end <= *e)
+                // Listing/reason し (鍛えてないし -> 鍛えてない + し, 悪いし,
+                // 行くし来るし): the 助詞-し never continues a span — it
+                // always starts its own (し as verb stem (する/死ぬ…) or noun
+                // (氏/師/市/4…) is a different POS and unaffected). ただし/
+                // すし/もし/よし stay whole as single tokens.
+                if tok.pos == "助詞" && tok.surface == "し" {
+                    break;
+                }
+                // Split causative さ|せ (気を悪くさせて tokenized 悪く|さ|
+                // せ|て, そうさせる as そう|さ|せ|る): せ continues the さ
+                // (する-stem), so it never starts a new phrase. させる whole
+                // after a する-stem or a ku-form adjective is the same
+                // construction unsplit; a bare さ surface before せ/させる
+                // is likewise always the causative split (さ as a sentence
+                // particle never precedes せ/させる).
+                let prev_tok = tokens.iter().filter(|t| t.end <= tok.start).last();
+                let tok_is_split_cause = matches!(tok.base_form.as_str(), "せる" | "させる")
+                    && prev_tok.map_or(false, |p| {
+                        p.base_form == "する"
+                            || (tok.base_form == "させる" && p.pos == "形容詞")
+                            || p.surface == "さ"
+                    });
+                // Adverbs never take continuations (そうほいほい -> そう +
+                // ほいほい, not そうほ/相補; とても親切 -> とても + 親切;
+                // よく書く -> よく + 書く): content words always start new
+                // phrases after an adverb — only particles, auxiliaries,
+                // adnominals, and completions continue the span. Three
+                // exemptions: the explanatory ん (そうなんだ still reaches
+                // だ); split-causative せ/させる (そうさせる still reaches
+                // せ for the causative-shorten rule); fixed adverbial
+                // compounds with noun continuations (もう一つ, もう一度)
+                // and lexicalized adverb+する units (ことにする,
+                // ちゃんとする) — longest-first falls back otherwise.
+                if token_at_pos.map_or(false, |t| t.pos == "副詞")
+                    && matches!(
+                        tok.pos.as_str(),
+                        "名詞" | "動詞" | "形容詞" | "副詞"
+                    )
+                    && !(tok.surface == "ん" && tok.pos == "名詞")
+                    && !tok_is_split_cause
                 {
-                    let e = tok.end.min(len);
-                    if e > position {
-                        ends.push(e);
+                    let compound_known = (tok.pos == "名詞"
+                        || (tok.pos == "動詞" && tok.base_form == "する"))
+                        && {
+                            let compound: String =
+                                chars[position..tok.end].iter().collect();
+                            normalize::normalize_variants(&compound)
+                                .iter()
+                                .any(|k| index.by_text.contains_key(k))
+                        };
+                    if !compound_known {
+                        break;
                     }
-                    continue;
                 }
                 if tok.base_form == "*" {
                     let unknown_compound: String = chars[position..tok.end].iter().collect();
@@ -749,6 +874,25 @@ fn lookup_from_position(
                 // てる is a bound contraction (て+いる/おる) that never starts
                 // a phrase, so it always extends.
                 let tok_is_bound = tok.base_form == "てる";
+                // Past-aux た + emphatic sokuon (よかったっ -> よかっ|たっ):
+                // MeCab lemmatizes the merged たっ as 立つ, but it is the
+                // past auxiliary plus emphasis — never a new word. Real
+                // 立つ continuations (立っ|た) keep 立っ and た separate, so
+                // this exact shape is unambiguous. Push both the た end
+                // (before the っ) and the full end, like the たん arm.
+                let tok_is_past_tsu =
+                    tok.surface == "たっ" && tok.base_form == "たつ";
+                if tok_is_past_tsu {
+                    let sub_end = tok.end - 1;
+                    if sub_end > position {
+                        ends.push(sub_end);
+                    }
+                    let e = tok.end.min(len);
+                    if e > position {
+                        ends.push(e);
+                    }
+                    continue;
+                }
                 // Suru-noun cursors absorb their inflections directly.
                 let tok_is_suru_infl = cursor_suru_noun
                     && matches!(
@@ -777,21 +921,12 @@ fn lookup_from_position(
                 let cursor_unknown = token_at_pos.map_or(false, |t| {
                     t.reading.is_empty() || t.base_form == "*"
                 });
-                // Split causative さ|せ (気を悪くさせて tokenized 悪く|さ|
-                // せ|て): せ continues the さ (する-stem), so it never
-                // starts a new phrase. させる whole after a する-stem or a
-                // ku-form adjective is the same construction unsplit.
-                let prev_tok = tokens.iter().filter(|t| t.end <= tok.start).last();
-                let tok_is_split_cause = matches!(tok.base_form.as_str(), "せる" | "させる")
-                    && prev_tok.map_or(false, |p| {
-                        p.base_form == "する"
-                            || (tok.base_form == "させる" && p.pos == "形容詞")
-                    });
                 if !cursor_is_verb
                     && crossed_separator
                     && tok.pos == "動詞"
                     && tok.base_form != "する"
                     && !tok_is_bound
+                    && !tok_is_past_tsu
                     && !(in_te_aux_chain && tok_is_te_aux)
                     && !(in_must_chain && tok_is_must_aux)
                     && !is_koto_naru(tok.end)
@@ -809,6 +944,7 @@ fn lookup_from_position(
                     && tok.pos == "動詞"
                     && tok.base_form != "する"
                     && !tok_is_bound
+                    && !tok_is_past_tsu
                     && !tok_is_suru_infl
                     && !tok_is_adj_cause
                     && !tok_is_split_cause
@@ -835,6 +971,33 @@ fn lookup_from_position(
                     in_must_chain = false;
                 }
                 if cursor_is_verb && tok.pos == "名詞" {
+                    // Volitional う/よう glued into the next token
+                    // (帰りましょうかっ -> 帰り|ましょ|うかっ): the う
+                    // continues a volitional construction (plain volitional
+                    // after a verb stem, polite volitional ましょう,
+                    // conjecture だろう), never a new word. The exact end
+                    // comes from the う/か single-char rule below; here just
+                    // don't break.
+                    let prev_volitional_base = tokens
+                        .iter()
+                        .filter(|t| t.end <= tok.start)
+                        .last()
+                        .map_or(false, |p| {
+                            p.pos == "動詞"
+                                || matches!(
+                                    p.surface.as_str(),
+                                    "ましょ" | "でしょ" | "だろ"
+                                )
+                        });
+                    if (tok.surface.starts_with('う') || tok.surface.starts_with("よう"))
+                        && prev_volitional_base
+                    {
+                        let e = tok.end.min(len);
+                        if e > position {
+                            ends.push(e);
+                        }
+                        continue;
+                    }
                     // ん followed by だ is the explanatory copula んだ (= のだ),
                     // not a real noun: したんだ must split as した + んだ,
                     // never resolve as one span even if the compound reads
@@ -1011,12 +1174,125 @@ fn lookup_from_position(
                         break;
                     }
                 }
+                // Causative-stem preference (そうさせる -> そう, not archaic
+                // 奏する): the win came through a causative strip, but the
+                // stem alone is a complete non-verb word — resolve as the
+                // stem (the させる tail stays reachable on hover). Ku-stem
+                // (悪くさせる) and verb-stem (食べさせる, 来させる) shapes
+                // never trigger this: their stems aren't literal words, or
+                // resolve to verbs.
+                if deconj_info
+                    .as_deref()
+                    .map_or(false, |d| d.contains("causative"))
+                {
+                    const CAUSE_SUFFIXES: &[&str] = &[
+                        "させて", "させた", "させない", "させます", "させよう",
+                        "させろ", "させる", "させ", "せて", "せた", "せない",
+                        "せます", "せよう", "せろ", "せる", "せ",
+                    ];
+                    for suffix in CAUSE_SUFFIXES {
+                        if !candidate.ends_with(suffix) || candidate.len() <= suffix.len() {
+                            continue;
+                        }
+                        let stem: String = candidate
+                            .chars()
+                            .take(candidate.chars().count() - suffix.chars().count())
+                            .collect();
+                        let stem_hit = normalize::normalize_variants(&stem)
+                            .iter()
+                            .any(|k| index.by_text.contains_key(k));
+                        if stem_hit {
+                            if let Some((se, si)) = lookup_candidate(
+                                &stem,
+                                index,
+                                decon,
+                                context_reading,
+                                morph_base,
+                                tokens,
+                                position,
+                            ) {
+                                let stem_is_word = se.first().map_or(false, |e| {
+                                    !e.pos.iter().any(|p| p.contains("verb"))
+                                });
+                                if stem_is_word {
+                                    eff_end = position + stem.chars().count();
+                                    candidate = stem;
+                                    entries = se;
+                                    deconj_info = si;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+                // Obscure-literal preference (そこに -> そこ, not 底荷;
+                // さんと -> さん, not 三都; ものは -> もの, not もの派):
+                // the winner is a priority-less literal whose surface splits
+                // at a token boundary into a stem that resolves to a common
+                // word of a DIFFERENT entry. Same-identity extensions
+                // (くせに -> 癖, ために -> 為, ところで -> 所, 残念ながら ->
+                // 残念, 今日, 食べ物) stay whole, as do conjugations (literal
+                // winners only) and standalone-な tails (owned by the
+                // rentaikei rule below). Continuative particles
+                // (ながら/たり/だり/がてら/つつ) never split either — they
+                // inflect the verb rather than casing a noun.
+                if deconj_info.is_none()
+                    && priority_score(&entries[0]) == 0
+                {
+                    const CONTINUATIVE: &[&str] =
+                        &["ながら", "たり", "だり", "がてら", "つつ"];
+                    if let Some(last) = tokens
+                        .iter()
+                        .filter(|t| t.start > position && t.end == eff_end)
+                        .last()
+                    {
+                        let na_owned = last.pos == "助動詞"
+                            && last.base_form == "だ"
+                            && last.surface == "な";
+                        let continuative = last.pos == "助詞"
+                            && CONTINUATIVE.iter().any(|s| *s == last.surface);
+                        if !na_owned && last.pos == "助詞" && !continuative {
+                            let stem: String =
+                                chars[position..last.start].iter().collect();
+                            let stem_hit = normalize::normalize_variants(&stem)
+                                .iter()
+                                .any(|k| index.by_text.contains_key(k));
+                            if stem_hit {
+                                if let Some((se, si)) = lookup_candidate(
+                                    &stem,
+                                    index,
+                                    decon,
+                                    context_reading,
+                                    morph_base,
+                                    tokens,
+                                    position,
+                                ) {
+                                    let stem_common = se
+                                        .iter()
+                                        .any(|e| priority_score(e) != 0);
+                                    let same_entry = se
+                                        .iter()
+                                        .any(|e| e.id == entries[0].id);
+                                    if stem_common && !same_entry {
+                                        eff_end = last.start;
+                                        candidate = stem;
+                                        entries = se;
+                                        deconj_info = si;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 // Rentaikei-な preference (ヘンな噂 -> ヘン + な, not the
                 // literal ヘンナ "henna" plant): the winner ends in a
-                // standalone copula-rentaikei な and the stem alone
+                // standalone copula-rentaikei な, the stem is a na-adjective
+                // (keiyodoshi — 変, 静か, 綺麗…), and the stem alone
                 // resolves — then な is adnominal, not part of the word.
                 // The な must be its own 助動詞-だ token, so ひな祭り,
-                // さかな, こんな (single tokens) never trigger this.
+                // さかな, こんな (single tokens) never trigger this; and
+                // non-na-adjective stems (よう/様 in ような) keep the whole
+                // span for the ranking boost below.
                 if candidate.ends_with('な') && candidate.chars().count() > 1 {
                     let stem: String =
                         candidate.chars().take(candidate.chars().count() - 1).collect();
@@ -1034,7 +1310,13 @@ fn lookup_from_position(
                             tokens,
                             position,
                         ) {
-                            if !se.is_empty() {
+                            // Only na-adjective stems shorten (変, 静か…):
+                            // noun/auxiliary stems (よう/様, 本当) keep the
+                            // whole span for the adnominal ranking boost.
+                            let stem_is_na_adj = se.iter().any(|e| {
+                                e.pos.iter().any(|p| p.contains("keiyodoshi"))
+                            });
+                            if !se.is_empty() && stem_is_na_adj {
                                 eff_end = stem_end;
                                 candidate = stem;
                                 entries = se;
@@ -1043,7 +1325,43 @@ fn lookup_from_position(
                         }
                     }
                 }
-                // ── NEW: compute related entries before returning ──
+                // Colloquial ない + listing/reason し mis-tagged as one
+                // conjunction token (ないし -> 乃至): in dialogue-heavy text
+                // this is almost always negation + し, so prefer the ない
+                // stem when it resolves to 無い. Formal 乃至 ("A to B" /
+                // "A nor B") is preserved by position: a content word right
+                // after (死刑乃至無期懲役) keeps the whole span, since 乃至
+                // takes nominal conjuncts while reason-し trails off into
+                // particles/punctuation/end. ただし/もし/すし/よし never
+                // match (their stems lack 無い).
+                if candidate == "ないし" {
+                    let next_is_content = tokens
+                        .iter()
+                        .find(|t| t.start == eff_end)
+                        .map_or(false, |t| {
+                            matches!(t.pos.as_str(), "名詞" | "動詞" | "形容詞")
+                        });
+                    if !next_is_content {
+                        if let Some((se, si)) = lookup_candidate(
+                            "ない",
+                            index,
+                            decon,
+                            context_reading,
+                            morph_base,
+                            tokens,
+                            position,
+                        ) {
+                            if se.iter().any(|e| {
+                                e.spellings.iter().any(|s| s == "無い")
+                            }) {
+                                eff_end = position + 2;
+                                candidate = "ない".to_string();
+                                entries = se;
+                                deconj_info = si;
+                            }
+                        }
+                    }
+                }
                 let exact_ids: HashSet<u32> = entries.iter().map(|e| e.id).collect();
                 let related = find_containing(&candidate, index, 20)
                     .into_iter()
@@ -1100,6 +1418,8 @@ fn lookup_from_position(
 /// Ordering here (lower = better) is the sort precedence.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum MatchKind {
+    ExactScript, // entry lists the raw surface script itself (katakana
+    // シャイ for シャイ) — outranks normalized-only homophones (謝意).
     PrimarySpelling, // normalized surface == entry's primary (first) spelling
     Spelling,        // normalized surface == some other spelling
     Morphological,   // reached via the tokenizer's base form (e.g. します -> する)
@@ -1422,7 +1742,35 @@ fn lookup_candidate(
 
     // Literal matches first — inserted with chain_len 0, so they win ties
     // against equal-priority deconjugated results, same as before.
-    for key in &variants {
+    // Exact-script katakana matches go first of all (シャイ the loanword
+    // beats 謝意/社医 for katakana シャイ): the index carries katakana raw
+    // forms alongside normalized keys for exactly this lookup.
+    if candidate
+        .chars()
+        .any(|c| ('\u{30A0}'..='\u{30FF}').contains(&c))
+    {
+        if let Some(entries) = index.by_text.get(candidate) {
+            for e in entries {
+                if e.spellings.iter().chain(e.readings.iter()).any(|s| s.as_str() == candidate)
+                    && seen_ids.insert(e.id)
+                {
+                    let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
+                    candidates.push((Arc::clone(e), 0, None, MatchKind::ExactScript, ctx));
+                }
+            }
+        }
+    }
+    // A whole-candidate っと/って is the quotative/emphatic と with
+    // sokuon (ちりっと走った) — te-form って never tokenizes as one
+    // piece (行って splits 行っ|て), so this only ever fires for the
+    // particle. Look it up as と as well.
+    let mut literal_keys: Vec<String> = variants.clone();
+    if (candidate == "っと" || candidate == "って")
+        && !literal_keys.iter().any(|k| k == "と")
+    {
+        literal_keys.push("と".to_string());
+    }
+    for key in &literal_keys {
         if let Some(entries) = index.by_text.get(key) {
             for e in entries {
                 // Bare だった would otherwise match its inflection-expression
@@ -1961,8 +2309,20 @@ fn lookup_candidate(
     // strips matching tails, resolves the stem via deconjugation or
     // literally, and pushes labeled candidates.
     let mut strip_tails = |tails: &[(&str, &str)], tail_bases: &[String]| {
+        // A trailing question か (本なんですか, だったか, 行くだろうか)
+        // peels first so the tail tables still match; the か itself stays
+        // in the span. Peel-only (never replaces the full base), so
+        // unrelated spans are unaffected.
+        let mut all_bases: Vec<&str> = tail_bases.iter().map(|s| s.as_str()).collect();
         for base in tail_bases {
-            let mut stem = base.as_str();
+            if let Some(stripped) = base.strip_suffix('か') {
+                if !stripped.is_empty() && !all_bases.iter().any(|b| *b == stripped) {
+                    all_bases.push(stripped);
+                }
+            }
+        }
+        for base in all_bases {
+            let mut stem = base;
             let mut tail_labels: Vec<&str> = Vec::new();
             loop {
                 let mut matched = false;
@@ -2010,7 +2370,39 @@ fn lookup_candidate(
                     }
                 }
             }
-            // ...or a literal dictionary stem.
+            // ...or a literal dictionary stem. Katakana-exact stems
+            // (シャイ in シャイなのか) resolve first as ExactScript so the
+            // script-faithful entry outranks normalized-only homophones
+            // (謝意/社医). An entry already pushed via the normalized
+            // reading base gets its kind upgraded in place (seen_ids would
+            // otherwise lock in the weaker Deconjugated kind, since the
+            // reading base runs first).
+            if stem.chars().any(|c| ('\u{30A0}'..='\u{30FF}').contains(&c)) {
+                if let Some(entries) = index.by_text.get(stem) {
+                    for e in entries {
+                        if !e.spellings.iter().chain(e.readings.iter()).any(|s| s.as_str() == stem) {
+                            continue;
+                        }
+                        seen_ids.insert(e.id);
+                        match candidates.iter_mut().find(|(c, _, _, _, _)| c.id == e.id) {
+                            Some(slot) => {
+                                slot.3 = MatchKind::ExactScript;
+                            }
+                            None => {
+                                let ctx = context_reading
+                                    .map_or(false, |r| reading_matches_context(e, r));
+                                candidates.push((
+                                    Arc::clone(e),
+                                    2,
+                                    Some(tail_desc.clone()),
+                                    MatchKind::ExactScript,
+                                    ctx,
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
             for key in normalize::normalize_variants(stem) {
                 if let Some(entries) = index.by_text.get(&key) {
                     for e in entries {
@@ -2038,6 +2430,10 @@ fn lookup_candidate(
         if let Some(reading) = &span_reading {
             tail_bases.push(reading.clone());
         }
+        // Raw surface first-class: normalized variants fold katakana away,
+        // but script-faithful stems (シャイ in シャイなのか) need their raw
+        // form for exact-script matching downstream.
+        tail_bases.push(candidate.to_string());
         tail_bases.extend(variants.iter().cloned());
         strip_tails(COPULA_TAILS, &tail_bases);
     }
@@ -2062,8 +2458,52 @@ fn lookup_candidate(
         if let Some(reading) = &span_reading {
             tail_bases.push(reading.clone());
         }
+        // Raw surface first-class: normalized variants fold katakana away,
+        // but script-faithful stems (シャイ in シャイなのか) need their raw
+        // form for exact-script matching downstream.
+        tail_bases.push(candidate.to_string());
         tail_bases.extend(variants.iter().cloned());
         strip_tails(CONJECTURE_TAILS, &tail_bases);
+    }
+
+    // なんだ-family tails: なんです/なのか/なのです/んですか/なのですか/っけ
+    // attach to any stem, so unlike copula tails they need no gate — the
+    // suffixes themselves are unambiguous. Plain なんだ is gated to
+    // adverbial stems (そう/こんな/何 + なんだ): after nouns it stays split
+    // (相手なんだ -> 相手 + な + ん + だ by deliberate design). The stem
+    // resolves via the same deconjugation/literal paths (and longest-first
+    // falls back when it doesn't).
+    const NANDA_TAILS: &[(&str, &str)] = &[
+        ("なんです", "explanatory + polite"),
+        ("なのか", "question"),
+        ("なのです", "explanatory + polite"),
+        ("んですか", "question + polite"),
+        ("なのですか", "question + polite"),
+        ("っけ", "recall"),
+    ];
+    const NANDA_ADVERBIAL_TAILS: &[(&str, &str)] = &[("なんだ", "explanatory")];
+    if starts_at_position {
+        let mut tail_bases: Vec<String> = Vec::new();
+        if let Some(reading) = &span_reading {
+            tail_bases.push(reading.clone());
+        }
+        // Raw surface first-class: normalized variants fold katakana away,
+        // but script-faithful stems (シャイ in シャイなのか) need their raw
+        // form for exact-script matching downstream.
+        tail_bases.push(candidate.to_string());
+        tail_bases.extend(variants.iter().cloned());
+        strip_tails(NANDA_TAILS, &tail_bases);
+        let adverbial_stem = tokens
+            .iter()
+            .find(|t| t.start == position)
+            .map_or(false, |t| {
+                // Note: MeCab's top-level POS only; 代名詞 lives under 名詞
+                // and is deliberately excluded (noun stems stay split).
+                matches!(t.pos.as_str(), "副詞" | "連体詞" | "感動詞")
+            });
+        if adverbial_stem {
+            strip_tails(NANDA_ADVERBIAL_TAILS, &tail_bases);
+        }
     }
 
     if candidates.is_empty() {
@@ -2102,6 +2542,43 @@ fn lookup_candidate(
         })
         .collect();
     let has_kanji = !surface_kanji.is_empty();
+    // Kanji-orphan filter (霧がかかった: 霧 drops 切る/斬る/剪る): when the
+    // surface has kanji and some candidate shares kanji with it, drop
+    // reading/deconjugation-only candidates sharing none — they matched
+    // through coincidental kana. Literal and morphological (tokenizer-
+    // backed) candidates always stay, and kana surfaces skip this entirely.
+    // Discoverability is preserved via related_entries.
+    if has_kanji {
+        let shares_kanji = |e: &Arc<DictEntry>| {
+            e.spellings.iter().any(|s| {
+                surface_kanji.iter().any(|k| s.contains(*k))
+            })
+        };
+        if candidates.iter().any(|(e, _, _, _, _)| shares_kanji(e)) {
+            candidates.retain(|(e, _, _, kind, _)| {
+                matches!(
+                    kind,
+                    MatchKind::PrimarySpelling
+                        | MatchKind::Spelling
+                        | MatchKind::Morphological
+                ) || shares_kanji(e)
+            });
+        }
+    }
+    // Adnominal-な spans (ような) prefer rentaishi entries (様な over
+    // 酔う): the な is a standalone copula token, so the construction is
+    // stem + adnominal particle, and dictionary adnominals outrank
+    // coincidental verbs sharing the reading.
+    let adnominal_na = {
+        let nchars: Vec<char> = candidate.chars().collect();
+        nchars.last() == Some(&'な')
+            && tokens.iter().any(|t| {
+                t.pos == "助動詞"
+                    && t.base_form == "だ"
+                    && t.end == position + nchars.len()
+                    && t.start == position + nchars.len() - 1
+            })
+    };
     // Longest-prefix specificity: among same-kind ties, an entry whose
     // spelling or reading is a strict prefix of the candidate surface
     // covers more of what the user pointed at (気を悪くさせて ->
@@ -2148,14 +2625,15 @@ fn lookup_candidate(
                 // Demonstrative + rentaishi agreement (このこと -> 此の, not
                 // 九): when the cursor token is an adnominal (連体詞), prefer
                 // pre-noun-adjectival entries. Both readings match here, so
-                // reading context alone cannot decide.
+                // reading context alone cannot decide. The same boost applies
+                // to adnominal-な spans (ような -> 様な, not 酔う).
                 let rentai = tokens
                     .iter()
                     .find(|t| t.start == position)
                     .map_or(false, |t| t.pos == "連体詞");
-                let ra = rentai
+                let ra = (rentai || adnominal_na)
                     && a.0.pos.iter().any(|p| p.contains("rentaishi"));
-                let rb = rentai
+                let rb = (rentai || adnominal_na)
                     && b.0.pos.iter().any(|p| p.contains("rentaishi"));
                 rb.cmp(&ra)
             });
@@ -3809,29 +4287,6 @@ mod lookup_tests {
             Some("suru + do for someone")
         );
     }
-
-    fn dbg_lookup(h: &Harness, text: &str, sub: &str) {
-        let pos = cpos(text, sub);
-        eprintln!("=== {sub:?} in {text:?} (pos {pos})");
-        for t in h.tokens(text) {
-            eprintln!(
-                "  tok [{},{}] {:?} pos={:?} base={:?} reading={:?}",
-                t.start, t.end, t.surface, t.pos, t.base_form, t.reading
-            );
-        }
-        let tokens = h.tokens(text);
-        let span = lookup_from_position(text, pos, 0, &h.index, &h.decon, &tokens).unwrap();
-        eprintln!("  => surface {:?} deconj {:?}", span.surface, span.deconjugated_from);
-        for e in span.entries.iter().take(4) {
-            eprintln!(
-                "     entry {:?} / {:?} pos={:?}",
-                e.spellings.first(),
-                e.readings.first(),
-                e.pos
-            );
-        }
-    }
-
     #[test]
     fn souieba_expression_merges_across_split() {
         // そう|いえ|ば must reach the そういえば expression, not 相違.
@@ -3881,7 +4336,7 @@ mod lookup_tests {
         let h = Harness::new();
         let text = "その無邪気そうな笑顔を見ていると実は何も考えてなさそうな雰囲気もなきにしもあらず。";
         let span = h.lookup(text, cpos(text, "考えてな"));
-        assert_eq!(span.surface, "考えてなさそう");
+        assert_eq!(span.surface, "考えてなさそうな");
         assert_eq!(top_reading(&span), "かんがえる");
         assert_eq!(
             span.deconjugated_from.as_deref(),
@@ -3953,5 +4408,260 @@ mod lookup_tests {
         assert_eq!(span.surface, "ちきしょー");
         assert_eq!(span.entries[0].spellings[0], "畜生");
     }
-}
 
+    #[test]
+    fn sou_nanda_strips_to_sou() {
+        // そう|な|ん|だ must span whole and resolve to そう + explanatory,
+        // not cut at なん (遭難).
+        let h = Harness::new();
+        let text = "そ、そうなんだ。";
+        let span = h.lookup(text, cpos(text, "そうなん"));
+        assert_eq!(span.surface, "そうなんだ");
+        assert_eq!(top_reading(&span), "そう");
+        assert_eq!(span.deconjugated_from.as_deref(), Some("explanatory"));
+    }
+
+    #[test]
+    fn youna_prefers_samana_over_you() {
+        // 感じたような: 様な (rentaishi) must outrank 酔う, and the span
+        // must not shorten to よう (様 lacks keiyodoshi, so rentaikei
+        // shortening stays off).
+        let h = Harness::new();
+        let text = "感じたような。";
+        let span = h.lookup(text, cpos(text, "ような"));
+        assert_eq!(span.surface, "ような");
+        assert_eq!(span.entries[0].spellings[0], "様な");
+    }
+
+    #[test]
+    fn yokatta_with_emphatic_tsu_resolves_to_yoi() {
+        // よかっ|たっ (past た + emphatic っ misread as 立つ) must reach
+        // よかった -> 良い, not よか/余暇.
+        let h = Harness::new();
+        let text = "よかったっ、ハル君。";
+        let span = h.lookup(text, cpos(text, "よかった"));
+        assert_eq!(span.surface, "よかった");
+        assert_eq!(top_reading(&span), "よい");
+    }
+
+    #[test]
+    fn gomen_nasai_merges_across_split() {
+        // ゴメン|な|さ|いね must reach ゴメンなさい -> 御免なさい.
+        let h = Harness::new();
+        let text = "みんな、ゴメンなさいね。";
+        let span = h.lookup(text, cpos(text, "ゴメンな"));
+        assert_eq!(span.surface, "ゴメンなさい");
+        assert_eq!(span.entries[0].spellings[0], "御免なさい");
+    }
+
+    #[test]
+    fn sou_hoihoi_splits_adverb_and_mimetic() {
+        // そう + ほいほい must stay split (adverbs take no continuations),
+        // not merge to そうほ/相補; ほいほい resolves whole.
+        let h = Harness::new();
+        let text = "はは、そうほいほい面白い。";
+        let span = h.lookup(text, cpos(text, "そうほい"));
+        assert_eq!(span.surface, "そう");
+        let span = h.lookup(text, cpos(text, "ほいほい"));
+        assert_eq!(span.surface, "ほいほい");
+        assert_eq!(top_reading(&span), "ほいほい");
+    }
+
+    #[test]
+    fn kaerimashou_volitional_reaches_kaeru() {
+        // 帰り|ましょ|うかっ (う glued into mis-split adjective) must span
+        // 帰りましょう -> 帰る, not cut before う.
+        let h = Harness::new();
+        let text = "お兄さんさあ、帰りましょうかっ!";
+        let span = h.lookup(text, cpos(text, "帰りましょ"));
+        assert_eq!(span.surface, "帰りましょう");
+        assert_eq!(top_reading(&span), "かえる");
+    }
+
+    #[test]
+    fn kiri_single_kanji_drops_coincidental_verbs() {
+        // 霧がかかった: 霧 stays, but 切る/斬る/剪る (matched only through
+        // the kana reading きり) must not clutter entries.
+        let h = Harness::new();
+        let text = "頭の中が霧がかかったようになっていて。";
+        let span = h.lookup(text, cpos(text, "霧がかか"));
+        assert_eq!(span.surface, "霧");
+        assert_eq!(span.entries[0].spellings[0], "霧");
+        assert!(!span.entries.iter().any(|e| e.spellings.first()
+            .map_or(false, |s| s == "切る" || s == "着る" || s == "来る")),
+            "coincidental kiru-verbs should be filtered, got {:?}",
+            span.entries.iter().map(|e| e.spellings.first()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn sou_saseru_splits_to_sou() {
+        // そうさせる must not resolve as one span to archaic 奏する;
+        // hovering そう gives そう (させる -> する reachable separately).
+        let h = Harness::new();
+        let text = "そうさせる。";
+        let span = h.lookup(text, cpos(text, "そうさせ"));
+        assert_eq!(span.surface, "そう");
+    }
+
+    #[test]
+    fn wakannai_slurred_negative_resolves() {
+        // わかんない (slurred わからない) must reach 分かる.
+        let h = Harness::new();
+        let text = "わかんないけど。";
+        let span = h.lookup(text, cpos(text, "わかんな"));
+        assert_eq!(span.surface, "わかんないけど");
+        assert_eq!(top_reading(&span), "わかる");
+    }
+
+    #[test]
+    fn bonus_locks_koto_ni_suru_furisou_ayamannakute() {
+        // Loose ends that already work: ことにする, 降りそう, あやまんなくて.
+        let h = Harness::new();
+        let span = h.lookup("ことにする。", cpos("ことにする。", "ことにする"));
+        assert_eq!(span.surface, "ことにする");
+        assert_eq!(span.entries[0].spellings[0], "事にする");
+        let span = h.lookup("雨が降りそう。", cpos("雨が降りそう。", "降りそう"));
+        assert_eq!(span.surface, "降りそう");
+        assert_eq!(top_reading(&span), "おりる");
+        let span = h.lookup("あやまんなくて良いよ。", cpos("あやまんなくて良いよ。", "あやまんな"));
+        assert_eq!(top_reading(&span), "あやまる");
+    }
+
+    #[test]
+    fn sou_nanda_etc_strip_universally() {
+        // なんだ-family tails attach to any stem.
+        let h = Harness::new();
+        let span = h.lookup("そ、そうなんだ。", cpos("そ、そうなんだ。", "そうなん"));
+        assert_eq!(span.surface, "そうなんだ");
+        assert_eq!(top_reading(&span), "そう");
+        // Verb + explanatory ん keeps the deliberate split (したんだ ->
+        // した + んだ, never merged): verbs never absorb ん.
+        let span = h.lookup("行くんですか。", cpos("行くんですか。", "行くんです"));
+        assert_eq!(span.surface, "行く");
+        // Noun stems do resolve whole through the tail.
+        let span = h.lookup("本なんですか。", cpos("本なんですか。", "本なんで"));
+        assert_eq!(span.surface, "本なんですか");
+        assert_eq!(top_reading(&span), "ほん");
+    }
+
+    #[test]
+    fn tto_particle_maps_to_to() {
+        // Single-token っと (quotative/emphatic と) must resolve, not vanish.
+        let h = Harness::new();
+        let text = "ちりっと走った。";
+        let pos = cpos(text, "っと");
+        let tokens = h.tokens(text);
+        let span = lookup_from_position(text, pos, 0, &h.index, &h.decon, &tokens).unwrap();
+        assert_eq!(span.surface, "っと");
+        assert!(span.entries.iter().any(|e| e.readings.first().map_or(false, |r| r == "と")),
+            "っと should resolve to the と particle");
+    }
+
+    #[test]
+    fn obscure_literal_prefers_common_stem() {
+        // Orphan literals swallowing common stems split back.
+        let h = Harness::new();
+        let span = h.lookup("そこにいる。", cpos("そこにいる。", "そこに"));
+        assert_eq!(span.surface, "そこ");
+        let span = h.lookup("渚さんと行く。", cpos("渚さんと行く。", "さんと"));
+        assert_eq!(span.surface, "さん");
+    }
+
+    #[test]
+    fn bound_volitional_u_reaches_verb() {
+        let h = Harness::new();
+        let text = "お兄さんさあ、帰りましょうかっ!";
+        let span = h.lookup(text, cpos(text, "帰りましょ"));
+        assert_eq!(span.surface, "帰りましょう");
+        assert_eq!(top_reading(&span), "かえる");
+    }
+
+    #[test]
+    fn tatsu_past_emphasis_splits_ta() {
+        // たっ (past た + emphatic っ) must end at た.
+        let h = Harness::new();
+        let span = h.lookup("よかったっ。", cpos("よかったっ。", "よかった"));
+        assert_eq!(span.surface, "よかった");
+        assert_eq!(top_reading(&span), "よい");
+    }
+
+    #[test]
+    fn nasai_after_noun_resolves() {
+        // ゴメン|な|さ|いね must reach ゴメンなさい -> 御免なさい.
+        let h = Harness::new();
+        let text = "みんな、ゴメンなさいね。";
+        let span = h.lookup(text, cpos(text, "ゴメンな"));
+        assert_eq!(span.surface, "ゴメンなさい");
+        assert_eq!(span.entries[0].spellings[0], "御免なさい");
+    }
+
+    #[test]
+    fn causative_prefers_complete_stem_word() {
+        // そうさせる must not resolve as one span to archaic 奏する.
+        let h = Harness::new();
+        let span = h.lookup("そうさせる。", cpos("そうさせる。", "そうさせ"));
+        assert_eq!(span.surface, "そう");
+    }
+
+    #[test]
+    fn sou_ieba_kanji_reaches_expression() {
+        // そう|言え|ば (kanji tail) must merge via readings to そう言えば.
+        let h = Harness::new();
+        let text = "あー、そう言えば初めて。";
+        let span = h.lookup(text, cpos(text, "そう言え"));
+        assert_eq!(span.surface, "そう言えば");
+        assert_eq!(span.entries[0].spellings[0], "そう言えば");
+    }
+
+    #[test]
+    fn mono_ha_splits_to_mono() {
+        // ものは must not resolve as one span to もの派.
+        let h = Harness::new();
+        let text = "足りないものはスーパーに。";
+        let span = h.lookup(text, cpos(text, "ものは"));
+        assert_eq!(span.surface, "もの");
+    }
+
+    #[test]
+    fn naishi_single_token_prefers_nai() {
+        // Conjunction-tagged ないし in dialogue position is ない + し.
+        let h = Harness::new();
+        let text = "体を鍛えてないし。";
+        let span = h.lookup(text, cpos(text, "ないし"));
+        assert_eq!(span.surface, "ない");
+        assert_eq!(span.entries[0].spellings[0], "無い");
+    }
+
+    #[test]
+    fn katakana_shai_outranks_homophones() {
+        // Exact-script シャイ beats normalized-only 謝意/社医.
+        let h = Harness::new();
+        let text = "シャイなのか。";
+        let span = h.lookup(text, cpos(text, "シャイ"));
+        assert_eq!(span.surface, "シャイなのか");
+        assert!(span.entries[0].readings.iter().any(|r| r == "シャイ"),
+            "シャイ loanword should top, got {:?}", span.entries[0].readings.first());
+    }
+
+    #[test]
+    fn suguni_prefix_shredding_resolves() {
+        // す|ぐにどっか… (prefix + giant unknown) must reach すぐに/直ぐに.
+        let h = Harness::new();
+        let text = "すぐにどっか。";
+        let span = h.lookup(text, cpos(text, "すぐに"));
+        assert_eq!(span.surface, "すぐに");
+        assert_eq!(span.entries[0].spellings[0], "直ぐに");
+    }
+
+    #[test]
+    fn tto_particle_resolves_to_to() {
+        // Single-token quotative っと must show と.
+        let h = Harness::new();
+        let text = "ちりっと走った。";
+        let pos = cpos(text, "っと");
+        let tokens = h.tokens(text);
+        let span = lookup_from_position(text, pos, 0, &h.index, &h.decon, &tokens).unwrap();
+        assert_eq!(span.surface, "っと");
+        assert!(span.entries.iter().any(|e| e.readings.first().map_or(false, |r| r == "と")));
+    }
+}
