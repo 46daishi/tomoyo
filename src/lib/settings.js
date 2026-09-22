@@ -60,6 +60,7 @@ export const HIGHLIGHT_MODE_OPTIONS = [
   { value: 'none', label: 'None' },
   { value: 'known', label: 'Known words' },
   { value: 'unknown', label: 'Unknown words' },
+  { value: 'all-but-known', label: 'All but known' },
 ]
 
 // Each option: { key, label, type, subRow?, showIf?, ...type-specific fields }

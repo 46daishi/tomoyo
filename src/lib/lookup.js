@@ -63,30 +63,56 @@ export async function findKnownWordSpans(text, knownWordsMap) {
  * - "known": underline if any entry is in the dictionary (existing behavior)
  * - "unknown": underline only if ALL entries are unknown
  *   (not in dictionary, or in dictionary with status 0 when treatNewAsUnknown)
+ * - "all-but-known": underline unless ANY entry is Known (status 4) — i.e.
+ *   only when no entry is Known. Unmined spans render red, mined ones in
+ *   their status color (handled by the components' status-color fallback).
  */
 export async function findHighlightedWordSpans(text, knownWordsMap, mode, treatNewAsUnknown) {
     if (mode === 'none' || !text) return [];
     if (mode === 'known') return findKnownWordSpans(text, knownWordsMap);
 
     // unknown mode
-    const allSpans = await scanSentenceSpans(text);
-    const spans = [];
-    for (const s of allSpans) {
-        const entryIds = s.entryIds ?? [];
-        if (entryIds.length === 0) {
-            // No dictionary entries at all — truly unknown
-            spans.push({ ...s, wordId: null, status: null });
-            continue;
+    if (mode === 'unknown') {
+        const allSpans = await scanSentenceSpans(text);
+        const spans = [];
+        for (const s of allSpans) {
+            const entryIds = s.entryIds ?? [];
+            if (entryIds.length === 0) {
+                // No dictionary entries at all — truly unknown
+                spans.push({ ...s, wordId: null, status: null });
+                continue;
+            }
+            const allUnknown = entryIds.every((id) => {
+                const status = knownWordsMap.get(id);
+                if (status === undefined) return true;           // not in dict
+                if (treatNewAsUnknown && status === 0) return true; // status NEW
+                return false;
+            });
+            if (allUnknown) {
+                spans.push({ ...s, wordId: entryIds[0], status: knownWordsMap.get(entryIds[0]) ?? null });
+            }
         }
-        const allUnknown = entryIds.every((id) => {
-            const status = knownWordsMap.get(id);
-            if (status === undefined) return true;           // not in dict
-            if (treatNewAsUnknown && status === 0) return true; // status NEW
-            return false;
-        });
-        if (allUnknown) {
-            spans.push({ ...s, wordId: entryIds[0], status: knownWordsMap.get(entryIds[0]) ?? null });
-        }
+        return spans;
     }
-    return spans;
+
+    // all-but-known mode
+    if (mode === 'all-but-known') {
+        const allSpans = await scanSentenceSpans(text);
+        const spans = [];
+        for (const s of allSpans) {
+            const entryIds = s.entryIds ?? [];
+            if (entryIds.length === 0) {
+                // No dictionary entries at all — truly unknown
+                spans.push({ ...s, wordId: null, status: null });
+                continue;
+            }
+            const anyKnown = entryIds.some((id) => knownWordsMap.get(id) === 4);
+            if (!anyKnown) {
+                spans.push({ ...s, wordId: entryIds[0], status: knownWordsMap.get(entryIds[0]) ?? null });
+            }
+        }
+        return spans;
+    }
+
+    return [];
 }
