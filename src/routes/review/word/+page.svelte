@@ -3,6 +3,7 @@
     import { goto } from '$app/navigation';
     import { onMount, onDestroy } from 'svelte';
     import ActionButton from '$lib/components/ActionButton.svelte';
+    import WordImageButton from '$lib/components/WordImageButton.svelte';
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS } from '$lib/constants.js';
     import { loadSettings } from '$lib/settings.js';
@@ -199,6 +200,14 @@
 
             <div class="review-word">{currentWord.spelling}</div>
 
+            <div class="review-image-row">
+                <WordImageButton
+                    wordId={currentWord.id}
+                    imagePath={currentWord.image_path ?? null}
+                    onSaved={(path) => (currentWord.image_path = path)}
+                />
+            </div>
+
             {#if isRevealed}
                 <div class="review-reading">{currentWord.reading}</div>
                 <div class="review-definitions">{parseDefinitions(currentWord.definitions).join('; ')}</div>
@@ -358,6 +367,12 @@
         font-size: 3rem;
         font-weight: 700;
         color: var(--theme-text, #f6f6f6);
+    }
+
+    .review-image-row {
+        display: flex;
+        justify-content: center;
+        margin-top: 0.6rem;
     }
 
     .review-reading {

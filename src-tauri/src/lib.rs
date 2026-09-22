@@ -2913,6 +2913,12 @@ pub fn run() {
             sql: include_str!("../migrations/0013_session_links.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 14,
+            description: "words_image",
+            sql: include_str!("../migrations/0014_words_image.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

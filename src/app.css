@@ -419,6 +419,46 @@ body {
     position: static;
 }
 
+/* Word-image hover preview, portaled to <body> by WordImageButton so the
+   lookup tooltip's overflow and fly transition can never clip or trap it.
+   JS sets left/top/flip; visibility and the hold-to-reveal delay are CSS. */
+.word-image-preview-portal {
+    position: fixed;
+    z-index: 400;
+    width: 14rem;
+    max-width: min(70vw, 20rem);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--theme-border, #404040);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 95%, #000);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+        opacity 0.18s ease 0.5s,
+        transform 0.18s ease 0.5s;
+}
+
+.word-image-preview-portal.flip {
+    transform: translateY(calc(-100% - 8px));
+}
+
+.word-image-preview-portal.visible {
+    opacity: 1;
+}
+
+.word-image-preview-portal:not(.visible) {
+    transition-delay: 0s;
+}
+
+.word-image-preview-portal img {
+    width: 100%;
+    max-height: 16rem;
+    object-fit: contain;
+    display: block;
+}
+
 .tooltip-surface {
     font-family: "Noto Sans JP", Inter, sans-serif;
     font-weight: 700;

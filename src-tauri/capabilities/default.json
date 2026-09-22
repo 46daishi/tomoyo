@@ -15,6 +15,7 @@
     "fs:allow-exists",
     "fs:allow-write-file",
     "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-read-image",
     "core:event:allow-emit",
     "core:event:allow-listen",
     {
@@ -23,7 +24,7 @@
     },
     {
       "identifier": "fs:scope",
-      "allow": ["$APPDATA/covers", "$APPDATA/covers/**", "$APPDATA/profile", "$APPDATA/profile/**"]
+      "allow": ["$APPDATA/covers", "$APPDATA/covers/**", "$APPDATA/profile", "$APPDATA/profile/**", "$APPDATA/word-images", "$APPDATA/word-images/**"]
     }
   ]
 }

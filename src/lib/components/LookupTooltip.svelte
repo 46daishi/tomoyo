@@ -4,7 +4,8 @@
     import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS } from '$lib/constants';
-    import { getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
+    import { getKnownWordsMap, updateWordStatus, getWordImages } from '$lib/dictionary.js';
+    import WordImageButton from '$lib/components/WordImageButton.svelte';
 
     let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {}, onStatusChanged } = $props();
     
@@ -15,6 +16,24 @@
 
     let knownWordsMap = $state(new Map());
     let statusMenu = $state(null);
+    let wordImages = $state({});
+
+    async function loadWordImages() {
+        const ids = [
+            ...tooltipSpan.entries,
+            ...(tooltipSpan.related_entries ?? []),
+        ].map((e) => e.id);
+        try {
+            wordImages = await getWordImages(ids);
+        } catch {
+            wordImages = {};
+        }
+    }
+
+    $effect(() => {
+        tooltipSpan;
+        loadWordImages();
+    });
 
     async function loadKnownWords() {
         if (!settings?.underline_mined_words) {
@@ -124,6 +143,15 @@
                                         <div class="entry-pos">{entry.pos.join(', ')}</div>
                                         <div class="entry-definitions">{entry.definitions.join('; ')}</div>
                                     </div>
+                                    {#if entry.id in wordImages}
+                                        <WordImageButton
+                                            small
+                                            fixedPreview
+                                            wordId={entry.id}
+                                            imagePath={wordImages[entry.id]}
+                                            onSaved={(path) => (wordImages[entry.id] = path)}
+                                        />
+                                    {/if}
                                     <div class="mine-select">
                                         <ActionButton
                                             icon={ICONS.plus}

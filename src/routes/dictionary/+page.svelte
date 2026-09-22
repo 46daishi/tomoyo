@@ -16,6 +16,7 @@
     import { goto, afterNavigate } from '$app/navigation';
     import CustomReviewModal from '$lib/components/CustomReviewModal.svelte';
     import WordImportModal from '$lib/components/WordImportModal.svelte';
+    import WordImageButton from '$lib/components/WordImageButton.svelte';
     import Toast from '$lib/components/Toast.svelte';
     import HeatMap from '$lib/components/HeatMap.svelte';
 
@@ -735,6 +736,11 @@
                         {/if}
                         
                         <div class="word-main">
+                            <WordImageButton
+                                wordId={word.id}
+                                imagePath={word.image_path ?? null}
+                                onSaved={(path) => (word.image_path = path)}
+                            />
                             <span class="word-spelling">{word.spelling}</span>
                             <span class="word-reading">{word.reading}</span>
                             <button
@@ -1538,8 +1544,12 @@
 
     .word-main {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         gap: 0.6rem;
+    }
+
+    .word-main .word-image-wrap {
+        align-self: center;
     }
 
     .word-spelling {
@@ -1621,7 +1631,7 @@
     .view-full-sentences-btn {
         background: none;
         border: none;
-        padding: 0;
+        padding: 2;
         font: inherit;
         font-size: 0.78rem;
         color: var(--theme-textSecondary, #b3b3b3);

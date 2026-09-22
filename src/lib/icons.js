@@ -13,6 +13,7 @@ export const ICONS = {
   back: "\uf053",
   backAlt: "\uf060",
   trash: "\uf1f8",
+  image: "\uf03e",
   focus: "\u26a1",
   coffee: "\uf0f4",
   check: "\uf05d",

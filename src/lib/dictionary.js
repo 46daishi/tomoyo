@@ -152,6 +152,22 @@ export async function updateWordStatus({ wordId, status }) {
     );
 }
 
+export async function updateWordImage({ wordId, imagePath }) {
+    const db = await getDb();
+    await db.execute('UPDATE words SET image_path = $1 WHERE id = $2', [imagePath, wordId]);
+}
+
+export async function getWordImages(wordIds) {
+    if (!wordIds || wordIds.length === 0) return {};
+    const db = await getDb();
+    const placeholders = wordIds.map((_, i) => `$${i + 1}`).join(', ');
+    const rows = await db.select(
+        `SELECT id, image_path FROM words WHERE id IN (${placeholders})`,
+        wordIds
+    );
+    return Object.fromEntries(rows.map((r) => [r.id, r.image_path]));
+}
+
 export async function getWordWithDetails(wordId) {
     const db = await getDb();
     const [word] = await db.select('SELECT * FROM words WHERE id = $1', [wordId]);
