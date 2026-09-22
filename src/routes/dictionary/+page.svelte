@@ -742,7 +742,9 @@
                                 onSaved={(path) => (word.image_path = path)}
                             />
                             <span class="word-spelling">{word.spelling}</span>
-                            <span class="word-reading">{word.reading}</span>
+                            {#if word.reading && word.reading !== word.spelling}
+                                <span class="word-reading">{word.reading}</span>
+                            {/if}
                             <button
                                 type="button"
                                 class="word-delete-btn"
@@ -936,7 +938,9 @@
                         </div>
                         <div class="word-main">
                             <span class="word-spelling">{item.entry.spellings?.[0] ?? item.surfaceText}</span>
-                            <span class="word-reading">{item.entry.readings?.[0] ?? ''}</span>
+                            {#if item.entry.readings?.[0] && item.entry.readings?.[0] !== (item.entry.spellings?.[0] ?? item.surfaceText)}
+                                <span class="word-reading">{item.entry.readings[0]}</span>
+                            {/if}
                         </div>
                         <div class="entry-pos">{item.entry.pos?.join(', ') ?? ''}</div>
                         <div class="word-definitions">

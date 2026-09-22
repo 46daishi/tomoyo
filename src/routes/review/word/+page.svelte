@@ -209,7 +209,9 @@
             </div>
 
             {#if isRevealed}
-                <div class="review-reading">{currentWord.reading}</div>
+                {#if currentWord.reading && currentWord.reading !== currentWord.spelling}
+                    <div class="review-reading">{currentWord.reading}</div>
+                {/if}
                 <div class="review-definitions">{parseDefinitions(currentWord.definitions).join('; ')}</div>
                 {#if currentSentence}
                     <div class="review-sentence-wrap">
