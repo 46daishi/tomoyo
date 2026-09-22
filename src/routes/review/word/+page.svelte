@@ -36,6 +36,7 @@
 
     const desiredCountParam = page.url.searchParams.get('count');
     const statusesParam = page.url.searchParams.get('statuses');
+    const onlyWithImagesParam = page.url.searchParams.get('onlyWithImages');
     
     async function loadQueue() {
         settings = await loadSettings();
@@ -44,7 +45,7 @@
             ? statusesParam.split(',').map(Number)
             : settings.review_statuses ?? [0, 1, 2, 3];
     
-        const pool = await getReviewPool({ mediaId, statuses });
+        const pool = await getReviewPool({ mediaId, statuses, onlyWithImages: onlyWithImagesParam === '1' });
         if (pool.length === 0) {
             queue = [];
             return;

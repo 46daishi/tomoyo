@@ -8,6 +8,7 @@
     let count = $state(20);
     let selectedStatuses = $state([0, 1, 2, 3]);
     let onlyTranslated = $state(false);
+    let onlyWithImages = $state(false);
 
     function close() {
         show = false;
@@ -19,7 +20,7 @@
         const statuses = reviewKind === 'word' ? selectedStatuses : null;
     
         if (reviewKind === 'word') {
-            const pool = await getReviewPool({ mediaId: mediaFilter, statuses });
+            const pool = await getReviewPool({ mediaId: mediaFilter, statuses, onlyWithImages });
             if (pool.length === 0) {
                 onEmptyPool?.('No words available to review.');
                 return;
@@ -37,6 +38,7 @@
         params.set('count', String(count));
         if (reviewKind === 'word') {
             params.set('statuses', selectedStatuses.join(','));
+            if (onlyWithImages) params.set('onlyWithImages', '1');
         } else {
             params.set('onlyTranslated', onlyTranslated ? '1' : '0');
         }
@@ -98,6 +100,15 @@
                         values={selectedStatuses}
                         onChange={(next) => (selectedStatuses = next)}
                     />
+                </div>
+                <div class="setting-row translated-toggle-row">
+                    <label class="toggle-option">
+                        <span class="toggle-option-text">Only words with an image</span>
+                        <span class="switch">
+                            <input type="checkbox" bind:checked={onlyWithImages} />
+                            <span class="switch-track"></span>
+                        </span>
+                    </label>
                 </div>
             {:else}
                 <div class="setting-row translated-toggle-row">

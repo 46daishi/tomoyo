@@ -349,7 +349,7 @@ export async function getKnownWordsMap() {
     return new Map(rows.map((r) => [r.id, r.status]));
 }
 
-export async function getReviewPool({ mediaId = null, statuses = [] }) {
+export async function getReviewPool({ mediaId = null, statuses = [], onlyWithImages = false }) {
     if (statuses.length === 0) return [];
     const db = await getDb();
     const statusPlaceholders = statuses.map((_, i) => `$${i + 2}`).join(', ');
@@ -359,7 +359,8 @@ export async function getReviewPool({ mediaId = null, statuses = [] }) {
          WHERE w.status IN (${statusPlaceholders})
            AND ($1 IS NULL
              OR EXISTS (SELECT 1 FROM word_sentences ws WHERE ws.word_id = w.id AND ws.media_id = $1)
-             OR EXISTS (SELECT 1 FROM word_tags wt WHERE wt.word_id = w.id AND wt.media_id = $1))`,
+             OR EXISTS (SELECT 1 FROM word_tags wt WHERE wt.word_id = w.id AND wt.media_id = $1))
+           ${onlyWithImages ? 'AND w.image_path IS NOT NULL' : ''}`,
         [mediaId, ...statuses]
     );
 }
