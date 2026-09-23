@@ -12,6 +12,7 @@
 
 <img src="https://i.imgur.com/Mcj4Ghh.png" width="33%"> <img src="https://i.imgur.com/WzSyWJP.png" width="33%"> <img src="https://i.imgur.com/aVfjuU0.png" width="33%">
 <img src="https://i.imgur.com/Req3iZI.png" width="33%"> <img src="https://i.imgur.com/SuWlx9k.png" width="33%"> <img src="https://i.imgur.com/0pGgPhN.png" width="33%">
+<img src="https://i.imgur.com/TTeStcG.png" width="55%"> <img src="https://i.imgur.com/c8iYdM5.png" width="33%">
 
 
 ## 📘️ Philosophy
