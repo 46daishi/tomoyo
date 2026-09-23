@@ -1100,14 +1100,16 @@
                                     if (e.key === 'Enter') e.currentTarget.blur();
                                 }}
                             />
-                            <button
-                                type="button"
-                                class="word-delete-btn"
-                                onclick={() => handleDeleteName(entry)}
-                                title="Delete name"
-                            >
-                                {@html ICONS.trash}
-                            </button>
+                            {#if viewMode !== 'list'}
+                                <button
+                                    type="button"
+                                    class="word-delete-btn"
+                                    onclick={() => handleDeleteName(entry)}
+                                    title="Delete name"
+                                >
+                                    {@html ICONS.trash}
+                                </button>
+                            {/if}
                         </div>
                         <div class="notes-edit-row">
                             <span class="notes-icon">{@html ICONS.translate}</span>
@@ -1122,11 +1124,21 @@
                                 }}
                             />
                         </div>
-                        {#if !mediaFilter && entry.media_label}
-                            <div class="word-meta">
+                        <div class="word-meta">
+                            {#if viewMode === 'list'}
+                                <button
+                                    type="button"
+                                    class="word-delete-btn"
+                                    onclick={() => handleDeleteName(entry)}
+                                    title="Delete name"
+                                >
+                                    {@html ICONS.trash}
+                                </button>
+                            {/if}
+                            {#if !mediaFilter && entry.media_label}
                                 <span class="tag-pill">#{entry.media_label}</span>
-                            </div>
-                        {/if}
+                            {/if}
+                        </div>
                     </div>
                 {/each}
             </div>
@@ -1532,9 +1544,10 @@
         margin-left: 0;
     }
 
-    /* Name cards have no status bar or definitions column: name | reading | meta. */
+    /* Name cards have no status bar or definitions column: name | reading | meta.
+       The name column hugs its content so the reading sits right next to it. */
     .word-list.word-list-view .word-card.name-card {
-        grid-template-columns: 15rem minmax(0, 1fr) auto;
+        grid-template-columns: max-content minmax(0, 1fr) auto;
     }
 
     .word-list.word-list-view .name-card .word-main {
@@ -1554,6 +1567,10 @@
 
     .word-list.word-list-view .name-spelling-input {
         font-size: 1rem;
+        /* Names rarely exceed a few characters — cap the typing space
+           instead of stretching the full column. */
+        flex: none;
+        width: 8em;
     }
 
     .word-list.word-list-view .lookup-badge {
