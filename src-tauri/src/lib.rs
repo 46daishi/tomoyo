@@ -2863,6 +2863,50 @@ fn restart_app(app: tauri::AppHandle) {
     app.restart();
 }
 
+/// Resolves a bundled runtime resource (e.g. `resources/jmdict.json`) so
+/// ad-hoc "executable + resources folder" distributions work, not just
+/// proper bundles or in-`target/` runs. First existing file wins:
+/// 1. Tauri's Resource dir (bundled installers, cargo-run staging),
+/// 2. next to the executable (`<dir>/tomoyo` + `<dir>/resources/…`),
+/// 3. the current working directory,
+/// 4. the crate dir (dev fallback).
+/// A total miss lists every attempted absolute path so the failure is
+/// self-diagnosing instead of a bare ENOENT from the setup hook.
+fn resolve_resource(app: &tauri::AppHandle, rel: &str) -> Result<std::path::PathBuf, std::io::Error> {
+    use std::path::PathBuf;
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(p) = app.path().resolve(rel, tauri::path::BaseDirectory::Resource) {
+        candidates.push(p);
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join(rel));
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join(rel));
+    }
+    candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(rel));
+
+    for path in &candidates {
+        if path.is_file() {
+            return Ok(path.clone());
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!(
+            "resource `{rel}` not found; looked in:\n{}",
+            candidates
+                .iter()
+                .map(|p| format!("  - {}", p.display()))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ),
+    ))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![
@@ -3007,21 +3051,27 @@ pub fn run() {
             // by lookup_at_position and scan_sentence. lookup_at_position
             // still resolves spans from the dictionary index, but morphology
             // informs the reading and base-form candidates. ──
-            let resource_path = app
-                .path()
-                .resolve("resources/ipadic-mecab.dic.zst", tauri::path::BaseDirectory::Resource)?;
+            let resource_path = resolve_resource(app.handle(), "resources/ipadic-mecab.dic.zst")?;
 
-            let reader = Decoder::new(std::fs::File::open(resource_path)?)?;
+            let reader = Decoder::new(std::fs::File::open(&resource_path).map_err(|e| {
+                std::io::Error::new(
+                    e.kind(),
+                    format!("{} (tried {})", e, resource_path.display()),
+                )
+            })?)?;
             let dict = Dictionary::read(reader)?;
             let tokenizer = Tokenizer::new(dict);
             app.manage(TokenizerState(Mutex::new(tokenizer)));
 
             // ── Dictionary index (JMdict) ──
-            let jmdict_path = app
-                .path()
-                .resolve("resources/jmdict.json", tauri::path::BaseDirectory::Resource)?;
+            let jmdict_path = resolve_resource(app.handle(), "resources/jmdict.json")?;
 
-            let jmdict_json = std::fs::read_to_string(jmdict_path)?;
+            let jmdict_json = std::fs::read_to_string(&jmdict_path).map_err(|e| {
+                std::io::Error::new(
+                    e.kind(),
+                    format!("{} (tried {})", e, jmdict_path.display()),
+                )
+            })?;
             let entries: Vec<DictEntry> = serde_json::from_str(&jmdict_json)?;
             let dictionary_index = DictionaryIndex::build(entries);
             app.manage(DictState(dictionary_index));
