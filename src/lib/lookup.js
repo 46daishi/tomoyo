@@ -63,10 +63,14 @@ export async function findKnownWordSpans(text, knownWordsMap) {
  * - "known": underline if any entry is in the dictionary (existing behavior)
  * - "unknown": underline only if ALL entries are unknown
  *   (not in dictionary, or in dictionary with status 0 when treatNewAsUnknown)
- * - "all-but-known": underline unless the TOP-ranked entry is Known (status
- *   4) — i.e. only the top mined result decides, not any of the homophone
- *   entries. Unmined spans render red, mined ones in their status color
- *   (handled by the components' status-color fallback).
+ * - "all-but-known": underline unless the top MINED entry is Known (status
+ *   4) — i.e. the highest-ranked entry the user actually has in their
+ *   dictionary decides. An unmined homophone ranking above it must not mark
+ *   the span unknown (はいはい known as "yeah yeah" stays clean even with
+ *   這い這い on top) — and a still-learning top sense must not be hidden by
+ *   a Known homophone further down. Spans with nothing mined render red,
+ *   mined ones in their status color (handled by the components'
+ *   status-color fallback).
  */
 export async function findHighlightedWordSpans(text, knownWordsMap, mode, treatNewAsUnknown) {
     if (mode === 'none' || !text) return [];
@@ -107,9 +111,17 @@ export async function findHighlightedWordSpans(text, knownWordsMap, mode, treatN
                 spans.push({ ...s, wordId: null, status: null });
                 continue;
             }
-            const topId = entryIds[0];
-            if (knownWordsMap.get(topId) !== 4) {
-                spans.push({ ...s, wordId: topId, status: knownWordsMap.get(topId) ?? null });
+            // The top mined entry is the sense the user actually learned:
+            // unmined homophones above it don't make the span unknown, and
+            // a Known homophone below a still-learning top sense doesn't
+            // hide it either.
+            const minedId = entryIds.find((id) => knownWordsMap.has(id));
+            if (minedId === undefined) {
+                spans.push({ ...s, wordId: null, status: null });
+                continue;
+            }
+            if (knownWordsMap.get(minedId) !== 4) {
+                spans.push({ ...s, wordId: minedId, status: knownWordsMap.get(minedId) });
             }
         }
         return spans;

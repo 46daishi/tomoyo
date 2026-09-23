@@ -341,7 +341,11 @@ fn lookup_from_position(
         .iter()
         .find(|t| t.start == position)
         .and_then(|t| {
-            if t.pos == "動詞" && t.base_form != t.surface {
+            // A lone っ tagged as a verb (ったく shredded as っ|たく) is a
+            // fragment, never a verb stem: trusting its base (く) promotes
+            // unrelated entries (ったく -> 九) ahead of the real reading
+            // match (the ったく interjection).
+            if t.pos == "動詞" && t.base_form != t.surface && t.surface != "っ" {
                 Some(t.base_form.as_str())
             } else {
                 None
@@ -753,6 +757,18 @@ fn lookup_from_position(
                             || (tok.base_form == "させる" && p.pos == "形容詞")
                             || p.surface == "さ"
                     });
+                // Topic は after an adverb always starts a new phrase (そうは ->
+                // そう + は): an adverb+は merge only ever resolves to
+                // coincidental reading homophones (走破/争覇) — the real
+                // adverb+は words (まずは, または) are single tokens. Other
+                // particles (か/に/も) stay continuable so なぜか/どうか/
+                // そうです keep resolving.
+                if token_at_pos.map_or(false, |t| t.pos == "副詞")
+                    && tok.pos == "助詞"
+                    && tok.surface == "は"
+                {
+                    break;
+                }
                 // Adverbs never take continuations (そうほいほい -> そう +
                 // ほいほい, not そうほ/相補; とても親切 -> とても + 親切;
                 // よく書く -> よく + 書く): content words always start new
@@ -2636,6 +2652,21 @@ fn lookup_candidate(
                 let rb = (rentai || adnominal_na)
                     && b.0.pos.iter().any(|p| p.contains("rentaishi"));
                 rb.cmp(&ra)
+            })
+            .then({
+                // Interjection agreement (はいはい -> "yeah yeah", not 這い這い):
+                // when the cursor token is an interjection (感動詞), prefer
+                // interjection entries. Same-kind ties only — kind and reading
+                // context still decide first.
+                let kandoushi = tokens
+                    .iter()
+                    .find(|t| t.start == position)
+                    .map_or(false, |t| t.pos == "感動詞");
+                let ka = kandoushi
+                    && a.0.pos.iter().any(|p| p.contains("interjection"));
+                let kb = kandoushi
+                    && b.0.pos.iter().any(|p| p.contains("interjection"));
+                kb.cmp(&ka)
             });
         if has_kanji {
             ord.then(b_kanji_share.cmp(&a_kanji_share)) // kanji match: true first
@@ -3059,6 +3090,57 @@ mod lookup_tests {
 
     fn top_reading(span: &MatchSpan) -> String {
         span.entries[0].readings[0].clone()
+    }
+
+    #[test]
+    fn adverb_topic_wa_splits() {
+        let h = Harness::new();
+        // そうは must split into そう + は: the merged surface only matches
+        // coincidental reading homophones (走破/争覇), while the real
+        // adverb+は words (まずは/または) are single tokens.
+        let span = h.lookup("そうは言われてもなぁ", 0);
+        assert_eq!(span.surface, "そう");
+        assert_eq!(top_reading(&span), "そう");
+        let span = h.lookup("そうは言われてもなぁ", 2);
+        assert_eq!(span.surface, "は");
+        // Particles that form real words keep merging.
+        let span = h.lookup("なぜか", 0);
+        assert_eq!(span.surface, "なぜか");
+        assert_eq!(top_reading(&span), "なぜか");
+        let span = h.lookup("まずは", 0);
+        assert_eq!(span.surface, "まずは");
+        assert_eq!(top_reading(&span), "まずは");
+    }
+
+    #[test]
+    fn shredded_sokuon_does_not_hijack_morphology() {
+        let h = Harness::new();
+        // ったく tokenizes as っ|たく; the lone っ is a fragment, never a
+        // verb stem, so its く base must not promote 九 ahead of the ったく
+        // interjection (with 全く still discoverable as related).
+        let span = h.lookup("ったく......はいはい、穹にはかなわないよ。", 0);
+        assert_eq!(span.surface, "ったく");
+        assert_eq!(top_reading(&span), "ったく");
+        assert!(
+            span.related_entries.iter().any(|e| e.readings.iter().any(|r| r == "まったく")),
+            "全く should stay discoverable, got {:?}",
+            span.related_entries.iter().map(|e| &e.readings).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn interjection_cursor_prefers_interjection_entry() {
+        let h = Harness::new();
+        // はいはい tokenizes as interjection tokens; both 這い這い and the
+        // "yeah yeah" interjection match identically (Reading, same context),
+        // so the cursor's 感動詞 tag must break the tie — not JMdict order.
+        let span = h.lookup("ったく......はいはい、穹にはかなわないよ。", 9);
+        assert_eq!(span.surface, "はいはい");
+        assert!(
+            span.entries[0].pos.iter().any(|p| p.contains("interjection")),
+            "first entry should be the yeah-yeah interjection, got {:?}",
+            span.entries.iter().take(3).map(|e| (&e.spellings, &e.readings, &e.pos)).collect::<Vec<_>>()
+        );
     }
 
     #[test]
