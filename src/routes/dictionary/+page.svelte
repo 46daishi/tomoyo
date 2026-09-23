@@ -1088,7 +1088,7 @@
         {:else}
             <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
                 {#each pagedNames as entry (entry.id)}
-                    <div class="word-card" class:list-view={viewMode === 'list'}>
+                    <div class="word-card name-card" class:list-view={viewMode === 'list'}>
                         <div class="word-main">
                             <input
                                 class="name-spelling-input"
@@ -1530,6 +1530,30 @@
 
     .word-list.word-list-view .sentence-count {
         margin-left: 0;
+    }
+
+    /* Name cards have no status bar or definitions column: name | reading | meta. */
+    .word-list.word-list-view .word-card.name-card {
+        grid-template-columns: 15rem minmax(0, 1fr) auto;
+    }
+
+    .word-list.word-list-view .name-card .word-main {
+        grid-column: 1;
+    }
+
+    .word-list.word-list-view .name-card .notes-edit-row {
+        display: flex;
+        grid-column: 2;
+        min-width: 0;
+        margin-top: 0;
+    }
+
+    .word-list.word-list-view .name-card .word-meta {
+        grid-column: 3;
+    }
+
+    .word-list.word-list-view .name-spelling-input {
+        font-size: 1rem;
     }
 
     .word-list.word-list-view .lookup-badge {
