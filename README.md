@@ -66,7 +66,7 @@ A: Maybe in the future, but no guarantees.
 **Q: How do I look up only a part of a phrase instead of the longest match?**  
 A: Use the cycle function (Shift hotkey by default).
 
-**Q: Where do I report bugs?**
+**Q: Where do I report bugs?**  
 A: Either create a GH issue or post about it in the **#tomoyo** channel on my [Discord](discord.gg/fHJJm4jpwV)
 
 ## ⭐️ Credits/Inspirations
