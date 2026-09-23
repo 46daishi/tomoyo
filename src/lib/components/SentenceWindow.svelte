@@ -10,10 +10,12 @@
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
     import Toast from './Toast.svelte';
     import StatusMenu from './StatusMenu.svelte';
+    import NameModal from './NameModal.svelte';
+    import { getNames, findNameAt, scanNameSpans, nameToEntry } from '$lib/names';
 
     import { STATUS_LEVELS } from '$lib/constants';
 
-    let { settings, miniMode, session, mediaId, mediaTag, onMined, wordStatusVersion = 0, onStatusChanged } = $props();
+    let { settings, miniMode, session, mediaId, mediaTag, onMined, wordStatusVersion = 0, onStatusChanged, onNameSaved } = $props();
 
     let currentText = $state('');
     let historyEntries = $state([]);
@@ -25,8 +27,8 @@
     let displayedChars = $derived([...displayedText]);
     let viewingHistory = $derived(historyIndex > 0);
 
-    let hoveredSpan = $state(null);
-    let tooltipSpan = $state(null);
+    let hoveredSpan = $state(/** @type {any} */ (null));
+    let tooltipSpan = $state(/** @type {any} */ (null));
     let tooltipVisible = $state(false);
     let tooltipX = $state(0);
     let tooltipY = $state(0);
@@ -49,6 +51,17 @@
     let knownWordsMap = $state(new Map());
     let knownSpans = $state([]);
     let statusMenu = $state(null); // { x, y, wordId, current } | null
+
+    // Custom per-media name dictionary.
+    let names = $state(/** @type {Array<Record<string, any>>} */ ([]));
+    let namesRequestId = 0;
+    let nameSpans = $state(/** @type {Array<{ start: number, end: number, nameId: number }>} */ ([]));
+
+    // Text-selection "Save name" popup.
+    let selPopup = $state(/** @type {{ x: number, y: number } | null} */ (null)); // relative to the sentence window
+    let selText = $state('');
+    let suppressClick = false;
+    let showNameModal = $state(false);
 
     $effect(() => {
       if (!session?.running || !settings?.lookup_limit_enabled) {
@@ -140,7 +153,9 @@
     async function refreshMineStatuses(span) {
         if (!span) return;
 
-        const entries = [...span.entries, ...(settings?.show_related_entries ? span.related_entries : [])];
+        const entries = [...span.entries, ...(settings?.show_related_entries ? span.related_entries : [])].filter(
+            (entry) => !entry.customName
+        );
         const requestId = ++mineStatusRequestId;
 
         const results = await Promise.all(
@@ -167,12 +182,16 @@
             lookupsRemaining -= 1;
         }
 
-        logLookupEvent({
-            mediaId,
-            wordId: span.entries[0]?.id ?? null,
-            surfaceText: span.surface,
-            sessionId: session?.sessionId ?? null,
-        });
+        // Custom name lookups are never logged: names have no lookup
+        // counts and must not pollute the frequently-looked-up suggestions.
+        if (!span.entries[0]?.customName) {
+            logLookupEvent({
+                mediaId,
+                wordId: span.entries[0]?.id ?? null,
+                surfaceText: span.surface,
+                sessionId: session?.sessionId ?? null,
+            });
+        }
 
         positionTooltipUnderChar(charEl);
         refreshMineStatuses(span);
@@ -193,11 +212,11 @@
         const result = await lookupAtPosition(displayedText, index);
         if (requestId !== hoverRequestId) return;
 
-        hoveredSpan = result;
-        if (!result) return;
+        hoveredSpan = withCustomName(result, index);
+        if (!hoveredSpan) return;
 
         if (settings?.lookup_mode === 'hover') {
-            openTooltipAndLog(result, charEl);
+            openTooltipAndLog(hoveredSpan, charEl);
         }
     }
 
@@ -212,17 +231,17 @@
 
         if (result) {
             cycleSkip = nextSkip;
-            hoveredSpan = result;
+            hoveredSpan = withCustomName(result, anchorPos);
         } else {
             cycleSkip = 0;
             result = await lookupAtPosition(displayedText, anchorPos, 0);
             if (requestId !== hoverRequestId) return;
-            hoveredSpan = result;
+            hoveredSpan = withCustomName(result, anchorPos);
         }
 
-        if (result && tooltipVisible) {
-            tooltipSpan = result;
-            refreshMineStatuses(result);
+        if (hoveredSpan && tooltipVisible) {
+            tooltipSpan = hoveredSpan;
+            refreshMineStatuses(hoveredSpan);
         }
     }
 
@@ -261,6 +280,14 @@
     }
 
     function handleCharClick(index, event) {
+      // A drag-selection ending on a char fires click too — swallow it so
+      // selecting text for "Save name" never opens a lookup tooltip, and
+      // keep it from reaching the window handler so the popup stays open.
+      if (suppressClick) {
+          suppressClick = false;
+          event.stopPropagation();
+          return;
+      }
       const knownSpan = getKnownSpanAt(index);
           if (knownSpan && knownSpan.status != null) {
               const rect = event.currentTarget.getBoundingClientRect();
@@ -387,11 +414,121 @@
         knownSpans = await findHighlightedWordSpans(displayedText, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false);
     }
 
+    /** @param {number | null} id */
+    async function loadNames(id) {
+        const my = ++namesRequestId;
+        if (id == null) {
+            names = [];
+            return;
+        }
+        const rows = await getNames({ mediaId: id });
+        if (namesRequestId !== my) return;
+        names = rows;
+    }
+
+    function rescanNames() {
+        if (!displayedText || names.length === 0) {
+            nameSpans = [];
+            return;
+        }
+        // Names underline only while underlines are enabled at all
+        // (highlight_mode 'none' disables everything) and the toggle is on.
+        if ((settings?.highlight_mode ?? 'none') === 'none' || settings?.underline_names === false) {
+            nameSpans = [];
+            return;
+        }
+        nameSpans = scanNameSpans(displayedText, names);
+    }
+
+    /** @param {number} index */
+    function getNameSpanAt(index) {
+        return nameSpans.find((s) => index >= s.start && index < s.end) ?? null;
+    }
+
+    // Prepends the current media's saved name (if any covers `index`) as a
+    // custom first lookup result, widening the span to the whole name.
+    /** @param {Record<string, any> | null} span @param {number} index */
+    function withCustomName(span, index) {
+        if (names.length === 0) return span;
+        const hit = findNameAt(names, displayedText, index);
+        if (!hit) return span;
+        const entry = nameToEntry(hit.row);
+        const surface = displayedChars.slice(hit.start, hit.end).join('');
+        if (!span) {
+            return {
+                start: hit.start,
+                end: hit.end,
+                surface,
+                entries: [entry],
+                deconjugated_from: null,
+                related_entries: [],
+            };
+        }
+        const widened = hit.start !== span.start || hit.end !== span.end;
+        return {
+            ...span,
+            start: Math.min(span.start, hit.start),
+            end: Math.max(span.end, hit.end),
+            surface: widened ? surface : span.surface,
+            entries: [entry, ...span.entries],
+            deconjugated_from: widened ? null : span.deconjugated_from,
+        };
+    }
+
+    /** @param {MouseEvent} event */
+    function handleSentenceMouseUp(event) {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+            selPopup = null;
+            return;
+        }
+        const sentenceEl = /** @type {HTMLElement} */ (event.currentTarget);
+        if (!sentenceEl.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+            selPopup = null;
+            return;
+        }
+        const text = sel.toString().trim();
+        if (!text) {
+            selPopup = null;
+            return;
+        }
+        const rect = sel.getRangeAt(0).getBoundingClientRect();
+        const containerRect = sentenceWindowEl.getBoundingClientRect();
+        selText = text;
+        // Swallow the click that follows mouseup so selecting never opens a
+        // lookup tooltip.
+        suppressClick = true;
+        selPopup = {
+            x: Math.max(8, Math.min(rect.left - containerRect.left, containerRect.width - 200)),
+            y: Math.max(8, rect.top - containerRect.top - 95),
+        };
+    }
+
+    async function handleNameSaved() {
+        window.getSelection()?.removeAllRanges();
+        selText = '';
+        await loadNames(mediaId);
+        rescanNames();
+        onNameSaved?.();
+    }
+
+    $effect(() => {
+        loadNames(mediaId);
+    });
+
+    $effect(() => {
+        displayedText;
+        selPopup = null;
+    });
+
     $effect(() => {
         displayedText;
         settings?.highlight_mode;
         settings?.treat_new_as_unknown;
+        settings?.underline_names;
+        names;
         rescanKnownWords();
+        rescanNames();
     });
     
     onMount(() => {
@@ -431,7 +568,16 @@
 </script>
 
 <svelte:window
-    onclick={() => { tooltipVisible = false; }}
+    onclick={() => {
+        tooltipVisible = false;
+        // A drag-selection's click lands on the sentence element itself and
+        // bubbles here: don't let it dismiss the popup it just created.
+        if (suppressClick) {
+            suppressClick = false;
+        } else {
+            selPopup = null;
+        }
+    }}
     onkeydown={handleGlobalKeydown}
     onkeyup={handleGlobalKeyup}
 />
@@ -442,6 +588,8 @@
             class="sentence-text"
             class:history-text={viewingHistory}
             onmouseleave={handleSentenceLeave}
+            onmousedown={() => (suppressClick = false)}
+            onmouseup={handleSentenceMouseUp}
             style={`--font-size: ${settings?.font_size ?? 30}px; --font-family: '${settings?.font_family ?? 'Noto Sans JP'}'`}
         >
             {#each displayedChars as char, i}
@@ -451,6 +599,7 @@
                     class:span-start={hoveredSpan && i === hoveredSpan.start && settings?.word_highlight_enabled}
                     class:span-end={hoveredSpan && i === hoveredSpan.end - 1 && settings?.word_highlight_enabled}
                     class:known-word={getKnownSpanAt(i) !== null}
+                    class:name-word={getNameSpanAt(i) !== null}
                     class:no-match={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end && hoveredSpan.entries.length === 0 && settings?.word_highlight_enabled}
                     onmouseenter={(event) => handleCharHover(i, event)}
                     onclick={(event) => handleCharClick(i, event)}
@@ -485,6 +634,26 @@
         </div>
     {/if}
 
+    {#if selPopup}
+        <div
+            class="selection-popup"
+            style={`left: ${selPopup.x}px; top: ${selPopup.y}px`}
+        >
+            <button
+                type="button"
+                class="selection-save-btn"
+                onclick={(event) => {
+                    event.stopPropagation();
+                    selPopup = null;
+                    suppressClick = false;
+                    showNameModal = true;
+                }}
+            >
+                Save name
+            </button>
+        </div>
+    {/if}
+
     {#if statusMenu}
         <StatusMenu
             x={statusMenu.x}
@@ -496,6 +665,8 @@
         />
     {/if}
 </div>
+
+<NameModal bind:show={showNameModal} {mediaId} name={selText} onSaved={handleNameSaved} />
 
 <Toast message={mineToastMessage} />
 
@@ -609,5 +780,51 @@
     .char-token.known-word {
         border-bottom: 2px solid var(--status-color, transparent);
         padding-bottom: 1px;
+    }
+
+    /* Custom name dictionary matches underline cyan, winning over the
+       known-word color when both apply. */
+    .char-token.name-word {
+        border-bottom: 2px solid #4FDCFF;
+        padding-bottom: 1px;
+    }
+
+    .selection-popup {
+        position: absolute;
+        z-index: 30;
+        min-width: 118px;
+        background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 95%, #000);
+        border: 1px solid var(--theme-border, #404040);
+        border-radius: 8px;
+        padding: 0.12rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        animation: popup-in 0.12s ease-out;
+    }
+
+    @keyframes popup-in {
+        from {
+            opacity: 0;
+        }
+    }
+
+    .selection-save-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        border-radius: 6px;
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--theme-text, #f6f6f6);
+        padding: 0.28rem 0.6rem;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s ease;
+    }
+
+    .selection-save-btn:hover {
+        background: color-mix(in srgb, var(--theme-text, #f6f6f6) 8%, transparent);
     }
 </style>

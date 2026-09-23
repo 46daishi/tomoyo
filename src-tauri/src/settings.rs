@@ -31,6 +31,7 @@ pub struct AppSettings {
 
     pub highlight_mode: String, // "none" | "known" | "unknown"
     pub treat_new_as_unknown: bool,
+    pub underline_names: bool,
 
     // ── Input & History ──
     pub input_mode: String, // "clipboard" | "websocket"
@@ -85,6 +86,7 @@ impl Default for AppSettings {
 
             highlight_mode: "none".into(),
             treat_new_as_unknown: false,
+            underline_names: true,
 
             input_mode: "clipboard".into(),
             websocket_address: "ws://127.0.0.1:6677".into(),

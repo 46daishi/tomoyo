@@ -22,7 +22,9 @@
         const ids = [
             ...tooltipSpan.entries,
             ...(tooltipSpan.related_entries ?? []),
-        ].map((e) => e.id);
+        ]
+            .filter((e) => !e.customName)
+            .map((e) => e.id);
         try {
             wordImages = await getWordImages(ids);
         } catch {
@@ -129,19 +131,29 @@
                             <li>
                                 <div class="entry-row">
                                     <div class="entry-body">
-                                        <span class="entry-readings">
-                                            <span
-                                                class="entry-spelling"
-                                                class:known-word={entryStatus != null}
-                                                style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
-                                                onclick={(e) => handleEntryReadingClick(entry, e)}
-                                            >{entry.spellings[0] ?? entry.readings[0]}</span>
-                                            {#if entry.readings[0] && entry.spellings.length > 0}
-                                                <span class="entry-reading-kana">{entry.readings[0]}</span>
+                                        {#if entry.customName}
+                                            <span class="entry-readings">
+                                                <span class="entry-spelling">{entry.spellings[0]}</span>
+                                            </span>
+                                            <div class="entry-pos">{entry.pos.join(', ')}</div>
+                                            {#if entry.definitions.length > 0}
+                                                <div class="entry-definitions">{entry.definitions.join('; ')}</div>
                                             {/if}
-                                        </span>
-                                        <div class="entry-pos">{entry.pos.join(', ')}</div>
-                                        <div class="entry-definitions">{entry.definitions.join('; ')}</div>
+                                        {:else}
+                                            <span class="entry-readings">
+                                                <span
+                                                    class="entry-spelling"
+                                                    class:known-word={entryStatus != null}
+                                                    style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
+                                                    onclick={(e) => handleEntryReadingClick(entry, e)}
+                                                >{entry.spellings[0] ?? entry.readings[0]}</span>
+                                                {#if entry.readings[0] && entry.spellings.length > 0}
+                                                    <span class="entry-reading-kana">{entry.readings[0]}</span>
+                                                {/if}
+                                            </span>
+                                            <div class="entry-pos">{entry.pos.join(', ')}</div>
+                                            <div class="entry-definitions">{entry.definitions.join('; ')}</div>
+                                        {/if}
                                     </div>
                                     {#if entry.id in wordImages}
                                         <WordImageButton
@@ -152,6 +164,7 @@
                                             onSaved={(path) => (wordImages[entry.id] = path)}
                                         />
                                     {/if}
+                                    {#if !entry.customName}
                                     <div class="mine-select">
                                         <ActionButton
                                             icon={ICONS.plus}
@@ -172,12 +185,13 @@
                                                     onMine(entry, value);
                                                 }}
                                             >
-                                                {#each forms as form}
-                                                    <option value={form.value}>{form.label}</option>
-                                                {/each}
-                                            </select>
+                                            {#each forms as form}
+                                                <option value={form.value}>{form.label}</option>
+                                            {/each}
+                                        </select>
                                         {/if}
                                     </div>
+                                    {/if}
                                 </div>
                             </li>
                         {/each}

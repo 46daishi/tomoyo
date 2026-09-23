@@ -145,6 +145,7 @@ export const SETTINGS_SCHEMA = [
               subRow: true,
               showIf: (s) => s.highlight_mode === 'unknown',
           },
+          { key: 'underline_names', label: 'Underline custom names', type: 'checkbox' },
       { key: 'history_enabled', label: 'Enable history', type: 'checkbox' },
       {
           key: 'history_span',

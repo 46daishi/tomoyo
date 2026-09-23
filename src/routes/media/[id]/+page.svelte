@@ -23,6 +23,8 @@
 
     import { STATUS_LEVELS } from '$lib/constants';
     import { parseDefinitions, updateWordStatus } from '$lib/dictionary.js';
+    import { getNames, deleteName } from '$lib/names.js';
+    import { confirm } from '@tauri-apps/plugin-dialog';
 
     let settings = $state(null);
     let showEditModal = $state(false);
@@ -148,6 +150,38 @@
         await updateWordStatus({ wordId: word.id, status });
         wordStatusVersion += 1;
     }
+
+    // Custom names saved for this media entry.
+    let names = $state(/** @type {Array<Record<string, any>>} */ ([]));
+    let namesLoaded = $state(false);
+    let namesExpanded = $state(false);
+    let namesVersion = $state(0);
+    let namesRequestId = 0;
+
+    async function loadNames(id) {
+        const my = ++namesRequestId;
+        const rows = await getNames({ mediaId: id });
+        if (namesRequestId !== my) return;
+        names = rows;
+        namesLoaded = true;
+    }
+
+    $effect(() => {
+        namesVersion;
+        namesLoaded = false;
+        loadNames(mediaId);
+    });
+
+    async function handleDeleteName(entry) {
+        const yes = await confirm(`Delete the name "${entry.name}"?`, {
+            title: 'Delete name',
+            kind: 'warning',
+        });
+        if (!yes) return;
+
+        await deleteName({ id: entry.id });
+        namesVersion += 1;
+    }
 </script>
 
 {#key mediaId}
@@ -167,6 +201,7 @@
             onMined={() => (minedVersion += 1)}
             {wordStatusVersion}
             onStatusChanged={() => (wordStatusVersion += 1)}
+            onNameSaved={() => (namesVersion += 1)}
         />
 
         {#if session.running}
@@ -226,6 +261,47 @@
                 {/if}
             </div>
         {/if}
+
+        <div class="session-words-section">
+            <button
+                type="button"
+                class="session-words-head"
+                onclick={() => (namesExpanded = !namesExpanded)}
+                aria-expanded={namesExpanded}
+            >
+                <span class="sw-icon" style="color: #52ECFF;">{ICONS.translate}</span>
+                <span class="sw-title">Saved names</span>
+                <span class="sw-count">{names.length}</span>
+                <span class="sw-chevron">{ICONS[namesExpanded ? 'collapse' : 'expand']}</span>
+            </button>
+
+            {#if namesExpanded}
+                {#if !namesLoaded}
+                    <p class="sw-empty">Loading…</p>
+                {:else if names.length === 0}
+                    <p class="sw-empty">No names saved yet. Select text in the sentence window to save one.</p>
+                {:else}
+                    <div class="session-words-grid">
+                        {#each names as entry (entry.id)}
+                            <div class="mined-word-card">
+                                <span class="mined-word-spelling">{entry.name}</span>
+                                {#if entry.reading}
+                                    <span class="mined-word-reading">{entry.reading}</span>
+                                {/if}
+                                <button
+                                    type="button"
+                                    class="word-delete-btn name-delete-btn"
+                                    onclick={() => handleDeleteName(entry)}
+                                    title="Delete name"
+                                >
+                                    {@html ICONS.trash}
+                                </button>
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            {/if}
+        </div>
 
         <MediaFormModal
             bind:show={showEditModal}
@@ -443,6 +519,39 @@
 
     .mined-word-status:hover {
         width: 9px;
+    }
+
+    .name-delete-btn {
+        position: absolute;
+        top: 0.4rem;
+        right: 0.5rem;
+        font-family: "Symbols Nerd Font";
+        background: none;
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        width: 1rem;
+        height: 1rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s ease, color 0.15s ease;
+    }
+
+    .name-delete-btn :global(svg) {
+        width: 100%;
+        height: 100%;
+    }
+
+    .mined-word-card:hover .name-delete-btn {
+        opacity: 1;
+    }
+
+    .name-delete-btn:hover {
+        color: #f38ba8;
     }
 
     .mined-word-spelling {

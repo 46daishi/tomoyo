@@ -2950,6 +2950,12 @@ pub fn run() {
             sql: include_str!("../migrations/0014_words_image.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 15,
+            description: "names",
+            sql: include_str!("../migrations/0015_names.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

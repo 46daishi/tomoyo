@@ -11,6 +11,7 @@
     import { ICONS } from '$lib/icons';
     import { loadSettings } from '$lib/settings';
     import { confirm } from '@tauri-apps/plugin-dialog';
+    import { getNames, updateName, deleteName } from '$lib/names.js';
     import { STATUS_LEVELS } from '$lib/constants';
     import { getReviewStats, getReviewActivityByDay } from '$lib/reviewStats.js';
     import { goto, afterNavigate } from '$app/navigation';
@@ -20,7 +21,7 @@
     import Toast from '$lib/components/Toast.svelte';
     import HeatMap from '$lib/components/HeatMap.svelte';
 
-    const TABS = ['words', 'sentences', 'frequent', 'review'];
+    const TABS = ['words', 'sentences', 'names', 'frequent', 'review'];
 
     afterNavigate(() => {
         const tabParam = page.url.searchParams.get('tab');
@@ -44,7 +45,7 @@
     let expandedWords = $state(new Set());
     let sentencesByWord = $state({});
 
-    let activeTab = $state('words'); // 'words' | 'sentences' | 'frequent' | 'review'
+    let activeTab = $state('words'); // 'words' | 'sentences' | 'names' | 'frequent' | 'review'
     let viewMode = $state('card'); // 'card' | 'grid' | 'list'
     let expandedTranslations = $state(new Set());
     let allSentences = $state([]);
@@ -58,13 +59,17 @@
     // smaller.
     const WORDS_PAGE_SIZE = 500;
     const SENTENCES_PAGE_SIZE = 100;
+    const NAMES_PAGE_SIZE = 500;
     let wordsPage = $state(1);
     let sentencesPage = $state(1);
+    let namesPage = $state(1);
     let pageEl = $state(/** @type {HTMLElement | null} */ (null));
 
     let frequentWords = $state([]);
     let frequentLoaded = $state(false);
     let frequentLimit = $state(10);
+
+    let names = $state(/** @type {Array<Record<string, any>>} */ ([]));
 
     let showCustomReviewModal = $state(false);
     let showImportModal = $state(false);
@@ -161,6 +166,16 @@
         if (dictRequestId !== my) return;
         words = wordRows;
         lookupCounts = counts;
+    }
+
+    let namesRequestId = 0;
+
+    async function loadNames() {
+        const my = ++namesRequestId;
+        const mediaId = mediaFilter;
+        const rows = await getNames({ mediaId });
+        if (namesRequestId !== my) return;
+        names = rows;
     }
 
     async function loadSentences() {
@@ -276,6 +291,10 @@
 
     $effect(() => {
         loadWords();
+    });
+
+    $effect(() => {
+        loadNames();
     });
 
     $effect(() => {
@@ -417,6 +436,25 @@
         filteredSentences.slice((safeSentencesPage - 1) * SENTENCES_PAGE_SIZE, safeSentencesPage * SENTENCES_PAGE_SIZE)
     );
 
+    let filteredNames = $derived(
+        searchQuery.trim()
+            ? names.filter((n) => {
+                  const q = searchQuery.toLowerCase();
+                  return (
+                      n.name.includes(searchQuery) ||
+                      (n.reading ?? '').includes(searchQuery) ||
+                      (n.media_label ?? '').toLowerCase().includes(q)
+                  );
+              })
+            : names
+    );
+
+    let namesPageCount = $derived(Math.max(1, Math.ceil(filteredNames.length / NAMES_PAGE_SIZE)));
+    let safeNamesPage = $derived(Math.min(Math.max(1, namesPage), namesPageCount));
+    let pagedNames = $derived(
+        filteredNames.slice((safeNamesPage - 1) * NAMES_PAGE_SIZE, safeNamesPage * NAMES_PAGE_SIZE)
+    );
+
     // Reset to page 1 whenever the result set identity changes.
     $effect(() => {
         searchQuery;
@@ -425,7 +463,9 @@
         mediaFilter;
         activeTab;
         words;
+        names;
         wordsPage = 1;
+        namesPage = 1;
     });
     $effect(() => {
         searchQuery;
@@ -444,6 +484,12 @@
     /** @param {number} p */
     function gotoSentencesPage(p) {
         sentencesPage = Math.min(Math.max(1, p), sentencesPageCount);
+        pageEl?.scrollTo({ top: 0 });
+    }
+
+    /** @param {number} p */
+    function gotoNamesPage(p) {
+        namesPage = Math.min(Math.max(1, p), namesPageCount);
         pageEl?.scrollTo({ top: 0 });
     }
 
@@ -502,6 +548,43 @@
         const notes = value.trim() || null;
         word.notes = notes;
         await updateWordNotes({ wordId: word.id, notes });
+    }
+
+    async function commitName(entry, value) {
+        const name = value.trim();
+        if (!name) {
+            // Names can't be empty — reload to restore the input.
+            await loadNames();
+            return;
+        }
+        if (name === entry.name) return;
+        const previous = entry.name;
+        entry.name = name;
+        try {
+            await updateName({ id: entry.id, name, reading: entry.reading ?? '' });
+        } catch {
+            entry.name = previous;
+            showToast('A name with that text already exists.');
+            await loadNames();
+        }
+    }
+
+    async function commitNameReading(entry, value) {
+        const reading = value.trim();
+        if (reading === (entry.reading ?? '')) return;
+        entry.reading = reading;
+        await updateName({ id: entry.id, name: entry.name, reading });
+    }
+
+    async function handleDeleteName(entry) {
+        const yes = await confirm(`Delete the name "${entry.name}"?`, {
+            title: 'Delete name',
+            kind: 'warning',
+        });
+        if (!yes) return;
+
+        await deleteName({ id: entry.id });
+        await loadNames();
     }
 
     async function handleClearDictionary() {
@@ -650,6 +733,14 @@
         >
             Sentences
         </button>
+        <button
+            type="button"
+            class="tab-btn"
+            class:active={activeTab === 'names'}
+            onclick={() => (activeTab = 'names')}
+        >
+            Names
+        </button>
         {#if settings?.track_unknown_words}
             <button
                 type="button"
@@ -673,7 +764,7 @@
                 Import
             </button>
         {/if}
-        {#if activeTab === 'words' || activeTab === 'sentences' || activeTab === 'frequent'}
+        {#if activeTab === 'words' || activeTab === 'sentences' || activeTab === 'names' || activeTab === 'frequent'}
             <div class="view-toggle">
                 <button
                     type="button"
@@ -990,6 +1081,64 @@
                     </div>
                 {/each}
             </div>
+        {/if}
+    {:else if activeTab === 'names'}
+        {#if filteredNames.length === 0}
+            <p class="empty-notice">No names found.</p>
+        {:else}
+            <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
+                {#each pagedNames as entry (entry.id)}
+                    <div class="word-card" class:list-view={viewMode === 'list'}>
+                        <div class="word-main">
+                            <input
+                                class="name-spelling-input"
+                                type="text"
+                                value={entry.name}
+                                aria-label="Name"
+                                onblur={(e) => commitName(entry, e.currentTarget.value)}
+                                onkeydown={(e) => {
+                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
+                            />
+                            <button
+                                type="button"
+                                class="word-delete-btn"
+                                onclick={() => handleDeleteName(entry)}
+                                title="Delete name"
+                            >
+                                {@html ICONS.trash}
+                            </button>
+                        </div>
+                        <div class="notes-edit-row">
+                            <span class="notes-icon">{@html ICONS.translate}</span>
+                            <input
+                                class="notes-input"
+                                type="text"
+                                placeholder="Reading..."
+                                value={entry.reading ?? ''}
+                                onblur={(e) => commitNameReading(entry, e.currentTarget.value)}
+                                onkeydown={(e) => {
+                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
+                            />
+                        </div>
+                        {#if !mediaFilter && entry.media_label}
+                            <div class="word-meta">
+                                <span class="tag-pill">#{entry.media_label}</span>
+                            </div>
+                        {/if}
+                    </div>
+                {/each}
+            </div>
+            {#if namesPageCount > 1}
+                <div class="pager">
+                    <button type="button" class="pager-btn" disabled={safeNamesPage <= 1} onclick={() => gotoNamesPage(1)} title="First page">«</button>
+                    <button type="button" class="pager-btn" disabled={safeNamesPage <= 1} onclick={() => gotoNamesPage(safeNamesPage - 1)} title="Previous page">‹</button>
+                    <span class="pager-info">Page {safeNamesPage} of {namesPageCount} · {filteredNames.length} names</span>
+                    <button type="button" class="pager-btn" disabled={safeNamesPage >= namesPageCount} onclick={() => gotoNamesPage(safeNamesPage + 1)} title="Next page">›</button>
+                    <button type="button" class="pager-btn" disabled={safeNamesPage >= namesPageCount} onclick={() => gotoNamesPage(namesPageCount)} title="Last page">»</button>
+                </div>
+            {/if}
         {/if}
     {:else if activeTab === 'review'}
         <div class="review-tab">
@@ -1561,6 +1710,23 @@
         font-weight: 700;
         font-family: "Noto Sans JP", Inter, sans-serif;
         color: var(--theme-text, #f6f6f6);
+    }
+
+    .name-spelling-input {
+        flex: 1;
+        min-width: 0;
+        font-size: 1.4rem;
+        font-weight: 700;
+        font-family: "Noto Sans JP", Inter, sans-serif;
+        color: var(--theme-text, #f6f6f6);
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 0;
+    }
+
+    .name-spelling-input:focus {
+        border-bottom: 1px solid var(--theme-primary, #36b7bd);
     }
 
     .word-reading {
