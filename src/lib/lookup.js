@@ -63,9 +63,10 @@ export async function findKnownWordSpans(text, knownWordsMap) {
  * - "known": underline if any entry is in the dictionary (existing behavior)
  * - "unknown": underline only if ALL entries are unknown
  *   (not in dictionary, or in dictionary with status 0 when treatNewAsUnknown)
- * - "all-but-known": underline unless ANY entry is Known (status 4) — i.e.
- *   only when no entry is Known. Unmined spans render red, mined ones in
- *   their status color (handled by the components' status-color fallback).
+ * - "all-but-known": underline unless the TOP-ranked entry is Known (status
+ *   4) — i.e. only the top mined result decides, not any of the homophone
+ *   entries. Unmined spans render red, mined ones in their status color
+ *   (handled by the components' status-color fallback).
  */
 export async function findHighlightedWordSpans(text, knownWordsMap, mode, treatNewAsUnknown) {
     if (mode === 'none' || !text) return [];
@@ -106,9 +107,9 @@ export async function findHighlightedWordSpans(text, knownWordsMap, mode, treatN
                 spans.push({ ...s, wordId: null, status: null });
                 continue;
             }
-            const anyKnown = entryIds.some((id) => knownWordsMap.get(id) === 4);
-            if (!anyKnown) {
-                spans.push({ ...s, wordId: entryIds[0], status: knownWordsMap.get(entryIds[0]) ?? null });
+            const topId = entryIds[0];
+            if (knownWordsMap.get(topId) !== 4) {
+                spans.push({ ...s, wordId: topId, status: knownWordsMap.get(topId) ?? null });
             }
         }
         return spans;
