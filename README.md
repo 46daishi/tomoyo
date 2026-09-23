@@ -5,7 +5,7 @@
 
 **tomoyo is an immersion app made in Tauri + SvelteKit. Its goal is to aid you in learning Japanese by mainly just reading native content instead of relying on spaced repetition.**
 
-![Version](https://img.shields.io/badge/version-1.0.0-446db9?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.1.0-446db9?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-446db9?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 </div>
