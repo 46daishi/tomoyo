@@ -65,6 +65,7 @@
     })
 
     async function handleClipboardChange(text) {
+        text = text.replace(/[\r\n]+/g, '');
         if (!isMostlyJapanese(text)) return;
 
         if (settings?.history_enabled && currentText) {
