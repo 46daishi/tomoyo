@@ -469,6 +469,22 @@ fn lookup_from_position(
                 // the mid-token arm), どぉ the single-token form.
                 ("け", "ど", true),
                 ("け", "どぉ", true),
+                // しかない ("only") splits as しか|ない, and the しか head
+                // is function-locked — without the merge the expression
+                // never forms (the ない tail matches readings; 鹿しかいない
+                // stays safe because the tail must equal ない exactly).
+                ("しか", "ない", true),
+                // だけど ("but") splits as だけ|ど with the same lock.
+                ("だけ", "ど", true),
+                // ちゃっちゃと ("quickly") shreds as ちゃっ|ちゃ|と with a
+                // function-locked ちゃっ head, so the adverb never forms
+                // (and ちゃう wins its list). Any ちゃ head may start the
+                // ちゃ-pairs: the exact tail still has to match, so お茶と
+                // (と != ちゃと) never merges.
+                ("ちゃっ", "ちゃと", false),
+                ("ちゃっ", "ちゃっと", false),
+                ("ちゃ", "ちゃと", false),
+                ("ちゃ", "ちゃっと", false),
             ];
             let head_is_function = matches!(
                 head_tok.pos.as_str(),
@@ -656,13 +672,15 @@ fn lookup_from_position(
         // Okurigana merge: MeCab sometimes shreds a word so its final kana
         // lands in the next token (悪いし -> 悪|いし), making the real word
         // unreachable because spans never end mid-token. If exactly one more
-        // hiragana char completes a literal dictionary word, allow ending
-        // there. Literal-only (never a deconjugated end), function words stay
-        // locked, referential splits keep priority — so のこ/はよ-style
-        // false positives can't form. Kana-led cursors never merge: okurigana
-        // attaches to kanji stems, and kana words (さん, そう, この, ヘン,
-        // マジ, ち) plus the next kana would form coincidental words
-        // (さんい/三位, そうい/相違, このこ/海鼠子, へんな/ヘナ, マジか/間近).
+        // hiragana or kanji char completes a literal dictionary word, allow
+        // ending there — the kanji half covers numeral-counter splits
+        // (三|食分 -> 三食) the same way. Literal-only (never a
+        // deconjugated end), function words stay locked, referential splits
+        // keep priority — so のこ/はよ-style false positives can't form.
+        // Kana-led cursors never merge: okurigana attaches to kanji stems,
+        // and kana words (さん, そう, この, ヘン, マジ, ち) plus the next
+        // kana would form coincidental words (さんい/三位, そうい/相違,
+        // このこ/海鼠子, へんな/ヘナ, マジか/間近).
         if !function_word && !referential_split {
             // Kana-led cursors never merge (checked first): okurigana
             // attaches to kanji stems.
@@ -681,7 +699,11 @@ fn lookup_from_position(
                             let e = t.end + 1;
                             if e <= next.end.min(len) && e <= position + MAX_CHARS_COMBINED {
                                 if let Some(c) = chars.get(t.end) {
-                                    if matches!(c, 'ぁ'..='ん') {
+                                    let cp = *c as u32;
+                                    let is_kana = matches!(c, 'ぁ'..='ん');
+                                    let is_kanji = (0x4E00..=0x9FFF).contains(&cp)
+                                        || (0x3400..=0x4DBF).contains(&cp);
+                                    if is_kana || is_kanji {
                                         let merged: String =
                                             chars[position..e].iter().collect();
                                         if normalize::normalize_variants(&merged)
@@ -877,6 +899,44 @@ fn lookup_from_position(
                 _ => None,
             };
             let is_koto_naru = |end: usize| koto_naru_end == Some(end);
+            // Noun + を/に + verb dictionary compounds (身につける,
+            // 皮をむく): the particle trips the separator guard below and
+            // the inflected compound is never literal-known, so the verb's
+            // end is exempted from both verb guards when noun + particle +
+            // verb-base is itself a dictionary entry — the span then
+            // resolves via normal lookup/deconjugation (literal for
+            // dictionary forms, deconjugation for inflections like
+            // 身につけた). Longest-first falls back when it doesn't
+            // resolve, so ordinary phrases stay split (本を読む/トイレを
+            // 使う/費用を出す are not dictionary entries).
+            let pp_compound_end: Option<usize> = match token_at_pos {
+                Some(t) if t.pos == "名詞" && position == t.start => {
+                    let p = tokens.iter().find(|tok| tok.start == t.end);
+                    let v = p
+                        .filter(|p| {
+                            p.pos == "助詞" && matches!(p.surface.as_str(), "を" | "に")
+                        })
+                        .and_then(|p| tokens.iter().find(|tok| tok.start == p.end))
+                        .filter(|v| v.pos == "動詞" && v.base_form != "*");
+                    match (p, v) {
+                        (Some(p), Some(v)) => {
+                            let compound: String =
+                                format!("{}{}{}", t.surface, p.surface, v.base_form);
+                            let known = normalize::normalize_variants(&compound)
+                                .iter()
+                                .any(|k| index.by_text.contains_key(k));
+                            if known {
+                                Some(v.end)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
+            let is_pp_compound = |end: usize| pp_compound_end == Some(end);
             // A noun span stops once a non-te-form particle (でも/は/と/に...)
             // is followed by a content verb: 風船でも割れる must split as 風船 /
             // でも / 割れる rather than deconjugating the whole string into
@@ -1250,6 +1310,7 @@ fn lookup_from_position(
                     && !(in_te_aux_chain && tok_is_te_aux)
                     && !(in_must_chain && tok_is_must_aux)
                     && !is_koto_naru(tok.end)
+                    && !is_pp_compound(tok.end)
                     && !tok_is_split_cause
                 {
                     break;
@@ -1274,6 +1335,7 @@ fn lookup_from_position(
                     && !(in_te_aux_chain && tok_is_te_aux)
                     && !(in_must_chain && tok_is_must_aux)
                     && !is_koto_naru(tok.end)
+                    && !is_pp_compound(tok.end)
                     && !(cursor_unknown && token_at_pos.map_or(false, |t| t.start == position))
                 {
                     let compound: String = chars[position..tok.end].iter().collect();
@@ -1332,6 +1394,29 @@ fn lookup_from_position(
                             ends.push(e);
                         }
                         continue;
+                    }
+                    // Contracted てしまう/でしまう (炒めちゃう -> 炒める):
+                    // after a verb, ちゃ/じゃ (and their ちま/じま cousins,
+                    // with or without emphatic sokuon) is the contraction,
+                    // never a new word — continue instead of breaking, like
+                    // てる does. Longest-first still falls back when the
+                    // merged span doesn't resolve.
+                    {
+                        let bare: String = tok
+                            .surface
+                            .chars()
+                            .take(
+                                tok.surface.chars().count()
+                                    - usize::from(tok.surface.ends_with('っ')),
+                            )
+                            .collect();
+                        if matches!(bare.as_str(), "ちゃ" | "じゃ" | "ちま" | "じま") {
+                            let e = tok.end.min(len);
+                            if e > position {
+                                ends.push(e);
+                            }
+                            continue;
+                        }
                     }
                     // ん followed by だ is the explanatory copula んだ (= のだ),
                     // not a real noun: したんだ must split as した + んだ,
@@ -1704,8 +1789,13 @@ fn lookup_from_position(
                     const SOKUON_TAIL_PARTICLES: &[char] =
                         &['よ', 'ね', 'な', 'か', 'は', 'も', 'と', 'に', 'で', 'が', 'を', 'や'];
                     let last = candidate.chars().next_back();
-                    if !wrapper_win
-                        && deconj_info.is_some()
+                    // Wrapper wins (お待たせっ -> 待たせる via honorific)
+                    // shorten the same way so the emphatic っ doesn't stay
+                    // in the span — but only onto the bare stem (no
+                    // particle-strip fallback) and only when the stem names
+                    // the same top entry; otherwise the wrapper answer stays
+                    // whole instead of dying like non-wrapper spans do.
+                    if deconj_info.is_some()
                         && (last == Some('っ') || last == Some('ッ'))
                     {
                         let stem: String = candidate
@@ -1721,14 +1811,17 @@ fn lookup_from_position(
                             // Candidate remainders, longest first: the stem
                             // itself, then the stem minus a trailing
                             // particle (a literal win anywhere adopts).
+                            // Wrapper wins only try the bare stem.
                             let mut remainders = vec![stem.clone()];
-                            if let Some(p) = stem.chars().next_back() {
-                                if SOKUON_TAIL_PARTICLES.contains(&p) {
-                                    remainders.push(
-                                        stem.chars()
-                                            .take(stem.chars().count() - 1)
-                                            .collect(),
-                                    );
+                            if !wrapper_win {
+                                if let Some(p) = stem.chars().next_back() {
+                                    if SOKUON_TAIL_PARTICLES.contains(&p) {
+                                        remainders.push(
+                                            stem.chars()
+                                                .take(stem.chars().count() - 1)
+                                                .collect(),
+                                        );
+                                    }
                                 }
                             }
                             let mut adopted = false;
@@ -1748,7 +1841,14 @@ fn lookup_from_position(
                                     // Adopt only literal remainders: the
                                     // deconjugation already spoke for the
                                     // longer surface and lost credibility.
-                                    if si.is_none() {
+                                    // Wrapper wins additionally adopt a
+                                    // deconjugated stem when it names the
+                                    // same top entry (お待たせっ -> お待たせ,
+                                    // still 待たせる).
+                                    let same_top = se.first().map_or(false, |e| {
+                                        entries.first().map_or(false, |f| e.id == f.id)
+                                    });
+                                    if si.is_none() || (wrapper_win && same_top) {
                                         eff_end =
                                             position + remainder.chars().count();
                                         candidate = remainder;
@@ -1759,11 +1859,13 @@ fn lookup_from_position(
                                     }
                                 }
                             }
-                            if !adopted {
+                            if !adopted && !wrapper_win {
                                 // Nothing literal underneath: kill the span
                                 // so shorter spans win. (Found is not
                                 // incremented — a killed candidate must not
-                                // consume a skip.)
+                                // consume a skip.) Wrapper wins stay whole
+                                // instead — their answer came from the
+                                // wrapped stem, not the っ.
                                 continue;
                             }
                         }
@@ -2162,6 +2264,130 @@ fn lookup_from_position(
                         }
                     }
                 }
+                // Stem + explanatory ん + conjecture (良いんだろうか -> 良い,
+                // いいんだろうけど -> いい): the whole run resolves to a
+                // coincidental word (良いんだろうか -> 余韻, いいんだろう ->
+                // 委員 + conjecture), so shorten to the stem like the
+                // explanatory-ん split does — the ん keeps its span and
+                // だろう/けど resolve after it. The ん is found in the
+                // surface itself (not just as a standalone token, since
+                // んだろう/んだ may tokenize fused) — but a token must
+                // start there, so mid-word ん (ふんだろう's 分) never
+                // matches. The stem walks back over a copula run
+                // (相手なんだろう -> 相手 + なん + だろう), must resolve to
+                // a different entry, and the winner must be
+                // reading-or-deconjugation reached (spelled winners keep the
+                // span). The remainder after the ん has to open with the
+                // conjecture (んだろ/んでしょ, covering だろう/だろうか/
+                // けど…, でしょう…): plain んだ/んです/んじゃない/んだよ
+                // tails never match, and spans without an ん (何だろう) or
+                // without a stem (bare んだろう) are untouched.
+                {
+                    let nposs: Vec<usize> = (position + 1..eff_end)
+                        .filter(|&i| {
+                            chars[i] == 'ん' && tokens.iter().any(|t| t.start == i)
+                        })
+                        .collect();
+                    for i in nposs {
+                        let rest: String = chars[i..eff_end].iter().collect();
+                        if !(rest.starts_with("んだろ") || rest.starts_with("んでしょ")) {
+                            continue;
+                        }
+                        let mut stem_start = i;
+                        while let Some(t) = tokens
+                            .iter()
+                            .find(|t| t.start >= position && t.end == stem_start)
+                        {
+                            if t.pos == "助動詞" && t.base_form == "だ" {
+                                stem_start = t.start;
+                            } else {
+                                break;
+                            }
+                        }
+                        if stem_start <= position {
+                            continue;
+                        }
+                        let stem: String = chars[position..stem_start].iter().collect();
+                        if let Some((se, si)) = lookup_candidate(
+                            &stem,
+                            index,
+                            decon,
+                            context_reading,
+                            morph_base,
+                            tokens,
+                            position,
+                        ) {
+                            let same_entry = se.iter().any(|e| e.id == entries[0].id);
+                            let winner_kind = normalize::normalize_variants(&candidate)
+                                .iter()
+                                .map(|k| match_kind(&entries[0], k))
+                                .min();
+                            if !se.is_empty()
+                                && !same_entry
+                                && winner_kind.map_or(false, |k| k >= MatchKind::Reading)
+                            {
+                                eff_end = stem_start;
+                                candidate = stem;
+                                entries = se;
+                                deconj_info = si;
+                                break;
+                            }
+                        }
+                    }
+                }
+                // Adverb + したい (どうしたい -> どう + したい): the whole
+                // run slurred-deconjugates to a coincidental noun (どうし ->
+                // 動詞/同志), hiding the どうする "what to do" construction.
+                // Only どう/そう/こう plus exactly したい (する + want-to):
+                // して-forms are excluded on purpose (そうして is そして).
+                // The したい remainder must resolve to する on its own or
+                // the span stays as it was.
+                {
+                    let adv = token_at_pos.filter(|t| {
+                        t.start == position
+                            && t.pos == "副詞"
+                            && matches!(t.surface.as_str(), "どう" | "そう" | "こう")
+                    });
+                    if let Some(a) = adv {
+                        let want: String =
+                            format!("{}したい", a.surface);
+                        if candidate.starts_with(&want) && candidate != a.surface {
+                            let rest: String = chars[a.end..eff_end].iter().collect();
+                            if rest.starts_with("したい") {
+                                if let Some((se, _)) = lookup_candidate(
+                                    "したい",
+                                    index,
+                                    decon,
+                                    context_reading,
+                                    morph_base,
+                                    tokens,
+                                    a.end,
+                                ) {
+                                    let to_suru = se.iter().any(|e| {
+                                        e.readings.iter().any(|r| r == "する")
+                                            && e.pos.iter().any(|p| p.contains("suru verb"))
+                                    });
+                                    if to_suru {
+                                        if let Some((stem_e, stem_l)) = lookup_candidate(
+                                            &a.surface,
+                                            index,
+                                            decon,
+                                            context_reading,
+                                            morph_base,
+                                            tokens,
+                                            position,
+                                        ) {
+                                            eff_end = a.end;
+                                            candidate = a.surface.clone();
+                                            entries = stem_e;
+                                            deconj_info = stem_l;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 // Fused sentence particles (部はね -> は + ね, 猫よね, 嫌だよ):
                 // MeCab fuses the particle run into one token — often
                 // mis-tagged as a verb stem (はね -> 跳ねる via morphology) —
@@ -2244,6 +2470,49 @@ fn lookup_from_position(
                                     candidate = head;
                                     entries = se;
                                     deconj_info = si;
+                                }
+                            }
+                        }
+                    }
+                }
+                // Bare-し suru absorption before a とく-continuation
+                // (おまけしといた -> おまけ + しといた): the suru path
+                // absorbs a lone し stem plus nothing, swallowing the split
+                // the といた/とく/とけ tail needs (おまけし -> おまけ +
+                // "suru"). When exactly one し follows the noun and a
+                // とく-form continues, keep the noun alone so しといた
+                // resolves on its own. Same-entry gated: the noun alone
+                // must name the same word.
+                {
+                    let noun_tok = tokens.iter().find(|t| t.start == position);
+                    if let Some(noun) = noun_tok.filter(|t| t.pos == "名詞") {
+                        if eff_end == noun.end + 1 && chars.get(noun.end) == Some(&'し') {
+                            let after: String = chars
+                                .get(eff_end..(eff_end + 2).min(len))
+                                .unwrap_or(&[])
+                                .iter()
+                                .collect();
+                            if matches!(after.as_str(), "とい" | "とく" | "とけ") {
+                                let stem: String =
+                                    chars[position..noun.end].iter().collect();
+                                if let Some((se, si)) = lookup_candidate(
+                                    &stem,
+                                    index,
+                                    decon,
+                                    context_reading,
+                                    None,
+                                    tokens,
+                                    position,
+                                ) {
+                                    let same_entry = se.first().map_or(false, |e| {
+                                        entries.first().map_or(false, |f| e.id == f.id)
+                                    });
+                                    if !se.is_empty() && same_entry {
+                                        eff_end = noun.end;
+                                        candidate = stem;
+                                        entries = se;
+                                        deconj_info = si;
+                                    }
                                 }
                             }
                         }
@@ -2612,6 +2881,40 @@ fn lookup_candidate(
             }
             all.extend(decon.deconjugate(key));
         }
+        // Trailing emphatic sokuon (お待たせっ -> 待たせる): deconjugate
+        // the surface/reading minus the final っ as well, so sokuon-final
+        // inflections resolve instead of dying (the sokuon-shorten
+        // post-rule then lands the span on the stem). Deconjugation only,
+        // never literals (マジかっ must not reach 間近), and skipped
+        // outright when the stripped form is itself a literal word (its
+        // own paths already cover it: いいよ, マジか, てめ).
+        {
+            let mut stripped_inputs: Vec<String> = Vec::new();
+            if let Some(reading) = &span_reading {
+                let cs: Vec<char> = reading.chars().collect();
+                if matches!(cs.last(), Some('っ') | Some('ッ')) {
+                    stripped_inputs.push(cs[..cs.len() - 1].iter().collect());
+                }
+            }
+            {
+                let cs: Vec<char> = candidate.chars().collect();
+                if matches!(cs.last(), Some('っ') | Some('ッ')) {
+                    stripped_inputs.push(cs[..cs.len() - 1].iter().collect());
+                }
+            }
+            stripped_inputs.retain(|s| !s.is_empty());
+            let literal_hit = stripped_inputs
+                .iter()
+                .flat_map(|s| normalize::normalize_variants(s))
+                .any(|k| index.by_text.contains_key(&k));
+            if !literal_hit {
+                for s in &stripped_inputs {
+                    for key in normalize::normalize_variants(s) {
+                        all.extend(decon.deconjugate(&key));
+                    }
+                }
+            }
+        }
         let mut best: HashMap<(String, String), usize> = HashMap::new();
         let mut out: Vec<DeconjugatedForm> = Vec::new();
         for f in all {
@@ -2787,7 +3090,23 @@ fn lookup_candidate(
     //      いいよる) hijack morphology ahead of the honest reading match.
     if let Some(base) = morph_base {
         let base_norm = normalize::normalize_text(base);
-        let via_deconj = reading_forms.iter().any(|f| normalize::normalize_text(&f.text) == base_norm);
+        let base_ids: HashSet<u32> = index
+            .by_text
+            .get(&base_norm)
+            .map(|es| es.iter().map(|e| e.id).collect())
+            .unwrap_or_default();
+        // A kana reading deconjugates to kana text while the base form may
+        // be kanji (あり -> ある vs 有る), so a reading form also counts
+        // when it resolves to the base's dictionary entry — ったく -> 九
+        // and いいよっ -> いいよる stay gated since no reading form
+        // reaches those entries.
+        let via_deconj = reading_forms.iter().any(|f| {
+            normalize::normalize_text(&f.text) == base_norm
+                || index
+                    .by_text
+                    .get(&normalize::normalize_text(&f.text))
+                    .map_or(false, |es| es.iter().any(|e| base_ids.contains(&e.id)))
+        });
         let tail_tokens: Vec<&MorphToken> = tokens
             .iter()
             .filter(|t| t.start >= position && t.start < position + span_len && t.start != position)
@@ -2801,11 +3120,6 @@ fn lookup_candidate(
             // base form in the tooltip. The deconjugation forms are kana while
             // the base form may be kanji (のむ vs 飲む), so they are matched by
             // the dictionary entry they resolve to, not by raw text.
-            let base_ids: HashSet<u32> = index
-                .by_text
-                .get(&base_norm)
-                .map(|es| es.iter().map(|e| e.id).collect())
-                .unwrap_or_default();
             let resolves_to_base = |f: &DeconjugatedForm| {
                 index
                     .by_text
@@ -3247,12 +3561,22 @@ fn lookup_candidate(
         let chain_has_slurred = form.rule_chain.as_deref().map_or(false, |c| {
             c.split('→').any(|seg| seg == "slurred")
         });
+        // ても/でも/っても conditionals (出来ても -> できる "even if"):
+        // the rule itself only ever fires on a te-stem, so a verb-class
+        // result through it is genuine even when the tokenizer mistagged
+        // the stem as a noun (出来 as 名詞). Noun + ても with no verb
+        // continuation (子供でも -> 子供で) reaches nothing verb-classed,
+        // so the exemption has nothing to admit there.
+        let chain_has_even_if = form.rule_chain.as_deref().map_or(false, |c| {
+            c.split('→').any(|seg| seg.contains("even if"))
+        });
         if starts_at_position
             && !single_token_span
             && is_verb_class(&form.tag)
             && !span_has_verb_token
             && !(cursor_single_kanji && ends_mid_token && surface_te_form)
             && !chain_has_slurred
+            && !chain_has_even_if
         {
             continue;
         }
@@ -3336,6 +3660,61 @@ fn lookup_candidate(
                                     MatchKind::Deconjugated,
                                     ctx,
                                 ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Char-level honorific strip for fused politeness (お待たせっ arriving
+    // as one token, so no お-token exists for the token wrapper): strip
+    // the first character and deconjugate the rest. Deconjugation-only
+    // with a literal-skip gate — common お-words are literal keys (お茶,
+    // お金, おこ, おは…) so the feed never fires for them — and skipped
+    // outright when an お/ご/御 token sits at the cursor (the token
+    // wrapper owns those, labels intact). Labeled honorific like the
+    // wrapper, so the sokuon-shorten rule can land the span on the stem.
+    // Runs unconditionally (not only when empty): the full span must get
+    // its chance before shorter spans win by fallback.
+    {
+        let first = candidate.chars().next();
+        let has_prefix_token = tokens
+            .iter()
+            .any(|t| t.start == position && matches!(t.surface.as_str(), "お" | "ご" | "御"));
+        if matches!(first, Some('お') | Some('ご') | Some('御')) && !has_prefix_token {
+            let stripped: String = candidate.chars().skip(1).collect();
+            if !stripped.is_empty() {
+                let literal_hit = normalize::normalize_variants(&stripped)
+                    .iter()
+                    .any(|k| index.by_text.contains_key(k));
+                if !literal_hit {
+                    for key in normalize::normalize_variants(&stripped) {
+                        for form in decon.deconjugate(&key) {
+                            let fkey = normalize::normalize_text(&form.text);
+                            if let Some(fentries) = index.by_text.get(&fkey) {
+                                let chain_desc =
+                                    form.rule_chain.as_deref().and_then(combined_label);
+                                let label = match chain_desc {
+                                    Some(l) => Some(format!("honorific + {l}")),
+                                    None => Some("honorific".to_string()),
+                                };
+                                for e in fentries {
+                                    if deconj_tag_matches_entry(&e.pos, &form.tag)
+                                        && seen_ids.insert(e.id)
+                                    {
+                                        let ctx = context_reading.map_or(false, |r| {
+                                            reading_matches_context(e, r)
+                                        });
+                                        candidates.push((
+                                            Arc::clone(e),
+                                            form.proper_steps + 1,
+                                            label.clone(),
+                                            MatchKind::Deconjugated,
+                                            ctx,
+                                        ));
+                                    }
+                                }
                             }
                         }
                     }
@@ -3637,9 +4016,23 @@ fn lookup_candidate(
             t.start >= position && t.end <= span_end && t.pos == "助詞"
         });
         if !crosses_particle {
+            // An honorific お/ご/御 prefix (おじい -> 爺, おまたせ -> 待つ):
+            // usually tagged 接頭詞, but sentence-initial お often comes
+            // out as 感動詞 (お待たせっ), a noun reading (尾), or worse —
+            // either way the prefix adds no meaning of its own, so resolve
+            // through the stem. Runs only when nothing else resolved, so it
+            // can only replace "no answer" with an answer (おはよう resolves
+            // literally and never reaches here). Particles, auxiliaries and
+            // bound/unknown pieces are excluded; everything else is tried.
             if let Some(pre) = tokens
                 .iter()
-                .find(|t| t.start == position && t.pos == "接頭詞")
+                .find(|t| {
+                    t.start == position
+                        && !matches!(
+                            t.pos.as_str(),
+                            "助詞" | "助動詞" | "記号" | "接頭辞" | "接尾辞"
+                        )
+                })
                 .filter(|t| matches!(t.surface.as_str(), "お" | "ご" | "御"))
             {
                 let plen = pre.surface.chars().count();
@@ -3723,10 +4116,10 @@ fn lookup_candidate(
     // (JL ranks MinDeconjugationProcessStepCount before frequency), which is
     // what gives 惹かれております -> 惹かれる over the higher-frequency
     // 光る/引く (惹かれる's primary shares 惹; neither rival primary does).
-    // For kana surfaces priority decides first. Then whether the entry's
-    // spelling matches the tokenizer's base form (行かせられなかった
-    // -> 行く, where 行く and 生かす tie on steps and priority), then
-    // non-bound entries.
+    // For kana surfaces priority decides first. The tokenizer's base form
+    // outranks same-kind homophones right after reading context (あり ->
+    // 有る over 蟻 when the cursor is the verb stem, 行かせられなかった
+    // -> 行く over 生かす), then non-bound entries.
     // Any surface kanji shared with the entry's primary spelling counts — for
     // 書けない, 書く (contains 書) must outrank 掛ける (homophone, unrelated).
     let surface_kanji: Vec<char> = candidate
@@ -3881,6 +4274,17 @@ fn lookup_candidate(
                 let kb = kandoushi
                     && b.0.pos.iter().any(|p| p.contains("interjection"));
                 kb.cmp(&ka)
+            })
+            .then({
+                // Morphological trust (あり -> 有る, not 蟻): when the cursor
+                // is a verb token, an entry spelling the tokenizer's base
+                // form outranks same-kind homophones — MeCab's analysis
+                // beats frequency there. Later tiebreaks (orphans,
+                // priority, steps) still order everything else, and other
+                // kinds still decide first, so this only ever settles ties
+                // like Reading-vs-Reading where one side is the actual
+                // inflection (き -> くる over 木, likewise verb-only).
+                b_base_match.cmp(&a_base_match)
             });
         if has_kanji {
             ord.then(b_kanji_share.cmp(&a_kanji_share)) // kanji match: true first
@@ -3888,7 +4292,6 @@ fn lookup_candidate(
                 .then(a_orphan.cmp(&b_orphan)) // common word first
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
                 .then(b_prio.cmp(&a_prio))
-                .then(b_base_match.cmp(&a_base_match)) // morph-base spelling: true first
                 .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
         } else {
             // Pure-kana surface: prefer usually-kana words (せい -> 所為,
@@ -3907,7 +4310,6 @@ fn lookup_candidate(
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
                 .then(b_prio.cmp(&a_prio))
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
-                .then(b_base_match.cmp(&a_base_match)) // morph-base spelling: true first
                 .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0)))
         }
     });
@@ -5947,6 +6349,194 @@ mod lookup_tests {
         let spans = scan(&h, "よっしゃー! メシメシー!");
         let meshi = spans.iter().find(|s| s.surface == "メシー").unwrap();
         assert_eq!(meshi.entries[0].spellings[0], "飯");
+    }
+
+    #[test]
+    fn ndarou_shortens_to_stem() {
+        let h = Harness::new();
+        // 良いんだろうか used to resolve whole to 余韻 (via よいん):
+        // stem + explanatory ん + conjecture splits like the ん-split does.
+        let spans = scan(&h, "確かめても良いんだろうか。");
+        let yoi = spans.iter().find(|s| s.surface == "良い").unwrap();
+        assert!(
+            yoi.entries.iter().any(|e| e.spellings.iter().any(|s| s == "良い")),
+            "良いんだろうか should shorten to 良い",
+        );
+        assert!(spans.iter().any(|s| s.surface == "だろう"));
+        assert!(spans.iter().all(|s| s.surface != "良いんだろうか"));
+        // いいんだろうけど did the same via 委員 + conjecture: the stem
+        // wins, なん/だろう/けど keep their spans, and しかない (which
+        // しか|ない tokenizes into) merges to the expression.
+        let spans = scan(
+            &h,
+            "何か、もっと簡単にできたらいいんだろうけど、まぁ、慣れていくしかないだろう。",
+        );
+        let ii = spans.iter().find(|s| s.surface == "いい").unwrap();
+        assert!(
+            ii.entries.iter().any(|e| e.spellings.iter().any(|s| s == "良い")),
+            "いいんだろうけど should shorten to いい",
+        );
+        let nan = spans.iter().find(|s| s.surface == "なん").unwrap();
+        assert!(
+            nan.entries.iter().any(|e| e.spellings.iter().any(|s| s == "何")),
+            "いいんだろうけど's なん should read 何",
+        );
+        assert!(spans.iter().any(|s| s.surface == "だろう"));
+        assert!(spans.iter().all(|s| s.surface != "いいんだろう"));
+        let shikanai = spans.iter().find(|s| s.surface == "しかない").unwrap();
+        assert_eq!(top_reading(shikanai), "しかない");
+        assert!(spans.iter().all(|s| s.surface != "しか"));
+    }
+
+    #[test]
+    fn doushitai_splits_suru_verb() {
+        let h = Harness::new();
+        // どうしたい is どう + したい (する + want-to), not the coincidental
+        // noun どうし (動詞/同志).
+        let spans = scan(&h, "そもそも確かめて僕はどうしたいのか。");
+        assert!(spans.iter().any(|s| s.surface == "どう"));
+        let shitai = spans.iter().find(|s| s.surface == "したい").unwrap();
+        assert_eq!(top_reading(shitai), "する");
+        assert!(spans.iter().all(|s| s.surface != "どうしたい"));
+    }
+
+    #[test]
+    fn sanshoku_carves_counter() {
+        let h = Harness::new();
+        // 一日三食分 shreds as 三|食分: hovering 三 must reach 三食 (the
+        // number is never the point), topping its own list.
+        let spans = scan(
+            &h,
+            "弁当を作るとなると、朝、夜も含めて一日三食分の材料が必要になる。",
+        );
+        let sanshoku = spans.iter().find(|s| s.surface == "三食").unwrap();
+        assert_eq!(sanshoku.entries[0].spellings[0], "三食");
+    }
+
+    #[test]
+    fn dekitemo_labels_even_if() {
+        let h = Harness::new();
+        // 出来ても is 出来る + ても ("even if"), like 食べても — even though
+        // MeCab mistags the stem as a noun, the ても-rule proves the verb.
+        let spans = scan(
+            &h,
+            "電子レンジのトースターモードでパンを焼くことは出来ても、まだ炊飯器のセットすら出来ない。",
+        );
+        let dekitemo = spans.iter().find(|s| s.surface == "出来ても").unwrap();
+        assert_eq!(top_reading(dekitemo), "できる");
+        assert_eq!(dekitemo.deconjugated_from.as_deref(), Some("even if"));
+    }
+
+    #[test]
+    fn chatchato_completion_reaches_adverb() {
+        let h = Harness::new();
+        // ちゃっちゃと ("quickly") shreds with a function-locked ちゃっ
+        // head: without the merged end, ちゃう wins the list. The direct
+        // adverb match must rank first.
+        let spans = scan(&h, "そう? じゃあ後でいくね。よーし、買い物をちゃっちゃと済まさないと。");
+        let chatchato = spans.iter().find(|s| s.surface == "ちゃっちゃと").unwrap();
+        assert!(
+            chatchato.entries[0]
+                .readings
+                .iter()
+                .any(|r| r == "ちゃっちゃと"),
+            "ちゃっちゃと should top its own adverb entry",
+        );
+    }
+
+    #[test]
+    fn omake_shitoita_splits() {
+        let h = Harness::new();
+        // おまけしといた is おまけ + しといた (しておいた): the suru path
+        // must not absorb the bare し when a とく-form continues, and
+        // しといた resolves to する like しとく does.
+        let spans = scan(&h, "おまけしといたから、また来ておくれ!");
+        let omake = spans.iter().find(|s| s.surface == "おまけ").unwrap();
+        assert_eq!(omake.entries[0].spellings[0], "お負け");
+        assert!(spans.iter().all(|s| s.surface != "おまけし"));
+        let shitoita = spans.iter().find(|s| s.surface == "しといた").unwrap();
+        assert_eq!(top_reading(shitoita), "する");
+        assert_eq!(
+            shitoita.deconjugated_from.as_deref(),
+            Some("in advance (casual)")
+        );
+    }
+
+    #[test]
+    fn ari_continuative_prefers_aru() {
+        let h = Harness::new();
+        // あり (有る-continuative) must top 有る, not 蟻: the renyoukei rule
+        // reaches ある and the morphological path trusts MeCab's verb.
+        // Same sentence: だけど merges (だけ|ど) and 炒めちゃう stays whole
+        // (炒める), never あり->蟻-first / だけ|ど-split / 炒め+ちゃう.
+        let spans = scan(&h, "あとは、乱暴だけど全部まとめて炒めちゃうのもありね。");
+        let ari = spans.iter().find(|s| s.surface == "あり").unwrap();
+        assert_eq!(ari.entries[0].spellings[0], "有る");
+        let dakedo = spans.iter().find(|s| s.surface == "だけど").unwrap();
+        assert_eq!(top_reading(dakedo), "だけど");
+        assert!(spans.iter().all(|s| s.surface != "だけ"));
+        let itamechau = spans.iter().find(|s| s.surface == "炒めちゃう").unwrap();
+        assert_eq!(itamechau.entries[0].spellings[0], "炒める");
+    }
+
+    #[test]
+    fn omatasetsu_strips_sokuon() {
+        let h = Harness::new();
+        // お待たせっ is お + 待たせ (causative) + emphatic っ: the span
+        // lands on お待たせ naming 待たせる, never お待た (お股).
+        let spans = scan(&h, "お待たせっ、ゴメンね、遅くなって?");
+        let omatase = spans.iter().find(|s| s.surface == "お待たせ").unwrap();
+        assert!(
+            omatase
+                .entries
+                .iter()
+                .any(|e| e.spellings.iter().any(|s| s == "待たせる")),
+            "お待たせっ should resolve to 待たせる",
+        );
+        assert!(
+            omatase
+                .deconjugated_from
+                .as_deref()
+                .map_or(false, |l| l.contains("honorific")),
+            "お待たせっ should keep its honorific label",
+        );
+        assert!(spans.iter().all(|s| s.surface != "お待た"));
+    }
+
+    #[test]
+    fn minitsukeru_compound_stays_whole() {
+        let h = Harness::new();
+        // 身につける is a dictionary compound: noun + に + verb-base being
+        // a key exempts the verb end from the separator guards.
+        let spans = scan(
+            &h,
+            "奈緒ちゃんは、エプロンを身につけると流しに材料を並べて、水洗いを始めた。",
+        );
+        let mi = spans.iter().find(|s| s.surface == "身につける").unwrap();
+        assert!(
+            mi.entries
+                .iter()
+                .any(|e| e.spellings.iter().any(|s| s == "身につける")),
+            "身につける should resolve whole",
+        );
+    }
+
+    #[test]
+    fn kawa_wo_muku_compound_stays_whole() {
+        let h = Harness::new();
+        // 皮をむく, same shape with を (and an inflected 皮をむくと tail
+        // still reaches it through deconjugation).
+        let spans = scan(
+            &h,
+            "手早く皮をむくと、包丁で細切りにされていくジャガイモとタマネギ、にんじん。",
+        );
+        let kawa = spans.iter().find(|s| s.surface == "皮をむく").unwrap();
+        assert!(
+            kawa.entries
+                .iter()
+                .any(|e| e.spellings.iter().any(|s| s == "皮をむく" || s == "皮を剥く")),
+            "皮をむく should resolve whole",
+        );
     }
 
     #[test]

@@ -814,5 +814,55 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         });
     }
 
+    // Plain renyoukei (masu-stem) to dictionary form for ru-verbs
+    // (あり -> ある, おり -> おる) and kuru's き (き -> くる): JL only
+    // reaches these through polite ます-forms, so a bare stem lists
+    // homophones (あり -> 蟻) but never the verb. "continuative" names the
+    // stem in the tooltip. OnlyFinal and POS-gated; same-entry dedupe
+    // keeps longer chains stable, and literal kinds still outrank the new
+    // candidates (the morphological path promotes the verb instead).
+    for (con_end, dec_end, dec_tag) in [
+        ("り", "る", "v5r"),
+        ("り", "る", "v5r-i"),
+        ("き", "くる", "vk"),
+    ] {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: dec_end.to_string(),
+            con_end: con_end.to_string(),
+            dec_tag: dec_tag.to_string(),
+            con_tag: String::new(),
+            detail: "continuative".to_string(),
+        });
+    }
+
+    // Past of the とく contraction on する (しといた -> する, like しとく
+    // -> する via JL's toku rule): といた has no JL rule, so the span
+    // died and しといた never resolved. Direct to する (vs-i); other
+    // verbs' といた surfaces decay to misses as before.
+    rules.push(VirtualRule {
+        rule_type: RuleKind::OnlyFinal,
+        dec_end: "する".to_string(),
+        con_end: "しといた".to_string(),
+        dec_tag: "vs-i".to_string(),
+        con_tag: String::new(),
+        detail: "toku (for now)".to_string(),
+    });
+
+    // したい -> する ("want to", vs-i): JL has no したい rule, so bare
+    // したい lists nouns (したい -> 死体) and どうしたい degrades to
+    // どうし. Full-form only (con したい, never bare たい — 食べたい
+    // must keep reaching 食べる, not 食べする); Xしたい surfaces decay
+    // to misses unless Xする is itself an entry (勉強したい -> 勉強する,
+    // which is the right answer there too).
+    rules.push(VirtualRule {
+        rule_type: RuleKind::OnlyFinal,
+        dec_end: "する".to_string(),
+        con_end: "したい".to_string(),
+        dec_tag: "vs-i".to_string(),
+        con_tag: String::new(),
+        detail: "want to".to_string(),
+    });
+
     rules
 }
