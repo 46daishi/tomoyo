@@ -3979,6 +3979,72 @@ fn lookup_at_position(
     lookup_from_position(&text, position, skip, &dict_state.0, &decon_state.0, &tokens)
 }
 
+/// Looks up an exact substring (the sentence window's "Look up selected"):
+/// whatever text[start..end] is resolves as its own span — with entries when
+/// the dictionary reaches it, empty (but related-filled, still displayed)
+/// when nothing does. Unlike lookup_at_position this never extends past
+/// `end` or falls back to a shorter span.
+#[tauri::command]
+fn lookup_exact(
+    dict_state: tauri::State<DictState>,
+    decon_state: tauri::State<DeconjRulesState>,
+    morph_cache: tauri::State<MorphCacheState>,
+    tokenizer_state: tauri::State<TokenizerState>,
+    text: String,
+    start: usize,
+    end: usize,
+) -> Option<MatchSpan> {
+    let tokens = tokenize_cached(&morph_cache.0, &tokenizer_state.0, &text);
+    let chars: Vec<char> = text.chars().collect();
+    if start >= end || end > chars.len() {
+        return None;
+    }
+    let candidate: String = chars[start..end].iter().collect();
+    if candidate.is_empty() {
+        return None;
+    }
+    // In-context reading from the token under the cursor (as in the
+    // single-char fallback); the tokenizer's base form only when the
+    // selection is exactly that token, otherwise morphology would name a
+    // word the selection merely overlaps.
+    let containing = tokens.iter().find(|t| start >= t.start && start < t.end);
+    let context_reading = containing.and_then(|t| {
+        if t.reading.is_empty() {
+            None
+        } else {
+            Some(t.reading.as_str())
+        }
+    });
+    let morph_base = tokens
+        .iter()
+        .find(|t| t.start == start && t.end == end)
+        .filter(|t| t.pos == "動詞" && t.base_form != t.surface && t.surface != "っ")
+        .map(|t| t.base_form.as_str());
+    let (entries, deconj_info) = lookup_candidate(
+        &candidate,
+        &dict_state.0,
+        &decon_state.0,
+        context_reading,
+        morph_base,
+        &tokens,
+        start,
+    )
+    .map_or((Vec::new(), None), |(e, l)| (e, l));
+    let exact_ids: HashSet<u32> = entries.iter().map(|e| e.id).collect();
+    let related = find_containing(&candidate, &dict_state.0, 20)
+        .into_iter()
+        .filter(|e| !exact_ids.contains(&e.id))
+        .collect();
+    Some(MatchSpan {
+        start,
+        end,
+        surface: candidate,
+        entries,
+        deconjugated_from: deconj_info,
+        related_entries: related,
+    })
+}
+
 /// Morphological tokens for a whole sentence (with char offsets), for
 /// frontend consumers that need grammar-aware segmentation.
 #[tauri::command]
@@ -4245,6 +4311,7 @@ pub fn run() {
             discord_rpc::update_discord_presence,
             discord_rpc::disconnect_discord,
             tokenize_text, tokenize_sentence, scan_sentence, lookup_at_position,
+            lookup_exact,
             get_settings, save_settings,
             export_database, import_database, restart_app,
         ])

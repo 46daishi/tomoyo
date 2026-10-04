@@ -19,6 +19,18 @@ export async function lookupAtPosition(text, position, skip = 0) {
 }
 
 /**
+ * Looks up an exact substring (the sentence window's "Look up selected"):
+ * `text[start..end]` (character indices) resolves as its own span, with
+ * entries when the dictionary reaches it and none (but related entries)
+ * when nothing does — never extended or shortened.
+ *
+ * @param {string} text @param {number} start @param {number} end
+ */
+export async function lookupExact(text, start, end) {
+    return await invoke('lookup_exact', { text, start, end });
+}
+
+/**
  * Morphological tokens (MeCab) for a whole sentence: { start, end, surface,
  * base_form, pos, reading } with char offsets.
  */

@@ -1,6 +1,6 @@
 <script>
     import { isMostlyJapanese } from '$lib/japaneseDetect.js';
-    import { lookupAtPosition, findHighlightedWordSpans } from '$lib/lookup.js';
+    import { lookupAtPosition, lookupExact, findHighlightedWordSpans } from '$lib/lookup.js';
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { startWebsocketListener, stopWebsocketListener } from '$lib/websocketListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
@@ -38,7 +38,7 @@
     let cycleSkip = 0;
     let hoverRequestId = 0;
     let lastHoverEl = null;
-    let sentenceWindowEl = $state(null);
+    let sentenceWindowEl = /** @type {any} */ ($state(null));
 
     // entry.id -> 'new' | 'different' | 'same', for the currently open tooltip's entries
     let mineStatuses = $state({});
@@ -581,6 +581,63 @@
         onNameSaved?.();
     }
 
+    // The current selection as an exact { start, end, text } range within the
+    // sentence's char tokens (or null when there is none). Endpoints sitting
+    // at a span's end count as the next character (a drag started exactly on
+    // a boundary anchors to the previous span's end), and surrounding
+    // whitespace is trimmed with the start shifted forward to match.
+    function selectedRange() {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || !sentenceWindowEl) return null;
+        const tokens = sentenceWindowEl.querySelectorAll('.char-token');
+        const indexOf = (/** @type {any} */ node, /** @type {number} */ offset) => {
+            const el = node?.nodeType === 3 ? node.parentElement : node;
+            const token = el?.closest?.('.char-token');
+            const i = Array.prototype.indexOf.call(tokens, token);
+            if (i === -1) return -1;
+            const len = token?.textContent?.length ?? 1;
+            return i + (offset >= len ? 1 : 0);
+        };
+        const a = indexOf(sel.anchorNode, sel.anchorOffset);
+        const f = indexOf(sel.focusNode, sel.focusOffset);
+        if (a === -1 || f === -1) return null;
+        const raw = sel.toString();
+        const text = raw.trim();
+        if (!text) return null;
+        const leading = [...raw].length - [...raw.trimStart()].length;
+        const start = Math.min(a, f) + leading;
+        return { start, end: start + [...text].length, text };
+    }
+
+    // Look up exactly what was selected — no extending, no shortening — and
+    // pin its tooltip open, even when nothing resolves (the tooltip then
+    // says no entry was found).
+    /** @param {MouseEvent} event */
+    async function handleLookupSelected(event) {
+        event.stopPropagation();
+        selPopup = null;
+        suppressClick = false;
+        const range = selectedRange();
+        if (!range) return;
+        cycleSkip = 0;
+        const requestId = ++hoverRequestId;
+        const result = await lookupExact(displayedText, range.start, range.end);
+        if (requestId !== hoverRequestId) return;
+        if (!result) return;
+        // A selection exactly covering a saved name shows the name entry
+        // first, without widening (the surface stays what was selected).
+        const hit = findNameAt(names, displayedText, range.start);
+        let span = result;
+        if (hit && hit.start === range.start && hit.end === range.end) {
+            span = { ...result, entries: [nameToEntry(hit.row), ...(result.entries ?? [])] };
+        }
+        hoveredSpan = span;
+        const charEl = sentenceWindowEl.querySelectorAll('.char-token')[range.start];
+        if (!charEl) return;
+        lastHoverEl = charEl;
+        openTooltipAndLog(hoveredSpan, charEl);
+    }
+
     $effect(() => {
         loadNames(mediaId);
     });
@@ -719,6 +776,13 @@
                 }}
             >
                 Save name
+            </button>
+            <button
+                type="button"
+                class="selection-save-btn"
+                onclick={(event) => handleLookupSelected(event)}
+            >
+                Look up selected
             </button>
         </div>
     {/if}
