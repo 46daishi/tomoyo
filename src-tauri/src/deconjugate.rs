@@ -747,5 +747,72 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         });
     }
 
+    // Listing たり/だり on the copula (自主トレだったり, 彼からだったり, でしたり).
+    // The copula has no tari rule of its own: JL routes だったり through the
+    // godan-verb tari rules (だったる / だつ), which the verb-class gate then
+    // rejects because a copula span carries no 動詞 token — so the span fell
+    // back to だった plus a stray り (利). Two shapes, mirroring the copula
+    // suffixes above: with a stem the noun/particle absorbs the whole copula
+    // (自主トレだったり -> 自主トレ, like 自主トレだった), bare it resolves to
+    // the copula itself (だったり -> だ). OnlyFinal, so verbs ending in a
+    // coincidental だったり are unaffected — no verb surfaces like that.
+    for (con_end, dec_end, dec_tag, detail) in [
+        ("だったり", "", "any", "copula + tari"),
+        ("だったり", "だ", "cop", "past + tari"),
+        ("でしたり", "", "any", "copula + tari"),
+        ("でしたり", "です", "cop", "past + tari"),
+    ] {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: dec_end.to_string(),
+            con_end: con_end.to_string(),
+            dec_tag: dec_tag.to_string(),
+            con_tag: String::new(),
+            detail: detail.to_string(),
+        });
+    }
+
+    // Freshly-finished たて (転校したて -> する, 淹れ立て -> 淹れる):
+    // the masu-stem takes たて to form a noun meaning "just done".
+    // One rule per stem shape so the dictionary form restores exactly
+    // (ichidan stem + る, godan stem + its row vowel, する/くる special
+    // cases). Rendaku だて included (出来立て = できだて -> できる).
+    // OnlyFinal, so verbs never pick the suffix up mid-chain.
+    for (con_end, dec_end, dec_tag) in [
+        ("たて", "る", "v1"),
+        ("だて", "る", "v1"),
+        ("いたて", "う", "v5u"),
+        ("いだて", "う", "v5u"),
+        ("きたて", "く", "v5k"),
+        ("きだて", "く", "v5k"),
+        ("ぎたて", "ぐ", "v5g"),
+        ("ぎだて", "ぐ", "v5g"),
+        ("したて", "す", "v5s"),
+        ("しだて", "す", "v5s"),
+        ("ちたて", "つ", "v5t"),
+        ("ちだて", "つ", "v5t"),
+        ("にたて", "ぬ", "v5n"),
+        ("にだて", "ぬ", "v5n"),
+        ("びたて", "ぶ", "v5b"),
+        ("びだて", "ぶ", "v5b"),
+        ("みたて", "む", "v5m"),
+        ("みだて", "む", "v5m"),
+        ("りたて", "る", "v5r"),
+        ("りだて", "る", "v5r"),
+        ("したて", "する", "vs-i"),
+        ("しだて", "する", "vs-i"),
+        ("こたて", "くる", "vk"),
+        ("こだて", "くる", "vk"),
+    ] {
+        rules.push(VirtualRule {
+            rule_type: RuleKind::OnlyFinal,
+            dec_end: dec_end.to_string(),
+            con_end: con_end.to_string(),
+            dec_tag: dec_tag.to_string(),
+            con_tag: String::new(),
+            detail: "right after doing".to_string(),
+        });
+    }
+
     rules
 }

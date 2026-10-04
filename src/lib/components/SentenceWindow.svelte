@@ -411,7 +411,76 @@
             knownSpans = [];
             return;
         }
-        knownSpans = await findHighlightedWordSpans(displayedText, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false);
+        knownSpans = await splitSpansAtNames(
+            await findHighlightedWordSpans(displayedText, knownWordsMap, mode, settings?.treat_new_as_unknown ?? false)
+        );
+    }
+
+    // A scan span that starts inside a saved name but runs past it (奈緒だった
+    // resolving through the name to 尚) would paint the non-name tail with the
+    // span's status — usually unknown red. Drop the name-covered head (the
+    // name underline already marks it) and re-resolve from the name's end so
+    // だった underlines as だった. Runs once per overlapping span, only when
+    // names exist, so the common path costs nothing.
+    /** @param {any[]} spans */
+    async function splitSpansAtNames(spans) {
+        if (spans.length === 0 || names.length === 0 || !displayedText) return spans;
+        const nspans = scanNameSpans(displayedText, names);
+        if (nspans.length === 0) return spans;
+        const mode = settings?.highlight_mode ?? 'none';
+        const treatNew = settings?.treat_new_as_unknown ?? false;
+        const out = [];
+        for (const s of spans) {
+            let cur = s;
+            let guard = 0;
+            while (guard++ < 4) {
+                const hit = nspans.find((n) => cur.start >= n.start && cur.start < n.end && cur.end > n.end);
+                if (!hit) break;
+                let tail = null;
+                try {
+                    tail = await lookupAtPosition(displayedText, hit.end);
+                } catch (_) {
+                    tail = null;
+                }
+                if (!tail || (tail.entries ?? []).length === 0) {
+                    cur = null;
+                    break;
+                }
+                const entryIds = tail.entries.map((/** @type {any} */ e) => e.id);
+                const minedId = entryIds.find((/** @type {any} */ id) => knownWordsMap.has(id));
+                if (mode === 'known') {
+                    if (minedId === undefined) {
+                        cur = null;
+                        break;
+                    }
+                    cur = { start: tail.start, end: tail.end, entryIds, wordId: minedId, status: knownWordsMap.get(minedId) };
+                } else if (mode === 'unknown') {
+                    const allUnknown = entryIds.every((/** @type {any} */ id) => {
+                        const st = knownWordsMap.get(id);
+                        if (st === undefined) return true;
+                        if (treatNew && st === 0) return true;
+                        return false;
+                    });
+                    if (!allUnknown) {
+                        cur = null;
+                        break;
+                    }
+                    cur = { start: tail.start, end: tail.end, entryIds, wordId: entryIds[0], status: knownWordsMap.get(entryIds[0]) ?? null };
+                } else {
+                    // all-but-known
+                    if (minedId === undefined) {
+                        cur = { start: tail.start, end: tail.end, entryIds, wordId: null, status: null };
+                    } else if (knownWordsMap.get(minedId) === 4) {
+                        cur = null;
+                        break;
+                    } else {
+                        cur = { start: tail.start, end: tail.end, entryIds, wordId: minedId, status: knownWordsMap.get(minedId) };
+                    }
+                }
+            }
+            if (cur) out.push(cur);
+        }
+        return out;
     }
 
     /** @param {number | null} id */
