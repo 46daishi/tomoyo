@@ -34,6 +34,28 @@ pub(crate) struct DictEntry {
     // older JSONs — defaults to false so they keep loading.
     #[serde(default)]
     pub(crate) kana_only: bool,
+    // Per-form restriction tags from JMdict (ke_inf/re_inf, e.g. "ateji",
+    // "sk"), parallel to `spellings`/`readings`. Absent in older JSONs.
+    // Not enforced yet (precision flip comes separately); carried so the
+    // data survives a regen.
+    #[serde(default)]
+    pub(crate) ke_inf: Vec<Vec<String>>,
+    #[serde(default)]
+    pub(crate) re_inf: Vec<Vec<String>>,
+    // Readings valid only for these spellings (re_restr), parallel to
+    // `readings`. Empty = unrestricted.
+    #[serde(default)]
+    pub(crate) re_restr: Vec<Vec<String>>,
+    // Reading never valid in kanji form (re_nokanji), parallel to readings.
+    #[serde(default)]
+    pub(crate) re_nokanji: Vec<bool>,
+    // Sense-level misc tags (s_inf-adjacent, e.g. "uk", "arch").
+    #[serde(default)]
+    pub(crate) misc: Vec<String>,
+    // Corpus frequency rank (lower is more common); 0 = unranked, in
+    // which case the priority tiers decide as before.
+    #[serde(default)]
+    pub(crate) freq_rank: u32,
 }
 
 #[derive(serde::Serialize)]

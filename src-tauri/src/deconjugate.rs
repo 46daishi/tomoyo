@@ -92,6 +92,11 @@ fn is_recordable_tag(tag: &str) -> bool {
     tag == "any" || VALID_WORD_CLASSES.contains(&tag)
 }
 
+/// Word classes of historical Japanese (see `Deconjugator::deconjugate_inner`).
+fn is_archaic_tag(tag: &str) -> bool {
+    matches!(tag, "v4r" | "vz" | "vs-c" | "adj-ix")
+}
+
 const MAX_PROPER_STEPS: usize = 7;
 
 impl Deconjugator {
@@ -144,7 +149,25 @@ impl Deconjugator {
     /// Deconjugates `text` (expected already normalized to hiragana) into all
     /// recorded dictionary-form results, keeping the fewest-step chain per
     /// (text, word class) — mirroring JL's `Deconjugator.Deconjugate`.
+    /// Historical word classes are excluded (see `is_archaic_tag`); use
+    /// `deconjugate_including_archaic` for the classical fallback.
     pub fn deconjugate(&self, text: &str) -> Vec<DeconjugatedForm> {
+        self.deconjugate_inner(text, false)
+    }
+
+    /// Deconjugation including historical word classes (see
+    /// `is_archaic_tag`). Used only by the classical fallback in lookup,
+    /// which runs solely when nothing modern resolved.
+    pub(crate) fn deconjugate_including_archaic(&self, text: &str) -> Vec<DeconjugatedForm> {
+        self.deconjugate_inner(text, true)
+    }
+
+    /// Word classes of historical Japanese: Yodan with ru ending (v4r),
+    /// zuru verbs (vz), the su-precursor to modern suru (vs-c), and archaic
+    /// ku/shiku adjectives (adj-ix). Excluded from normal deconjugation so
+    /// modern text never routes through them, while real classical forms
+    /// stay reachable on demand.
+    fn deconjugate_inner(&self, text: &str, allow_archaic: bool) -> Vec<DeconjugatedForm> {
         let mut results: Vec<DeconjugatedForm> = Vec::new();
         // Queue dedup keyed by (text, tag): keep the fewest proper steps so
         // downstream forms always branch from the shortest valid chain.
@@ -225,9 +248,12 @@ impl Deconjugator {
                 }
 
                 // Record results in valid word classes, keeping the form with
-                // the fewest proper steps for each (text, tag).
+                // the fewest proper steps for each (text, tag). Historical
+                // classes record only on the archaic path: modern text must
+                // never route through them (mixed chains still flow, since
+                // only recording — never rule application — is gated).
                 if let Some(tag) = &form.tag {
-                    if is_recordable_tag(tag) {
+                    if is_recordable_tag(tag) && (allow_archaic || !is_archaic_tag(tag)) {
                         let (text, proper_steps) = (form.text.clone(), form.proper_steps);
                         let description = chain_description(&form.chain);
                         match results.iter_mut().find(|f| f.text == text && f.tag == *tag) {
@@ -1020,5 +1046,31 @@ pub(crate) fn combined_label(chain: &str) -> Option<String> {
         None
     } else {
         Some(parts.join(" + "))
+    }
+}
+
+#[cfg(test)]
+mod engine_tests {
+    use super::*;
+
+    #[test]
+    fn archaic_forms_stay_behind_the_flag() {
+        let decon =
+            Deconjugator::build(include_str!("../resources/deconjugation_rules.json"));
+        let modern = decon.deconjugate("ろんぜず");
+        assert!(
+            !modern
+                .iter()
+                .any(|f| ["v4r", "vz", "vs-c", "adj-ix"].contains(&f.tag.as_str())),
+            "modern deconjugation must not produce archaic word classes"
+        );
+        let full = decon.deconjugate_including_archaic("ろんぜず");
+        assert!(
+            full.iter().any(|f| f.text == "ろんずる" && f.tag == "vz"),
+            "archaic path must reach ろんずる/vz; got {:?}",
+            full.iter()
+                .map(|f| (f.text.clone(), f.tag.clone()))
+                .collect::<Vec<_>>()
+        );
     }
 }

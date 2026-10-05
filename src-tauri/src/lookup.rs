@@ -1295,6 +1295,105 @@ pub(crate) fn lookup_candidate(
         }
     }
 
+    // Trailing っ/ッ (emphatic sokuon) defers to shorter-span backoff:
+    // いいよっ must strip to いいよ, never detour through a coincidental
+    // lemma/archaic hit (MeCab reads いいよっ as 言い寄る-verb, so both
+    // fallbacks would fire). The main path's っ handling owns these.
+    let trailing_sokuon =
+        candidate.ends_with('っ') || candidate.ends_with('ッ');
+
+    // Last-resort lemma fallback: MeCab says verb (+ aux-only tail, or a
+    // bare stem) but no chain reached the base — trust the lemma as a
+    // Deconjugated hit so the span resolves instead of vanishing (bare
+    // 食べ -> 食べる). Fires only when still empty, so it can only replace
+    // "no answer" with an answer; kind Deconjugated keeps it below every
+    // literal/morphological/ranked answer, and the label stays None (bare
+    // base, like a literal). Reuses morph_base, so its gates (verb token,
+    // base != surface, no lone-っ, no contraction-aux, ある/おる auxiliaries
+    // only) apply unchanged.
+    if candidates.is_empty() && !trailing_sokuon {
+        if let Some(base) = morph_base {
+            let tail_ok = tokens
+                .iter()
+                .filter(|t| t.start > position && t.start < position + span_len)
+                .all(|t| {
+                    matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞")
+                });
+            // (An empty tail is vacuously true: bare continuative stems
+            // like 食べ are the core case. Anything else was already
+            // covered by the morphological path above.)
+            if tail_ok {
+                if let Some(entries) = index.by_text.get(&normalize::normalize_text(base)) {
+                    for e in entries {
+                        if seen_ids.insert(e.id) {
+                            let ctx = context_reading
+                                .map_or(false, |r| reading_matches_context(e, r));
+                            candidates.push((Arc::clone(e), 99, None, MatchKind::Deconjugated, ctx));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Classical fallback: historical word-class results resolve only here,
+    // when nothing modern did — modern text never sees archaic noise, but
+    // real classical forms (論ぜず -> 論ずる) still resolve instead of
+    // vanishing. Core validation mirrors the main path (verb gate,
+    // na-imperative guard, POS check); the modern-only exemptions
+    // (shredded-okurigana, slurred, ても) and the copula-absorption
+    // continuation are deliberately out of scope.
+    if candidates.is_empty() && !trailing_sokuon {
+        let mut archaic_forms: Vec<DeconjugatedForm> = Vec::new();
+        if let Some(reading) = &span_reading {
+            archaic_forms.extend(decon.deconjugate_including_archaic(reading));
+        }
+        for key in &variants {
+            if Some(key) == span_reading.as_ref() {
+                continue;
+            }
+            archaic_forms.extend(decon.deconjugate_including_archaic(key));
+        }
+        for form in &archaic_forms {
+            if starts_at_position
+                && !single_token_span
+                && is_verb_class(&form.tag)
+                && !span_has_verb_token
+            {
+                continue;
+            }
+            let is_na_imperative = form.rule_chain.as_deref().map_or(false, |c| {
+                c.split('→').any(|seg| seg == "casual polite imperative")
+            });
+            if is_na_imperative {
+                let stem_is_verb = tokens
+                    .iter()
+                    .find(|t| t.start == position)
+                    .map_or(false, |t| t.pos == "動詞");
+                if !stem_is_verb {
+                    continue;
+                }
+            }
+            let key = normalize::normalize_text(&form.text);
+            if let Some(entries) = index.by_text.get(&key) {
+                let chain_desc = form.rule_chain.as_deref().and_then(combined_label);
+                for e in entries {
+                    if deconj_tag_matches_entry(&e.pos, &form.tag) && seen_ids.insert(e.id) {
+                        let ctx = context_reading
+                            .map_or(false, |r| reading_matches_context(e, r));
+                        candidates.push((
+                            Arc::clone(e),
+                            form.proper_steps,
+                            chain_desc.clone(),
+                            MatchKind::Deconjugated,
+                            ctx,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     if candidates.is_empty() {
         return None;
     }

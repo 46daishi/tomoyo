@@ -548,3 +548,6 @@ spans-453	ranking	シャイなのか。	lookup	シャイ		surface	シャイな�
 spans-454	ranking	シャイなのか。	lookup	シャイ		top_has_reading	シャイ	
 spans-455	spans	すぐにどっか。	lookup	すぐに		surface	すぐに	prefix + unknown still reaches すぐに
 spans-456	spans	すぐにどっか。	lookup	すぐに		top_spelling	直ぐに	
+fallback-01	fallback	食べ	lookup			top_spelling	食べる	bare continuative stem resolves via lemma fallback, not empty
+fallback-02	fallback	論ぜず	lookup			top_spelling	論ずる	classical negative resolves via archaic fallback
+fallback-03	fallback	美しき	lookup			top_spelling	美しい	classical attributive still resolves
