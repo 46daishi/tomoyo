@@ -866,3 +866,159 @@ fn supplemental_rules() -> Vec<VirtualRule> {
 
     rules
 }
+
+/// How an entry was reached for a given surface. Used as a tie-breaker so a
+/// Maps a JL/Nazeka deconjugation tag to the JMdict English POS labels an
+/// entry must carry for the deconjugated result to be valid (JL's
+/// GetValidDeconjugatedResults). "any" (tomoyo's supplementary rules) and
+/// unknown tags are POS-unrestricted.
+pub(crate) fn deconj_tag_to_dict_pos(tag: &str) -> &'static [&'static str] {
+    match tag {
+        "v1" => &["Ichidan verb"],
+        "v1-s" => &["Ichidan verb - kureru special class"],
+        "v4r" => &["Yodan verb with 'ru' ending (archaic)"],
+        "v5aru" => &["Godan verb - -aru special class"],
+        "v5b" => &["Godan verb with 'bu' ending"],
+        "v5g" => &["Godan verb with 'gu' ending"],
+        "v5k" => &["Godan verb with 'ku' ending"],
+        "v5k-s" => &["Godan verb - Iku/Yuku special class"],
+        "v5m" => &["Godan verb with 'mu' ending"],
+        "v5n" => &["Godan verb with 'nu' ending"],
+        "v5r" => &["Godan verb with 'ru' ending"],
+        "v5r-i" => &["Godan verb with 'ru' ending (irregular verb)"],
+        "v5s" => &["Godan verb with 'su' ending"],
+        "v5t" => &["Godan verb with 'tsu' ending"],
+        "v5u" => &["Godan verb with 'u' ending"],
+        "v5u-s" => &["Godan verb with 'u' ending (special class)"],
+        "vk" => &["Kuru verb - special class"],
+        "vs-c" => &["su verb - precursor to the modern suru"],
+        "vs-i" => &["suru verb - included"],
+        "vs-s" => &["suru verb - special class"],
+        "vz" => &["Ichidan verb - zuru verb (alternative form of -jiru verbs)"],
+        "adj-i" => &["adjective (keiyoushi)"],
+        "adj-ix" => &["'ku' adjective (archaic)", "'shiku' adjective (archaic)"],
+        "cop" => &["copula"],
+        _ => &[],
+    }
+}
+
+pub(crate) fn deconj_tag_matches_entry(entry_pos: &[String], tag: &str) -> bool {
+    let allowed = deconj_tag_to_dict_pos(tag);
+    allowed.is_empty() || entry_pos.iter().any(|p| allowed.contains(&p.as_str()))
+}
+
+/// Verb word classes the deconjugation rules can claim. Deconjugation
+/// results in one of these are only trusted when the span actually contains
+/// a 動詞 token — otherwise a noun/na-adjective + な (好きな) deconjugates
+/// through the imperative な rule into a coincidental verb (好く).
+pub(crate) fn is_verb_class(tag: &str) -> bool {
+    matches!(
+        tag,
+        "v1" | "v1-s"
+            | "v4r"
+            | "v5aru"
+            | "v5b"
+            | "v5g"
+            | "v5k"
+            | "v5k-s"
+            | "v5m"
+            | "v5n"
+            | "v5r"
+            | "v5r-i"
+            | "v5s"
+            | "v5t"
+            | "v5u"
+            | "v5u-s"
+            | "vk"
+            | "vs-c"
+            | "vs-i"
+            | "vs-s"
+            | "vz"
+    )
+}
+
+/// Jargon-y JL rule names for sound changes and auxiliary helpers that say
+/// nothing about the surface form — excluded from combined labels so
+/// してくれました reads "polite past" rather than "polite past +
+/// statement/request + unstressed infinitive".
+pub(crate) fn is_stem_jargon(detail: &str) -> bool {
+    matches!(
+        detail,
+        // Auxiliary helpers and sound changes that say nothing about the
+        // surface form.
+        "statement/request"
+            | "slurred"
+            | "slurred negative"
+            | "rough casual"
+            | "ksb"
+            | "contracted"
+            // JL's parenthetical stem notes, which chain_description has
+            // already stripped of their parentheses.
+            | "masu stem"
+            | "unstressed infinitive"
+            | "stem"
+            | "adverbial stem"
+            | "izenkei"
+            | "ka stem"
+            | "ke stem"
+            | "mizenkei"
+            | "'a' stem"
+    )
+}
+
+/// Shorter, plainer names for verbose JL rule details. Ambiguous られる
+/// forms (passive / potential / honorific for ichidan+くる) stay labeled
+/// "passive/potential" at a glance instead of collapsing to "potential" and
+/// hiding the passive reading from learners.
+pub(crate) fn curated_name(detail: &str) -> &str {
+    match detail {
+        "finish/completely/end up" => "ended up",
+        "passive/potential/honorific" | "passive/potential" => "passive/potential",
+        "toku (for now)" => "in advance (casual)",
+        other => other,
+    }
+}
+
+/// Names the surface's conjugation from a deconjugation rule chain by
+/// combining every meaningful rule that applied, outermost first — e.g.
+/// 住んでいた -> "past + teiru", 忘れてしまった -> "past + ended up".
+/// Parenthetical stem notes ("(masu stem)") are skipped, except a leading
+/// one like (te) in 飲んで, which is the surface conjugation itself.
+pub(crate) fn combined_label(chain: &str) -> Option<String> {
+    let build_parts = |skip_leading_te: bool| -> Vec<String> {
+        let mut parts: Vec<String> = Vec::new();
+        for (i, detail) in chain.split('→').enumerate() {
+            if detail.is_empty() {
+                continue;
+            }
+            if detail.starts_with('(') {
+                if i == 0 && detail.len() >= 2 && detail.ends_with(')') {
+                    parts.push(detail[1..detail.len() - 1].to_string());
+                }
+                continue;
+            }
+            // A leading て/で is just the carrier for a trailing conjugation
+            // morpheme (できて -> "potential", 忘れておく -> "in advance").
+            // It is only dropped when something meaningful follows: 寝てた's
+            // chain "te→unstressed infinitive" has only jargon after the て,
+            // so there the て itself names the surface.
+            if skip_leading_te && i == 0 && (detail == "te" || detail == "de") {
+                continue;
+            }
+            if is_stem_jargon(detail) {
+                continue;
+            }
+            parts.push(curated_name(detail).to_string());
+        }
+        parts
+    };
+    let mut parts = build_parts(true);
+    if parts.is_empty() {
+        parts = build_parts(false);
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(" + "))
+    }
+}
