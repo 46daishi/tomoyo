@@ -330,13 +330,18 @@ pub(crate) fn lookup_candidate(
         // be kanji (あり -> ある vs 有る), so a reading form also counts
         // when it resolves to the base's dictionary entry — ったく -> 九
         // and いいよっ -> いいよる stay gated since no reading form
-        // reaches those entries.
+        // reaches those entries. Single-step bridges only (direct stems
+        // like ある/おる/き): a long chain reaching the base (知らされ ->
+        // 知らす over causative+passive+negative+past) is a different
+        // analysis winning on its own merits, not morphology to trust —
+        // 知らされなかった keeps resolving to 知る.
         let via_deconj = reading_forms.iter().any(|f| {
             normalize::normalize_text(&f.text) == base_norm
-                || index
-                    .by_text
-                    .get(&normalize::normalize_text(&f.text))
-                    .map_or(false, |es| es.iter().any(|e| base_ids.contains(&e.id)))
+                || (f.proper_steps <= 1
+                    && index
+                        .by_text
+                        .get(&normalize::normalize_text(&f.text))
+                        .map_or(false, |es| es.iter().any(|e| base_ids.contains(&e.id))))
         });
         let tail_tokens: Vec<&MorphToken> = tokens
             .iter()
@@ -1313,9 +1318,11 @@ pub(crate) fn lookup_candidate(
     // what gives 惹かれております -> 惹かれる over the higher-frequency
     // 光る/引く (惹かれる's primary shares 惹; neither rival primary does).
     // For kana surfaces priority decides first. The tokenizer's base form
-    // outranks same-kind homophones right after reading context (あり ->
-    // 有る over 蟻 when the cursor is the verb stem, 行かせられなかった
-    // -> 行く over 生かす), then non-bound entries.
+    // settles same-kind homophones right after the common-word preference
+    // (あり -> 有る over 蟻 when the cursor is the verb stem,
+    // 行かせられなかった -> 行く over 生かす) — but never above it, so an
+    // orphan base match (知らす for 知らされなかった) still loses to the
+    // common word (知る). Then non-bound entries.
     // Any surface kanji shared with the entry's primary spelling counts — for
     // 書けない, 書く (contains 書) must outrank 掛ける (homophone, unrelated).
     let surface_kanji: Vec<char> = candidate
@@ -1472,20 +1479,35 @@ pub(crate) fn lookup_candidate(
                 kb.cmp(&ka)
             })
             .then({
-                // Morphological trust (あり -> 有る, not 蟻): when the cursor
-                // is a verb token, an entry spelling the tokenizer's base
-                // form outranks same-kind homophones — MeCab's analysis
-                // beats frequency there. Later tiebreaks (orphans,
-                // priority, steps) still order everything else, and other
-                // kinds still decide first, so this only ever settles ties
-                // like Reading-vs-Reading where one side is the actual
-                // inflection (き -> くる over 木, likewise verb-only).
-                b_base_match.cmp(&a_base_match)
+                // Full-surface matches outrank partial ones of the same kind
+                // (ちゃっちゃと over ちゃう) — unless the rival covers the
+                // surface's head (今日 stays over 今日は, もの over ものは),
+                // in which case older evidence below decides. Transitive by
+                // construction: exact-vs-prefix ties fall through, exact
+                // beats only rivals covering neither whole nor head.
+                let entry_full = |e: &Arc<DictEntry>| {
+                    e.spellings
+                        .iter()
+                        .chain(e.readings.iter())
+                        .flat_map(|s| normalize::normalize_variants(s))
+                        .any(|f| !f.is_empty() && cand_keys.iter().any(|c| c == &f))
+                };
+                let a_full = entry_full(&a.0);
+                let b_full = entry_full(&b.0);
+                match (a_full, b_full, a_prefix, b_prefix) {
+                    (true, true, _, _)
+                    | (false, false, _, _)
+                    | (true, false, _, true)
+                    | (false, true, true, _) => std::cmp::Ordering::Equal,
+                    (true, false, _, _) => std::cmp::Ordering::Less,
+                    (false, true, _, _) => std::cmp::Ordering::Greater,
+                }
             });
         if has_kanji {
             ord.then(b_kanji_share.cmp(&a_kanji_share)) // kanji match: true first
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
                 .then(a_orphan.cmp(&b_orphan)) // common word first
+                .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
                 .then(b_prio.cmp(&a_prio))
                 .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
@@ -1502,6 +1524,7 @@ pub(crate) fn lookup_candidate(
             let b_kana = b.0.kana_only;
             // Pure-kana surface: no kanji evidence, most common word wins.
             ord.then(a_orphan.cmp(&b_orphan)) // common word first
+                .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
                 .then(b_kana.cmp(&a_kana)) // usually-kana entries first
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
                 .then(b_prio.cmp(&a_prio))

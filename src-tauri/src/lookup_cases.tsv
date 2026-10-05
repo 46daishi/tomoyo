@@ -1,0 +1,550 @@
+id	area	sentence	mode	marker	span	check	expected	note
+spans-01	spans	君だけがたよりなんだ	lookup	たより		surface	たより	たよりな must not resolve to 頼りない
+spans-02	spans	君だけがたよりなんだ	lookup	たより		top_reading	たより	
+spans-03	spans	たよりない	lookup			surface	たよりない	plain たよりない still reaches 頼りない
+spans-04	spans	たよりない	lookup			top_reading	たよりない	
+spans-05	spans	食べな	lookup			surface	食べな	verb stems keep the imperative reading
+spans-06	spans	食べな	lookup			top_reading	たべる	
+spans-07	spans	そうな顔	lookup			surface	そう	そうな has no entry, falls back to そう
+spans-08	spans	ような顔	lookup			surface	ような	literal ような keeps 様な
+spans-09	spans	えー、あたしは別になんともないけどぉ。	lookup	けどぉ		surface	けど	けどぉ joins via completion, ぉ stays separate
+spans-10	spans	えー、あたしは別になんともないけどぉ。	lookup	けどぉ		top_reading	けど	
+spans-11	spans	えー、あたしは別になんともないけどぉ。	lookup	ぉ		surface	ぉ	
+spans-12	constructions	てめっ! バカにしやがったな!?	lookup	バカにしやがった		surface	バカにしやがった	する + vulgar やがる restores 馬鹿にする whole
+spans-13	constructions	てめっ! バカにしやがったな!?	lookup	バカにしやがった		top_reading	ばかにする	
+spans-14	constructions	こわがる	lookup			surface	こわがる	stance-picker verbs hold via lemmatization
+spans-15	deconj	農作業なめんなよ	lookup	なめんな		surface	なめんな	slurred negative is a real verb lemma
+spans-16	deconj	農作業なめんなよ	lookup	なめんな		top_reading	なめる	
+spans-17	deconj	それ好きなんだ	lookup	きなんだ		not_top_reading	かえる|すく|へる	adjective lookalikes stay gated
+spans-18	deconj	変な話	lookup			not_top_reading	かえる|すく|へる	
+spans-19	spans	カズちゃんとらぶらぶ~♪	lookup	とらぶらぶ		surface	と	と must not absorb into 虎
+spans-20	spans	カズちゃんとらぶらぶ~♪	lookup	らぶらぶ		surface	らぶらぶ	
+spans-21	spans	カズちゃんとらぶらぶ~♪	lookup	らぶらぶ		top_reading	ラブラブ	
+spans-22	spans	かばん	lookup			surface	かばん	known tokens covering particles stay whole
+spans-23	spans	かばん	lookup			top_reading	かばん	
+spans-24	spans	そうは言われてもなぁ	lookup			surface	そう	そうは splits, merged form is coincidental
+spans-25	spans	そうは言われてもなぁ	lookup			top_reading	そう	
+spans-26	spans	そうは言われてもなぁ	lookup	は言われても		surface	は	
+spans-27	spans	なぜか	lookup			surface	なぜか	real particle-words keep merging
+spans-28	spans	なぜか	lookup			top_reading	なぜか	
+spans-29	spans	まずは	lookup			surface	まずは	
+spans-30	spans	まずは	lookup			top_reading	まずは	
+spans-31	ranking	迫力があると	lookup	あると		surface	ある	あると splits on frequency gap
+spans-32	ranking	迫力があると	lookup	あると		top_reading	ある	
+spans-33	ranking	月見山さんがいる	lookup	さんがいる		surface	さん	さんが splits on frequency gap
+spans-34	ranking	月見山さんがいる	lookup	さんがいる		top_reading	さん	
+spans-35	ranking	どうか	lookup			surface	どうか	frequency ties stay whole
+spans-36	ranking	そうか	lookup			surface	そうか	
+spans-37	spans	すぐにどっか。	lookup			surface	すぐに	same-lemma adverbial counts equal
+spans-38	spans	すぐにどっか。	lookup			top_reading	すぐに	
+spans-39	spans	カズちゃんとらぶらぶ	lookup	ちゃんとらぶらぶ		surface	ちゃん	suffix list reaches ちゃん
+spans-40	spans	カズちゃんとらぶらぶ	lookup	ちゃんとらぶらぶ		has_entry_pos	suffix	
+spans-41	spans	カズちゃんとらぶらぶ	lookup	とらぶらぶ		surface	と	
+spans-42	spans	カズちゃんとらぶらぶ	lookup	らぶらぶ		surface	らぶらぶ	
+spans-43	spans	カズちゃんとらぶらぶ	lookup	らぶらぶ		top_reading	ラブラブ	
+spans-44	spans	お前ら、相変わらず連んでんだな。	lookup	連んでんだ		surface	連んでん	te-form continuation + single-kanji gate reach 連む
+spans-45	spans	お前ら、相変わらず連んでんだな。	lookup	連んでんだ		top_reading	つるむ	
+spans-46	ranking	は	lookup			surface	は	single kana prefers its particle
+spans-47	ranking	は	lookup			top_pos_word	particle	
+spans-48	ranking	が	lookup			surface	が	single kana prefers its particle
+spans-49	ranking	が	lookup			top_pos_word	particle	
+spans-50	ranking	を	lookup			surface	を	single kana prefers its particle
+spans-51	ranking	を	lookup			top_pos_word	particle	
+spans-52	ranking	に	lookup			surface	に	single kana prefers its particle
+spans-53	ranking	に	lookup			top_pos_word	particle	
+spans-54	ranking	の	lookup			surface	の	single kana prefers its particle
+spans-55	ranking	の	lookup			top_pos_word	particle	
+spans-56	ranking	も	lookup			surface	も	single kana prefers its particle
+spans-57	ranking	も	lookup			top_pos_word	particle	
+spans-58	ranking	で	lookup			surface	で	single kana prefers its particle
+spans-59	ranking	で	lookup			top_pos_word	particle	
+spans-60	ranking	へ	lookup			surface	へ	single kana prefers its particle
+spans-61	ranking	へ	lookup			top_pos_word	particle	
+spans-62	ranking	や	lookup			surface	や	single kana prefers its particle
+spans-63	ranking	や	lookup			top_pos_word	particle	
+spans-64	ranking	か	lookup			surface	か	single kana prefers its particle
+spans-65	ranking	か	lookup			top_pos_word	particle	
+spans-66	ranking	よ	lookup			surface	よ	single kana prefers its particle
+spans-67	ranking	よ	lookup			top_pos_word	particle	
+spans-68	ranking	ね	lookup			surface	ね	single kana prefers its particle
+spans-69	ranking	ね	lookup			top_pos_word	particle	
+spans-70	spans	いいよっ	lookup			surface	いいよ	emphatic っ strips to いいよ, not 言い寄る
+spans-71	spans	いいよっ	lookup			top_reading	いいよ	
+spans-72	spans	あっ	lookup			surface	あっ	literal っ-final words untouched
+spans-73	spans	あっ	lookup			top_reading	あっ	
+spans-74	spans	なんともないけど	scan			scan_surfaces	なんともない|けど	adverb+adjective headword stays one span
+spans-75	spans	なんともないけど	lookup			surface	なんともない	
+spans-76	spans	なんともないけど	lookup			top_reading	なんともない	
+spans-77	spans	とても親切	lookup			surface	とても	non-headword pairs still split
+spans-78	spans	よく書く	lookup			surface	よく	
+spans-79	ranking	長身なせいで尚更迫力があると言うか	lookup	せいで		surface	せい	usually-kana wins on kana surfaces
+spans-80	ranking	長身なせいで尚更迫力があると言うか	lookup	せいで		top_spelling	所為	
+spans-81	spans	レッスンの日だっけ	lookup	日だっけ		surface	日	coincidental readings must not win
+spans-82	spans	日だっけ	lookup	だっけ		surface	だ	だ stays its own token
+spans-83	spans	日だっけ	lookup	だっけ		top_reading	だ	
+spans-84	spans	まだっけ	lookup			surface	まだっけ	common stems absorb the tail
+spans-85	spans	まだっけ	lookup			top_reading	まだ	
+spans-86	spans	そうだっけ	lookup			surface	そうだ	hearsay absorbs the tail
+spans-87	constructions	悠てめー	lookup	てめー		surface	てめー	completions form the span
+spans-88	constructions	悠てめー	lookup	てめー		top_reading	てめえ	
+spans-89	constructions	てめー	lookup			surface	てめー	completions form the span
+spans-90	constructions	てめー	lookup			top_reading	てめえ	
+spans-91	constructions	てめっ	lookup			surface	てめっ	completions form the span
+spans-92	constructions	てめっ	lookup			top_reading	てめえ	
+spans-93	spans	世話焼いてるっちゃ、そうかもな。	lookup	っちゃ		surface	っちゃ	っちゃ is topical は with sokuon
+spans-94	spans	世話焼いてるっちゃ、そうかもな。	lookup	っちゃ		top_reading	は	
+spans-95	spans	バカにしやがったな	lookup	しやがった		surface	しやがった	する + vulgar やがる
+spans-96	spans	バカにしやがったな	lookup	しやがった		top_reading	する	
+spans-97	spans	普通はそうしちゃいそうだよね。	lookup	そうしちゃい		surface	そう	contraction stem resolves as the stem word
+spans-98	spans	普通はそうしちゃいそうだよね。	lookup	そうしちゃい		top_reading	そう	
+spans-99	ranking	ったく......はいはい、穹にはかなわないよ。	lookup	ったく		surface	ったく	lone っ is a fragment, never a verb stem
+spans-100	ranking	ったく......はいはい、穹にはかなわないよ。	lookup	ったく		top_reading	ったく	
+spans-101	ranking	ったく......はいはい、穹にはかなわないよ。	lookup	ったく		has_related	まったく	全く stays discoverable
+spans-102	ranking	ったく......はいはい、穹にはかなわないよ。	lookup	はいはい		surface	はいはい	cursor 感動詞 breaks the tie
+spans-103	ranking	ったく......はいはい、穹にはかなわないよ。	lookup	はいはい		top_pos_contains	interjection	
+spans-104	deconj	連絡します	lookup	します		surface	します	morphology beats coincidental しる
+spans-105	deconj	連絡します	lookup	します		top_reading	する	
+spans-106	ranking	前にある	lookup			surface	前	in-context reading orders まえ first
+spans-107	ranking	前にある	lookup			top_reading	まえ	
+spans-108	deconj	待ってみてください	lookup			surface	待ってみてください	JL parity through てみる/ください auxiliaries
+spans-109	deconj	待ってみてください	lookup			top_reading	まつ	
+spans-110	deconj	入ってこない	lookup			surface	入ってこない	てくる reaches 入る
+spans-111	deconj	入ってこない	lookup			top_spelling	入る	either 入る headword is correct; pins the family over homographs
+spans-112	deconj	知らされなかった	lookup			surface	知らされなかった	causative-passive reaches 知る
+spans-113	deconj	知らされなかった	lookup			top_reading	しる	
+spans-114	deconj	食べてしまった	lookup			top_reading	たべる	てしまう reaches 食べる
+spans-115	deconj	行かせられなかった	lookup			top_reading	いく	stacked causative+passive+negative+past
+spans-116	deconj	言っちゃった	lookup			top_reading	いう	contracted ちゃう reaches 言う
+spans-117	deconj	食べなければならない	lookup			surface	食べなければならない	なければならない reduces to the verb
+spans-118	deconj	食べなければならない	lookup			top_reading	たべる	
+spans-119	constructions	学生だった	lookup			surface	学生だった	noun + だった resolves to the noun
+spans-120	constructions	学生だった	lookup			top_reading	がくせい	
+spans-121	deconj	食べられます	lookup			surface	食べられます	potential + polite reaches 食べる
+spans-122	deconj	食べられます	lookup			top_reading	たべる	
+spans-123	deconj	きませんでした	lookup			surface	きませんでした	き base resolves, not く/きる guesses
+spans-124	deconj	きませんでした	lookup			top_reading	くる	
+spans-125	ranking	こんにちは	lookup			surface	こんにちは	reading priority, no verb morphology
+spans-126	ranking	こんにちは	lookup			top_reading	こんにちは	
+spans-127	spans	可能性があります	lookup	が		surface	が	particles stay lookup-able, only as their own token
+spans-128	spans	考え方をしている	lookup	を		surface	を	particles stay lookup-able, only as their own token
+spans-129	spans	意図もない	lookup	も		surface	も	particles stay lookup-able, only as their own token
+spans-130	spans	にさせたい	lookup			surface	に	particles stay lookup-able, only as their own token
+spans-131	spans	はしません	lookup			surface	は	particles stay lookup-able, only as their own token
+spans-132	spans	のことは	lookup			surface	の	particles stay lookup-able, only as their own token
+spans-133	spans	はよほどいい	lookup			surface	は	particles stay lookup-able, only as their own token
+spans-134	spans	そういう相手なんだ	lookup	なんだ		surface	な	な is token-locked; なんだ never forms
+spans-135	spans	そういう相手なんだ	lookup	なんだ		not_top_reading	なみだ	
+spans-136	spans	そういう相手なんだ	lookup	だ		surface	だ	
+spans-137	spans	可能性があります	lookup	ます		surface	ます	ます resolves on its own
+spans-138	spans	はしません	lookup	しません		surface	しません	verb after particle, not ichidan coincidence
+spans-139	spans	はしません	lookup	しません		top_reading	する	
+spans-140	spans	にさせたい	lookup	させたい		surface	させたい	not にる via causative recursion
+spans-141	spans	にさせたい	lookup	させたい		top_reading	する	
+spans-142	spans	できる限りのことはします	lookup			surface	できる限り	real phrase, not 模する
+spans-143	spans	できる限りのことはします	lookup			top_reading	できるかぎり	
+spans-144	spans	意図もない	lookup	ない		surface	ない	ない is 無い, not 盛る
+spans-145	spans	意図もない	lookup	ない		top_reading	ない	
+spans-146	spans	はよほどいい	lookup	よほど		surface	よほど	よほど is 余程, not 早よ
+spans-147	spans	はよほどいい	lookup	よほど		top_reading	よほど	
+spans-148	spans	のことは	lookup	ことは		surface	こと	
+spans-149	spans	のことは	lookup	ことは		top_reading	こと	
+spans-150	spans	......苦労しているのも	lookup			surface	苦労している	leading dots snap forward to the word
+spans-151	spans	......苦労しているのも	lookup			start	6	
+spans-152	spans	......苦労しているのも	lookup			top_reading	くろう	
+spans-153	spans	......苦労しているのも	lookup			label	teiru	
+spans-154	spans	苦労〜	lookup			surface	苦労	trailing 記号 never enters the span
+spans-155	spans	苦労〜	lookup			top_reading	くろう	
+spans-156	spans	こっちの人格疲れるぅ〜......	lookup	疲れる		surface	疲れる	unknown ぅ never extends the span
+spans-157	spans	こっちの人格疲れるぅ〜......	lookup	疲れる		top_reading	つかれる	
+spans-158	spans	キレてる	lookup			surface	キレてる	キレてる reaches 切れる slang
+spans-159	spans	キレてる	lookup			top_reading	きれる	
+spans-160	spans	好きな	lookup			surface	好き	verb-class gate blocks 好く
+spans-161	spans	好きな	lookup			top_reading	すき	
+spans-162	spans	真面目な	lookup			surface	真面目	
+spans-163	spans	真面目な	lookup			top_reading	まじめ	
+labels-01	labels	した	lookup			label	past	deconjugation names the surface form
+labels-02	labels	高かった	lookup			label	past	deconjugation names the surface form
+labels-03	labels	面白くない	lookup			label	negative	deconjugation names the surface form
+labels-04	labels	呼んでいる	lookup			label	teiru	deconjugation names the surface form
+labels-05	labels	しなければならない	lookup			label	must	deconjugation names the surface form
+labels-06	labels	来てください	lookup			label	polite request	deconjugation names the surface form
+labels-7	labels	洗わないといけません	lookup			top_reading	あらう	negation + conditional tail is a must-construction
+labels-8	labels	洗わないといけません	lookup			label	must	
+labels-9	labels	洗わなければなりません	lookup			top_reading	あらう	negation + conditional tail is a must-construction
+labels-10	labels	洗わなければなりません	lookup			label	must	
+labels-11	labels	食べないといけない	lookup			top_reading	たべる	negation + conditional tail is a must-construction
+labels-12	labels	食べないといけない	lookup			label	must	
+labels-13	labels	食べなくてはいけません	lookup			top_reading	たべる	negation + conditional tail is a must-construction
+labels-14	labels	食べなくてはいけません	lookup			label	must	
+labels-15	labels	しないといけません	lookup			top_reading	する	negation + conditional tail is a must-construction
+labels-16	labels	しないといけません	lookup			label	must	
+labels-17	labels	しなければいけない	lookup			top_reading	する	negation + conditional tail is a must-construction
+labels-18	labels	しなければいけない	lookup			label	must	
+spans-164	spans	トイレを使ってから、手を洗わないといけません。	scan			scan_surfaces	トイレ|を|使ってから|手|を|洗わないといけません	full-sentence segmentation with labels
+spans-165	spans	トイレを使ってから、手を洗わないといけません。	scan		使ってから	label	after doing	
+spans-166	spans	トイレを使ってから、手を洗わないといけません。	scan		洗わないといけません	label	must	
+labels-19	labels	飲んで	lookup			top_reading	のむ	morphology names kanji-base conjugations
+labels-20	labels	飲んで	lookup			label	te	
+labels-21	labels	飲んでから	lookup			top_reading	のむ	morphology names kanji-base conjugations
+labels-22	labels	飲んでから	lookup			label	after doing	
+labels-23	labels	食べてから	lookup			top_reading	たべる	morphology names kanji-base conjugations
+labels-24	labels	食べてから	lookup			label	after doing	
+labels-25	labels	飲んでいる	lookup			top_reading	のむ	morphology names kanji-base conjugations
+labels-26	labels	飲んでいる	lookup			label	teiru	
+labels-27	labels	食べています	lookup			top_reading	たべる	morphology names kanji-base conjugations
+labels-28	labels	食べています	lookup			label	polite + teiru	
+labels-29	labels	始めます	lookup			top_reading	はじめる	morphology names kanji-base conjugations
+labels-30	labels	始めます	lookup			label	polite	
+labels-31	labels	始めませんでした	lookup			top_reading	はじめる	morphology names kanji-base conjugations
+labels-32	labels	始めませんでした	lookup			label	polite past negative	
+labels-33	labels	言いませんでした	lookup			top_reading	いう	morphology names kanji-base conjugations
+labels-34	labels	言いませんでした	lookup			label	polite past negative	
+labels-35	labels	住んでいた	lookup			top_reading	すむ	labels combine every meaningful rule, outermost first
+labels-36	labels	住んでいた	lookup			label	past + teiru	
+labels-37	labels	食べています	lookup			top_reading	たべる	labels combine every meaningful rule, outermost first
+labels-38	labels	食べています	lookup			label	polite + teiru	
+labels-39	labels	忘れてしまった	lookup			top_reading	わすれる	labels combine every meaningful rule, outermost first
+labels-40	labels	忘れてしまった	lookup			label	past + ended up	
+labels-41	labels	食べてしまった	lookup			top_reading	たべる	labels combine every meaningful rule, outermost first
+labels-42	labels	食べてしまった	lookup			label	past + ended up	
+labels-43	labels	食べさせられてしまった	lookup			top_reading	たべる	labels combine every meaningful rule, outermost first
+labels-44	labels	食べさせられてしまった	lookup			label	past + ended up + passive/potential + causative	
+labels-45	labels	食べられます	lookup			top_reading	たべる	labels combine every meaningful rule, outermost first
+labels-46	labels	食べられます	lookup			label	polite + passive/potential	
+labels-47	labels	しておきました	lookup			top_reading	する	labels combine every meaningful rule, outermost first
+labels-48	labels	しておきました	lookup			label	polite past + for now	
+labels-49	labels	しておく	lookup			top_reading	する	labels combine every meaningful rule, outermost first
+labels-50	labels	しておく	lookup			label	for now	
+labels-51	labels	してくれました	lookup			top_reading	する	labels combine every meaningful rule, outermost first
+labels-52	labels	してくれました	lookup			label	polite past	
+labels-53	labels	知らされなかった	lookup			top_reading	しる	labels combine every meaningful rule, outermost first
+labels-54	labels	知らされなかった	lookup			label	past + negative + causative passive	
+labels-55	labels	言っちゃった	lookup			top_reading	いう	labels combine every meaningful rule, outermost first
+labels-56	labels	言っちゃった	lookup			label	past + ended up	
+spans-167	constructions	調査している	lookup			surface	調査している	suru-noun phrase resolves to the noun headword
+spans-168	constructions	調査している	lookup			top_reading	ちょうさ	
+spans-169	constructions	調査している	lookup			label	teiru	
+spans-170	constructions	調査していた	lookup			surface	調査していた	suru-noun phrase resolves to the noun headword
+spans-171	constructions	調査していた	lookup			top_reading	ちょうさ	
+spans-172	constructions	調査していた	lookup			label	past + teiru	
+spans-173	constructions	調査して	lookup			surface	調査して	suru-noun phrase resolves to the noun headword
+spans-174	constructions	調査して	lookup			top_reading	ちょうさ	
+spans-175	constructions	調査して	lookup			label	te	
+spans-176	spans	ジイさんじゃない。	lookup			surface	ジイさんじゃない	unknown leading token uses surface deconjugation
+spans-177	spans	ジイさんじゃない。	lookup			top_reading	じいさん	
+spans-178	spans	ジイさんじゃない。	lookup			label	copula	
+spans-179	spans	マズいんだ	lookup			surface	マズい	false boundary crossed to the real word
+spans-180	spans	マズいんだ	lookup			top_reading	まずい	
+labels-57	labels	急がなくても	lookup			top_reading	いそぐ	も-ending te-forms name the condition
+labels-58	labels	急がなくても	lookup			label	even if not	
+labels-59	labels	食べなくても	lookup			top_reading	たべる	も-ending te-forms name the condition
+labels-60	labels	食べなくても	lookup			label	even if not	
+labels-61	labels	行かなくても	lookup			top_reading	いく	も-ending te-forms name the condition
+labels-62	labels	行かなくても	lookup			label	even if not	
+labels-63	labels	しなくても	lookup			top_reading	する	も-ending te-forms name the condition
+labels-64	labels	しなくても	lookup			label	even if not	
+labels-65	labels	食べても	lookup			top_reading	たべる	も-ending te-forms name the condition
+labels-66	labels	食べても	lookup			label	even if	
+labels-67	labels	行っても	lookup			top_reading	いく	も-ending te-forms name the condition
+labels-68	labels	行っても	lookup			label	even if	
+labels-69	labels	飲んでも	lookup			top_reading	のむ	も-ending te-forms name the condition
+labels-70	labels	飲んでも	lookup			label	even if	
+labels-71	labels	高くても	lookup			top_reading	たかい	も-ending te-forms name the condition
+labels-72	labels	高くても	lookup			label	even if	
+spans-181	spans	あともう一つ。	scan			scan_surfaces	あと|もう一つ	filler token allows sub-token span
+spans-182	spans	あともう一つ。	lookup			surface	あと	
+spans-183	spans	あともう一つ。	lookup			top_reading	あと	
+spans-184	spans	あともう一つ。	lookup	もう一つ		surface	もう一つ	
+spans-185	spans	あともう一つ。	lookup	もう一つ		top_reading	もうひとつ	
+spans-186	constructions	除外するとして。	lookup			surface	除外する	として starts a new phrase
+spans-187	constructions	除外するとして。	lookup			top_reading	じょがい	
+spans-188	constructions	除外するとして。	lookup	として		surface	として	
+spans-189	constructions	周りの大人が徹底して伏せた。	scan		徹底して	top_reading	てってい	independent verb starts a new phrase
+spans-190	constructions	周りの大人が徹底して伏せた。	scan		伏せた	top_reading	ふせる	
+spans-191	spans	すぐに引いたそうだ。	scan		引いた	top_reading	ひく	hearsay noun starts a new phrase
+spans-192	constructions	「もしもし。......お前、なにしたんだ? ジイさんバアさんたちパニック状態だぞ」	scan		した	top_reading	する	んだ is explanatory copula, never absorbed
+spans-193	constructions	「もしもし。......お前、なにしたんだ? ジイさんバアさんたちパニック状態だぞ」	scan			no_span	したんだ	
+spans-194	constructions	「もしもし。......お前、なにしたんだ? ジイさんバアさんたちパニック状態だぞ」	scan			has_span	んだ	
+spans-195	constructions	奈緒ちゃんは、どうなんだろう?	scan		どう	top_reading	どう	stem stands alone, copula keeps its spans
+spans-196	constructions	奈緒ちゃんは、どうなんだろう?	scan			no_span	どうなん	
+spans-197	constructions	奈緒ちゃんは、どうなんだろう?	scan		だろう	top_reading_contains	だろ	
+spans-198	constructions	それがいいんじゃねーか!!	scan		いい	top_reading	いい	
+spans-199	constructions	それがいいんじゃねーか!!	scan			no_span	いいん	
+spans-200	constructions	お昼借りてた弁当箱の事なんだけど...	scan		事	top_reading	こと	
+spans-201	constructions	お昼借りてた弁当箱の事なんだけど...	scan			no_span	事なん	
+spans-202	constructions	おまたせ。	scan		おまたせ	top_spelling	待つ	wrapper resolves through the split
+spans-203	constructions	おまたせ。	scan			no_span	おまた	
+spans-204	constructions	おまたせ。	scan			no_span	せ	
+spans-205	constructions	夏休みが始まり、今年もおじいの家に遊びに来て何日ぐらいが過ぎただろう。	scan		おじい	top_spelling	爺	
+spans-206	constructions	夏休みが始まり、今年もおじいの家に遊びに来て何日ぐらいが過ぎただろう。	scan			no_span	おじ	
+spans-207	constructions	おじいとおばぁが、近所に出かけてくると言ったので、僕は留守番を任されることになった。	scan		おばぁ	top_spelling	祖母	small-vowel coda adds no mora
+spans-208	constructions	おじいとおばぁが、近所に出かけてくると言ったので、僕は留守番を任されることになった。	scan		おじい	top_spelling	爺	
+spans-209	constructions	おじいとおばぁが、近所に出かけてくると言ったので、僕は留守番を任されることになった。	scan			no_span	おじいと	
+spans-210	constructions	おじいとおばぁが、近所に出かけてくると言ったので、僕は留守番を任されることになった。	scan			has_span	と	
+spans-211	spans	さて、穹のヤツどうしてるかな……	scan		どうしてる	top_reading	どうしてる	adverb continues through the headword
+spans-212	spans	さて、穹のヤツどうしてるかな……	scan			no_span	どうし	
+spans-213	spans	はは、そうほいほい面白い。	scan		そう	top_reading	そう	inflected fragments still split
+spans-214	spans	はは、そうほいほい面白い。	scan			no_span	そうほ	
+spans-215	spans	う、うん......それに、事情なら、私の方からも話しとくし......	scan		話しとく	top_spelling	話す	one glued kana still reaches the verb
+spans-216	spans	う、うん......それに、事情なら、私の方からも話しとくし......	scan			no_span	くし	
+spans-217	spans	ちぇっ、普通に終わらせやがって。	scan		やがって	top_reading_contains	がる	particle + がって form the auxiliary
+spans-218	spans	あ、やばい......もうそんな時間かな......	scan			no_span	もうそんな	slurred verb must not swallow the phrase
+spans-219	spans	あ、やばい......もうそんな時間かな......	scan		もう	top_reading	もう	
+spans-220	spans	あ、やばい......もうそんな時間かな......	scan		そんな	top_reading	そんな	
+spans-221	spans	あ、やばい......もうそんな時間かな......	scan		時間	top_reading	じかん	
+spans-222	constructions	「いま団地の管理会社と、お寺で除霊するからどっちが費用を出すって会議してるよ」	scan		会議してる	top_reading	かいぎ	merged てる stays in the construction
+spans-223	constructions	「いま団地の管理会社と、お寺で除霊するからどっちが費用を出すって会議してるよ」	scan		会議してる	top_spelling	会議	
+spans-224	constructions	なんか用か。寝てたんじゃなかったのか	scan		寝てたんじゃなかった	top_reading	ねる	たん merges, copula tail named
+spans-225	constructions	なんか用か。寝てたんじゃなかったのか	scan		寝てたんじゃなかった	label_contains	explanatory	
+spans-226	constructions	なんか用か。寝てたんじゃなかったのか	lookup	寝てたんじゃなかった		surface	寝てたんじゃなかった	skip-cycling reaches the shorter 寝てた
+spans-227	constructions	なんか用か。寝てたんじゃなかったのか	lookup	たんじゃなかった		not_surface	たんじゃなかった	lookups at たん never become 肝
+spans-228	constructions	待てと言おうとしたが、容赦なく時間停止は解除された。	scan		解除された	top_reading	かいじょ	passive れ continues the construction
+spans-229	constructions	待てと言おうとしたが、容赦なく時間停止は解除された。	scan		解除された	top_spelling	解除	
+spans-230	constructions	待てと言おうとしたが、容赦なく時間停止は解除された。	scan		解除された	label	past + passive	
+spans-231	spans	風船でも割れるみたいな消え方。	scan			no_span	風船でも割れる	noun + particle + verb stay three phrases
+spans-232	spans	風船でも割れるみたいな消え方。	scan		風船	top_reading	ふうせん	
+spans-233	spans	風船でも割れるみたいな消え方。	scan			has_span	でも	
+spans-234	spans	風船でも割れるみたいな消え方。	scan		割れる	top_reading	われる	
+spans-235	constructions	野菜を買うんじゃない	scan		買うんじゃない	top_reading	かう	prohibitive tail belongs to the verb
+spans-236	constructions	野菜を買うんじゃない	scan		買うんじゃない	top_spelling	買う	
+spans-237	constructions	野菜を買うんじゃない	scan		買うんじゃない	label	don't	
+spans-238	constructions	わざわざ買うんじゃなかった	scan		買うんじゃなかった	top_reading	かう	past tail names the missed obligation
+spans-239	constructions	わざわざ買うんじゃなかった	scan		買うんじゃなかった	top_spelling	買う	
+spans-240	constructions	わざわざ買うんじゃなかった	scan		買うんじゃなかった	label	shouldn't have	
+spans-241	constructions	そろそろ帰るんじゃない。	scan		帰るんじゃない	top_reading	かえる	prohibitive across godan/ichidan/suru/kuru
+spans-242	constructions	そろそろ帰るんじゃない。	scan		帰るんじゃない	label	don't	
+spans-243	constructions	食べるんじゃない	scan		食べるんじゃない	top_reading	たべる	
+spans-244	constructions	食べるんじゃない	scan		食べるんじゃない	label	don't	
+spans-245	constructions	まさか、するんじゃなかった。そろそろ帰るんじゃない。	scan		するんじゃなかった	label	shouldn't have	standalone suru + past tail
+spans-246	constructions	まさか、するんじゃなかった。そろそろ帰るんじゃない。	scan		するんじゃなかった	top_spelling	為る	
+spans-247	spans	嬉しそうにくしゃっと顔をゆがめた。	scan		くしゃっと	has_entry	くしゃっと	unknown-token crossing that is a real reading
+spans-248	spans	疲れるぅ	lookup			surface	疲れる	non-word crossings never extend
+spans-249	spans	疲れるぅ	lookup			top_reading	つかれる	
+spans-250	spans	俺はもうこの世界には――。	scan		もう	has_entry	蒙	parts win over the 蒙古 reading
+spans-251	spans	俺はもうこの世界には――。	scan		この	has_entry	此の	
+spans-252	spans	俺はもうこの世界には――。	scan		世界	top_spelling	世界	
+spans-253	spans	俺はもうこの世界には――。	scan			no_span	もうこ	
+spans-254	spans	ここ	lookup			surface	ここ	correlatives never split
+spans-255	spans	そこ	lookup			surface	そこ	
+spans-256	constructions	すぐ崩れるから、交信できてない	scan		交信できてない	top_reading	こうしん	potential continues the suru verb
+spans-257	constructions	すぐ崩れるから、交信できてない	scan		交信できてない	top_spelling	交信	
+spans-258	constructions	すぐ崩れるから、交信できてない	scan		交信できてない	label_contains	potential	
+spans-259	constructions	すぐ崩れるから、交信できて	scan		交信できて	top_reading	こうしん	bare potential continues too
+spans-260	constructions	すぐ崩れるから、交信できて	scan		交信できて	top_spelling	交信	
+spans-261	constructions	すぐ崩れるから、交信できて	scan		交信できて	label_contains	potential	
+spans-262	constructions	30歳にもなって......なんで今泣いてるんだ。	scan		なんで	has_entry	何で	なんで wins whole as 何で
+spans-263	constructions	そういう相手なんだ	scan			has_span	な	なんだ keeps な single
+spans-264	constructions	そういう相手なんだ	scan			no_span	なん	
+spans-265	constructions	野菜を買うんじゃない	scan		買うんじゃない	label	don't	dictionary stem is prohibitive
+spans-266	constructions	わざわざ買うんじゃなかった	scan		買うんじゃなかった	label	shouldn't have	
+spans-267	constructions	なんか用か。寝てたんじゃなかったのか	scan		寝てたんじゃなかった	label_contains	explanatory	past/negative stems are explanatory
+spans-268	constructions	なんか用か。寝てたんじゃなかったのか	scan		寝てたんじゃなかった	label_not_contains	shouldn't have	
+spans-269	constructions	食べないんじゃない	scan		食べないんじゃない	top_reading	たべる	
+spans-270	constructions	食べないんじゃない	scan		食べないんじゃない	label_contains	explanatory	
+spans-271	constructions	どこかの掲示板を読んだり、流行の服の画像をいろいろ保存したりしていた。	scan		保存したりしていた	top_reading	ほぞん	たり links suru clauses
+spans-272	constructions	どこかの掲示板を読んだり、流行の服の画像をいろいろ保存したりしていた。	scan		保存したりしていた	top_spelling	保存	
+spans-273	constructions	どこかの掲示板を読んだり、流行の服の画像をいろいろ保存したりしていた。	scan		保存したりしていた	label	past + teiru + tari	
+spans-274	constructions	どこかの掲示板を読んだり、流行の服の画像をいろいろ保存したりしていた。	scan			no_span	保存し	
+spans-275	constructions	その着信とメールは全て穹からだった。	scan		だった	top_reading	だ	no stem to absorb, copula itself
+spans-276	constructions	その着信とメールは全て穹からだった。	scan		だった	label	past	
+spans-277	constructions	彼からでした。	scan		でした	top_reading	です	polite copula itself
+spans-278	constructions	彼からでした。	scan		でした	label	past	
+spans-279	constructions	放課後だったり、朝だったりにやる。	scan		放課後だったり	top_reading	ほうかご	listing absorbs into the stem
+spans-280	constructions	放課後だったり、朝だったりにやる。	scan		放課後だったり	label	copula + tari	
+spans-281	constructions	放課後だったり、朝だったりにやる。	scan		朝だったり	top_reading	あさ	
+spans-282	constructions	放課後だったり、朝だったりにやる。	scan			no_span	り	
+spans-283	constructions	彼からだったり、彼女からだったりする。	scan		だったり	top_reading	だ	bare listing is the copula, past
+spans-284	constructions	彼からだったり、彼女からだったりする。	scan		だったり	label	past + tari	
+spans-285	constructions	彼からでしたり、彼女からでしたりする。	scan		でしたり	top_reading	です	
+spans-286	constructions	彼からでしたり、彼女からでしたりする。	scan		でしたり	label	past + tari	
+spans-287	regression	転校したては、みんな孤独なんだ。	scan		したて	top_reading	する	したて is する + freshly-finished たて
+spans-288	regression	転校したては、みんな孤独なんだ。	scan		したて	label	right after doing	
+spans-289	regression	うちの部はね、このシーズンまで自主トレだったり、休みだったりで、泳ぐことはないの。	scan			has_span	は	はね splits to は + ね
+spans-290	regression	うちの部はね、このシーズンまで自主トレだったり、休みだったりで、泳ぐことはないの。	scan			has_span	ね	
+spans-291	regression	うちの部はね、このシーズンまで自主トレだったり、休みだったりで、泳ぐことはないの。	scan			no_span	はね	
+spans-292	regression	うさぎが跳ね、止まった。	scan			has_span	跳ね	real stems survive fused-particle splitting
+spans-293	regression	うさぎが跳ね、止まった。	scan			no_span	は	
+spans-294	regression	お金は兼ねないよ。	scan			has_span	兼ねない	
+spans-295	regression	お金は兼ねないよ。	scan			no_span	か	
+spans-296	regression	うちの部はね、このシーズンまで自主トレだったり、休みだったりで、泳ぐことはないの。	scan		休みだったり	has_entry	休み	absorbed stems list their own readings
+spans-297	regression	うちの部はね、このシーズンまで自主トレだったり、休みだったりで、泳ぐことはないの。	scan		休みだったり	has_entry	休む	
+spans-298	regression	奈緒ちゃんは、どうなんだろう?	scan		なん	has_entry	何	なん reads as 何 across continuing だ
+spans-299	regression	奈緒ちゃんは、どうなんだろう?	scan			has_span	どう	
+spans-300	regression	奈緒ちゃんは、どうなんだろう?	scan			has_span	だろう	
+spans-301	regression	奈緒ちゃんは、どうなんだろう?	scan			no_span	どうなん	
+spans-302	regression	うん......突然ゴメンね...お昼借りてた弁当箱の事なんだけど...	scan		なん	has_entry	何	
+spans-303	regression	うん......突然ゴメンね...お昼借りてた弁当箱の事なんだけど...	scan			no_span	な	
+spans-304	regression	よっしゃー! メシメシー!	scan		メシー	top_spelling	飯	trailing chouonpu is emphatic lengthening
+spans-305	regression	確かめても良いんだろうか。	scan		良い	has_entry	良い	stem + ん + conjecture splits
+spans-306	regression	確かめても良いんだろうか。	scan			has_span	だろうか	か stays in the conjecture span by design
+spans-307	regression	確かめても良いんだろうか。	scan			no_span	良いんだろうか	
+spans-308	regression	何か、もっと簡単にできたらいいんだろうけど、まぁ、慣れていくしかないだろう。	scan		いい	top_reading	いい	stem wins over 委員; top is いい itself (良い has no いい reading)
+spans-310	regression	何か、もっと簡単にできたらいいんだろうけど、まぁ、慣れていくしかないだろう。	scan			has_span	だろう	
+spans-311	regression	何か、もっと簡単にできたらいいんだろうけど、まぁ、慣れていくしかないだろう。	scan			no_span	いいんだろう	
+spans-312	regression	何か、もっと簡単にできたらいいんだろうけど、まぁ、慣れていくしかないだろう。	scan		しかない	top_reading	しかない	しかない merges despite し particle
+spans-313	regression	何か、もっと簡単にできたらいいんだろうけど、まぁ、慣れていくしかないだろう。	scan			no_span	しか	
+spans-314	regression	そもそも確かめて僕はどうしたいのか。	scan			has_span	どう	どうしたい splits to どう + したい
+spans-315	regression	そもそも確かめて僕はどうしたいのか。	scan		したい	top_reading	する	
+spans-316	regression	そもそも確かめて僕はどうしたいのか。	scan			no_span	どうしたい	
+spans-317	regression	弁当を作るとなると、朝、夜も含めて一日三食分の材料が必要になる。	scan		三食	top_spelling	三食	counter carve reaches 三食 first
+spans-318	regression	電子レンジのトースターモードでパンを焼くことは出来ても、まだ炊飯器のセットすら出来ない。	scan		出来ても	top_reading	できる	ても-rule proves the verb despite mistag
+spans-319	regression	電子レンジのトースターモードでパンを焼くことは出来ても、まだ炊飯器のセットすら出来ない。	scan		出来ても	label	even if	
+spans-320	regression	そう? じゃあ後でいくね。よーし、買い物をちゃっちゃと済まさないと。	scan		ちゃっちゃと	top_has_reading	ちゃっちゃと	direct adverb match ranks first
+spans-321	regression	おまけしといたから、また来ておくれ!	scan		おまけ	top_spelling	お負け	suru path skips bare し before とく-forms
+spans-322	regression	おまけしといたから、また来ておくれ!	scan			no_span	おまけし	
+spans-323	regression	おまけしといたから、また来ておくれ!	scan		しといた	top_reading	する	
+spans-324	regression	おまけしといたから、また来ておくれ!	scan		しといた	label	in advance (casual)	
+spans-325	regression	あとは、乱暴だけど全部まとめて炒めちゃうのもありね。	scan		あり	top_spelling	有る	continuative stem trusts MeCab's verb
+spans-328	regression	あとは、乱暴だけど全部まとめて炒めちゃうのもありね。	scan		炒めちゃう	top_spelling	炒める	contraction continues the verb
+spans-329	regression	お待たせっ、ゴメンね、遅くなって?	scan		お待たせ	has_entry	待たせる	emphatic っ lands on the stem
+spans-330	regression	お待たせっ、ゴメンね、遅くなって?	scan		お待たせ	label_contains	honorific	
+spans-331	regression	お待たせっ、ゴメンね、遅くなって?	scan			no_span	お待た	
+spans-332	regression	奈緒ちゃんは、エプロンを身につけると流しに材料を並べて、水洗いを始めた。	scan		身につける	has_entry	身につける	noun + に + verb-base key exempts guards
+spans-333	regression	手早く皮をむくと、包丁で細切りにされていくジャガイモとタマネギ、にんじん。	scan		皮をむく	has_entry	皮をむく|皮を剥く	を-variant of the same exemption
+labels-73	labels	食べなければいけませんでした	lookup			surface	食べなければいけませんでした	must-construction tails never split
+labels-74	labels	食べなければいけませんでした	lookup			top_reading	たべる	
+labels-75	labels	食べなければいけませんでした	lookup			label	must	
+labels-76	labels	宿題をしなければいけない	lookup	しなければ		surface	しなければいけない	must-construction tails never split
+labels-77	labels	宿題をしなければいけない	lookup	しなければ		top_reading	する	
+labels-78	labels	宿題をしなければいけない	lookup	しなければ		label	must	
+labels-79	labels	行かなきゃいけない	lookup			surface	行かなきゃいけない	must-construction tails never split
+labels-80	labels	行かなきゃいけない	lookup			top_reading	いく	
+labels-81	labels	行かなきゃいけない	lookup			label	must	
+labels-82	labels	しなくちゃいけない	lookup			surface	しなくちゃいけない	must-construction tails never split
+labels-83	labels	しなくちゃいけない	lookup			top_reading	する	
+labels-84	labels	しなくちゃいけない	lookup			label	must	
+labels-85	labels	来なければいけない	lookup			surface	来なければいけない	must-construction tails never split
+labels-86	labels	来なければいけない	lookup			top_reading	くる	
+labels-87	labels	来なければいけない	lookup			label	must	
+labels-88	labels	行かねばならない	lookup			surface	行かねばならない	must-construction tails never split
+labels-89	labels	行かねばならない	lookup			top_reading	いく	
+labels-90	labels	行かねばならない	lookup			label	must	
+labels-91	labels	食べなくっちゃいけない	lookup			surface	食べなくっちゃいけない	must-construction tails never split
+labels-92	labels	食べなくっちゃいけない	lookup			top_reading	たべる	
+labels-93	labels	食べなくっちゃいけない	lookup			label	must	
+labels-94	labels	行かないといけませんでした	lookup			surface	行かないといけませんでした	must-construction tails never split
+labels-95	labels	行かないといけませんでした	lookup			top_reading	いく	
+labels-96	labels	行かないといけませんでした	lookup			label	must	
+spans-334	spans	行かなければ食べる。	scan			no_span	行かなければ食べる	non-aux verbs still split the chain
+spans-335	spans	行かなければ食べる。	scan		行かなければ	top_reading	いく	
+spans-336	spans	助かる。さっそく本題に入ろう。	scan		入ろう	top_spelling	入る	volitional reaches 入る despite mistag
+spans-337	spans	助かる。さっそく本題に入ろう。	scan		入ろう	label	volitional	
+spans-338	constructions	何度も同じ質問をしている。	scan		質問をしている	top_reading	しつもん	質問をする headword absorbs the phrase
+spans-339	constructions	何度も同じ質問をしている。	scan		質問をしている	label	teiru	
+spans-340	constructions	先輩を消失させるのは、俺だった。	scan		消失させる	top_reading	しょうしつ	causative stays in the span
+spans-341	constructions	儀式を完了させなければ	scan		完了させなければ	top_reading	かんりょう	bare conditional negation stays whole
+spans-342	constructions	うちから大事な物を盗んでいったんです	scan		盗んでいったんです	top_reading	ぬすむ	ていく + past + explanatory tail, one span
+spans-343	constructions	うちから大事な物を盗んでいったんです	scan		盗んでいったんです	top_spelling	盗む	
+spans-344	spans	なんで今泣いてるんだ。	scan		なんで	has_entry	何で	なんで is 何で; 今 never absorbs the verb
+spans-345	spans	なんで今泣いてるんだ。	scan			has_span	今	
+spans-346	spans	なんで今泣いてるんだ。	scan		泣いてる	top_reading	なく	
+spans-347	spans	なんで今泣いてるんだ。	scan			no_span_contains	忌	
+spans-348	ranking	ナタが引かれた。	scan		引かれた	top_spelling	引く	shared kanji outranks fewer steps
+spans-349	constructions	だが俺はもう歳を取り過ぎた。	lookup	取り過ぎた	取り過ぎた	top_spelling	取る	front verb heads the compound
+spans-350	constructions	だが俺はもう歳を取り過ぎた。	lookup	取り過ぎた	取り過ぎた	label	past + too much	
+spans-351	spans	豹馬(聞いてるぞ。5人で手助けをしてくれるんだよな)	lookup	聞いて		surface	聞いてる	every hover position resolves
+spans-352	spans	豹馬(聞いてるぞ。5人で手助けをしてくれるんだよな)	lookup	聞いて		top_reading	きく	
+spans-353	spans	豹馬(聞いてるぞ。5人で手助けをしてくれるんだよな)	lookup	手助け		surface	手助けをしてくれる	
+spans-354	spans	豹馬(聞いてるぞ。5人で手助けをしてくれるんだよな)	lookup	手助け		top_reading	てだすけ	
+spans-355	constructions	気を悪くさせてごめんね、本当に。	lookup	悪く		surface	悪くさせて	ku-stem continues into させる
+spans-356	constructions	気を悪くさせてごめんね、本当に。	lookup	悪く		top_reading	わるい	
+spans-357	constructions	気を悪くさせてごめんね、本当に。	lookup	悪く		label	causative + te	
+spans-358	constructions	っと、そろそろ私、行かなきゃ遅刻しちゃう。	lookup	遅刻		surface	遅刻しちゃう	contraction continues the suru chain
+spans-359	constructions	っと、そろそろ私、行かなきゃ遅刻しちゃう。	lookup	遅刻		top_reading	ちこく	
+spans-360	constructions	学校の方からも連絡があり、いよいよ今日から通うことになった。	lookup	ことにな		surface	ことになった	formal noun + なる across に
+spans-361	constructions	学校の方からも連絡があり、いよいよ今日から通うことになった。	lookup	ことにな		top_reading	ことになる	
+spans-362	constructions	学校の方からも連絡があり、いよいよ今日から通うことになった。	lookup	ことにな		label	past	
+spans-363	spans	あ、だったら、立ちっぱなしも悪いし中に入って待っててよ。	lookup	悪いし		surface	悪い	single-hiragana literal merge
+spans-364	spans	あ、だったら、立ちっぱなしも悪いし中に入って待っててよ。	lookup	悪いし		top_reading	わるい	
+spans-365	constructions	学校まではるちゃん達を案内しながら行くつもりだったから。	lookup	案内し		surface	案内しながら	ながら continues the chain
+spans-366	constructions	学校まではるちゃん達を案内しながら行くつもりだったから。	lookup	案内し		top_reading	あんない	
+spans-367	constructions	学校まではるちゃん達を案内しながら行くつもりだったから。	lookup	案内し		label	while	
+spans-368	spans	そんな、淹れてもらうのにわざわざ注文なんてつけないよ。	lookup	淹れて		surface	淹れてもらう	unknown kanji continues to its verb
+spans-369	spans	そんな、淹れてもらうのにわざわざ注文なんてつけないよ。	lookup	淹れて		top_spelling	淹れる	
+spans-370	spans	そんな、淹れてもらうのにわざわざ注文なんてつけないよ。	lookup	淹れて		top_reading	いれる	
+spans-371	constructions	片付けと食器洗いは私がしておいてあげるから、はるちゃんは早く準備しちゃいなよ。	lookup	準備しちゃ		surface	準備しちゃいな	ちゃいな contraction stays in
+spans-372	constructions	片付けと食器洗いは私がしておいてあげるから、はるちゃんは早く準備しちゃいなよ。	lookup	準備しちゃ		top_reading	じゅんび	
+spans-373	constructions	片付けと食器洗いは私がしておいてあげるから、はるちゃんは早く準備しちゃいなよ。	lookup	準備しちゃ		label	contracted + casual imperative + ended up	
+spans-374	constructions	逆に目立てて良いんじゃないかなぁ。	lookup	良いん		surface	良いんじゃないか	adjective stems take copula tails
+spans-375	constructions	逆に目立てて良いんじゃないかなぁ。	lookup	良いん		top_reading	よい	
+spans-376	constructions	逆に目立てて良いんじゃないかなぁ。	lookup	良いん		label	explanatory + negative + question	
+spans-377	spans	その見た目通りにおおざっぱな性格なのか。	lookup	おおざっ		surface	おおざっぱ	shredded unknown reaches 大雑把
+spans-378	spans	その見た目通りにおおざっぱな性格なのか。	lookup	おおざっ		top_reading	おおざっぱ	
+spans-379	spans	その見た目通りにおおざっぱな性格なのか。	lookup	おおざっ		top_spelling	大雑把	
+spans-380	constructions	わかんないけど。気を悪くさせてごめんね、本当に。	lookup	気を悪く		surface	気を悪くさせて	せ continues さ, whole resolves
+spans-381	constructions	わかんないけど。気を悪くさせてごめんね、本当に。	lookup	気を悪く		top_reading	きをわるくする	
+spans-382	constructions	わかんないけど。気を悪くさせてごめんね、本当に。	lookup	気を悪く		top_spelling	気を悪くする	
+spans-383	constructions	わかんないけど。気を悪くさせてごめんね、本当に。	lookup	気を悪く		label	causative	
+spans-384	constructions	豹馬(聞いてるぞ。5人で手助けをしてくれるんだよな)	lookup	手助け		surface	手助けをしてくれる	benefactive tail named, not bare suru
+spans-385	constructions	豹馬(聞いてるぞ。5人で手助けをしてくれるんだよな)	lookup	手助け		top_reading	てだすけ	
+spans-386	constructions	豹馬(聞いてるぞ。5人で手助けをしてくれるんだよな)	lookup	手助け		label	suru + do for someone	
+spans-387	spans	そういえば、穹とは別のクラスになってしまった。	lookup	そうい		surface	そういえば	kanji tail merges via readings
+spans-388	spans	そういえば、穹とは別のクラスになってしまった。	lookup	そうい		top_reading	そういえば	
+spans-389	spans	穹がこのことを知ったら、ますます学校に出てこないんじゃないかと、ひどく心配になる。	lookup	このこ		surface	この	この + こと stay split
+spans-390	spans	穹がこのことを知ったら、ますます学校に出てこないんじゃないかと、ひどく心配になる。	lookup	このこ		top_spelling	此の	
+spans-391	constructions	少し着くずした制服に、あごヒゲがなんか少し学生離れしてる印象があるけど。	lookup	着くず		surface	着くずした	kanji-sharing deconjugation
+spans-392	constructions	少し着くずした制服に、あごヒゲがなんか少し学生離れしてる印象があるけど。	lookup	着くず		top_spelling	着崩す	
+spans-393	constructions	少し着くずした制服に、あごヒゲがなんか少し学生離れしてる印象があるけど。	lookup	着くず		top_reading	きくずす	
+spans-394	spans	でも、呼ばれ方に何かしらこだわりがあるわけじゃないし、彼女の愛嬌さもあって、特に不快でもなかった。	lookup	不快でも		surface	不快	literal stem beats even-if split
+spans-395	spans	でも、呼ばれ方に何かしらこだわりがあるわけじゃないし、彼女の愛嬌さもあって、特に不快でもなかった。	lookup	不快でも		top_reading	ふかい	
+spans-396	constructions	その無邪気そうな笑顔を見ていると実は何も考えてなさそうな雰囲気もなきにしもあらず。	lookup	考えてな		surface	考えてなさそうな	hearsay on the negative stem
+spans-397	constructions	その無邪気そうな笑顔を見ていると実は何も考えてなさそうな雰囲気もなきにしもあらず。	lookup	考えてな		top_reading	かんがえる	
+spans-398	constructions	その無邪気そうな笑顔を見ていると実は何も考えてなさそうな雰囲気もなきにしもあらず。	lookup	考えてな		label	negative + hearsay	
+spans-399	spans	ヘンな噂になると困るじゃないかぁ。	lookup	ヘンな		surface	ヘン	ヘン + rentaikei な, not the plant
+spans-400	spans	ヘンな噂になると困るじゃないかぁ。	lookup	ヘンな		top_spelling	変	
+spans-401	constructions	ヘンな噂になると困るじゃないかぁ。	lookup	になると		surface	になると	に + なる + と expression
+spans-402	constructions	ヘンな噂になると困るじゃないかぁ。	lookup	になると		top_reading	になると	
+spans-403	spans	渚さんいいの？迷惑じゃない？	lookup	さんいい		surface	さん	さん + いい stay split
+spans-404	spans	渚さんいいの？迷惑じゃない？	lookup	いいの		surface	いい	
+spans-405	constructions	何だろう、さっきもそうだったけど。	lookup	何だろう		surface	何だろう	何だろう spans 何だ + conjecture
+spans-406	constructions	何だろう、さっきもそうだったけど。	lookup	何だろう		top_spelling	何	
+spans-407	constructions	何だろう、さっきもそうだったけど。	lookup	何だろう		label	conjecture	
+spans-408	spans	マジかっ！ちきしょー！俺より先に、何いい関係築いてんだよ！	lookup	マジか		surface	マジ	マジか splits to マジ
+spans-409	spans	マジかっ！ちきしょー！俺より先に、何いい関係築いてんだよ！	lookup	マジか		top_reading	まじ	
+spans-410	spans	マジかっ！ちきしょー！俺より先に、何いい関係築いてんだよ！	lookup	ちきしょ		surface	ちきしょー	chouonpu reaches 畜生
+spans-411	spans	マジかっ！ちきしょー！俺より先に、何いい関係築いてんだよ！	lookup	ちきしょ		top_spelling	畜生	
+spans-412	constructions	そ、そうなんだ。	lookup	そうなん		surface	そうなんだ	adverbial なんだ spans whole
+spans-413	constructions	そ、そうなんだ。	lookup	そうなん		top_reading	そう	
+spans-414	constructions	そ、そうなんだ。	lookup	そうなん		label	explanatory	
+spans-415	ranking	感じたような。	lookup	ような		surface	ような	rentaishi outranks coincidental verb
+spans-416	ranking	感じたような。	lookup	ような		top_spelling	様な	
+spans-417	spans	よかったっ、ハル君。	lookup	よかった		surface	よかった	past た + emphatic っ
+spans-418	spans	よかったっ、ハル君。	lookup	よかった		top_reading	よい	
+spans-419	spans	みんな、ゴメンなさいね。	lookup	ゴメンな		surface	ゴメンなさい	なさい merges across the split
+spans-420	spans	みんな、ゴメンなさいね。	lookup	ゴメンな		top_spelling	御免なさい	
+spans-421	spans	はは、そうほいほい面白い。	lookup	そうほい		surface	そう	adverbs take no continuations
+spans-422	spans	はは、そうほいほい面白い。	lookup	ほいほい		surface	ほいほい	
+spans-423	spans	はは、そうほいほい面白い。	lookup	ほいほい		top_reading	ほいほい	
+spans-424	spans	お兄さんさあ、帰りましょうかっ!	lookup	帰りましょ		surface	帰りましょう	glued う continues volitional
+spans-425	spans	お兄さんさあ、帰りましょうかっ!	lookup	帰りましょ		top_reading	かえる	
+spans-426	spans	そうさせる。	lookup	そうさせ		surface	そう	causative stem is the adverb, not 奏する
+spans-427	spans	わかんないけど。	lookup	わかんな		surface	わかんないけど	slurred negative reaches 分かる
+spans-428	spans	わかんないけど。	lookup	わかんな		top_reading	わかる	
+spans-429	spans	ことにする。	lookup	ことにする		surface	ことにする	loose ends that already work
+spans-430	spans	ことにする。	lookup	ことにする		top_spelling	事にする	
+spans-431	spans	雨が降りそう。	lookup	降りそう		surface	降りそう	
+spans-432	spans	雨が降りそう。	lookup	降りそう		top_reading	おりる	
+spans-433	spans	あやまんなくて良いよ。	lookup	あやまんな		top_reading	あやまる	
+spans-434	constructions	そ、そうなんだ。	lookup	そうなん		surface	そうなんだ	なんだ-family tails attach to any stem
+spans-435	constructions	そ、そうなんだ。	lookup	そうなん		top_reading	そう	
+spans-436	constructions	行くんですか。	lookup	行くんです		surface	行く	verbs never absorb ん
+spans-437	constructions	本なんですか。	lookup	本なんで		surface	本なんですか	noun stems resolve whole
+spans-438	constructions	本なんですか。	lookup	本なんで		top_reading	ほん	
+spans-439	spans	そこにいる。	lookup	そこに		surface	そこ	obscure literals split back to common stems
+spans-440	spans	渚さんと行く。	lookup	さんと		surface	さん	
+spans-441	spans	お兄さんさあ、帰りましょうかっ!	lookup	帰りましょ		surface	帰りましょう	glued う continues volitional
+spans-442	spans	お兄さんさあ、帰りましょうかっ!	lookup	帰りましょ		top_reading	かえる	
+spans-443	spans	よかったっ。	lookup	よかった		surface	よかった	past た + emphatic っ ends at た
+spans-444	spans	よかったっ。	lookup	よかった		top_reading	よい	
+spans-445	spans	みんな、ゴメンなさいね。	lookup	ゴメンな		surface	ゴメンなさい	なさい after non-verb stems
+spans-446	spans	みんな、ゴメンなさいね。	lookup	ゴメンな		top_spelling	御免なさい	
+spans-447	spans	そうさせる。	lookup	そうさせ		surface	そう	complete stem word beats archaic verb
+spans-448	spans	あー、そう言えば初めて。	lookup	そう言え		surface	そう言えば	kanji tail merges via readings
+spans-449	spans	あー、そう言えば初めて。	lookup	そう言え		top_spelling	そう言えば	
+spans-450	spans	足りないものはスーパーに。	lookup	ものは		surface	もの	ものは never resolves to もの派
+spans-451	spans	体を鍛えてないし。	lookup	ないし		surface	ない	conjunction ないし is ない + し
+spans-452	spans	体を鍛えてないし。	lookup	ないし		top_spelling	無い	
+spans-453	ranking	シャイなのか。	lookup	シャイ		surface	シャイなのか	exact script beats normalized homophones
+spans-454	ranking	シャイなのか。	lookup	シャイ		top_has_reading	シャイ	
+spans-455	spans	すぐにどっか。	lookup	すぐに		surface	すぐに	prefix + unknown still reaches すぐに
+spans-456	spans	すぐにどっか。	lookup	すぐに		top_spelling	直ぐに	

@@ -103,8 +103,23 @@ pub(crate) fn lookup_from_position(
             // A lone っ tagged as a verb (ったく shredded as っ|たく) is a
             // fragment, never a verb stem: trusting its base (く) promotes
             // unrelated entries (ったく -> 九) ahead of the real reading
-            // match (the ったく interjection).
-            if t.pos == "動詞" && t.base_form != t.surface && t.surface != "っ" {
+            // match (the ったく interjection). Same for contraction
+            // fragments (ちゃっ -> ちゃう): the shredded piece is not a
+            // ちゃう-stem, so morphology must not promote the auxiliary
+            // over the adverb it shredded from (ちゃっちゃと -> ちゃう
+            // over the adverb).
+            if t.pos == "動詞" && t.base_form != t.surface && t.surface != "っ"
+                && !CONTRACTION_AUX_VERBS.contains(&t.base_form.as_str())
+            {
+                Some(t.base_form.as_str())
+            // Continuative ある/おる come out tagged as auxiliaries (ありね):
+            // the existence verbs are the only auxiliaries ever trusted this
+            // way — ください/なさい keep their literal readings (their bases
+            // くださる/なさる are excluded by the allowlist below).
+            } else if t.pos == "助動詞"
+                && t.base_form != t.surface
+                && matches!(t.base_form.as_str(), "ある" | "おる")
+            {
                 Some(t.base_form.as_str())
             } else {
                 None
@@ -300,11 +315,20 @@ pub(crate) fn lookup_from_position(
         // like ともう being one token), or a prefix (接頭詞 like す in すぐ,
         // which only ever forms words together with what follows), allow the
         // span to continue character-by-character into the next token so a
-        // real literal word can still form across the false boundary.
+        // real literal word can still form across the false boundary. Two
+        // tokens deep: an honorific prefix plus stem plus inflection tail
+        // (お|待た|せ) needs the second token too, or お待たせ can never
+        // form and falls back to お待た (お股). Ends still have to resolve
+        // to win, so longest-first fallback keeps this safe.
         if t.reading.is_empty() || t.pos == "フィラー" || t.pos == "接頭詞" {
             if let Some(next) = tokens.iter().find(|tok| tok.start > position) {
                 for e in (t.end + 1)..=next.end.min(len) {
                     ends.push(e);
+                }
+                if let Some(following) = tokens.iter().find(|tok| tok.start >= next.end && tok.start > t.end) {
+                    for e in (next.end + 1)..=following.end.min(len) {
+                        ends.push(e);
+                    }
                 }
             }
         }
@@ -580,8 +604,10 @@ pub(crate) fn lookup_from_position(
             // verb-base is itself a dictionary entry — the span then
             // resolves via normal lookup/deconjugation (literal for
             // dictionary forms, deconjugation for inflections like
-            // 身につけた). Longest-first falls back when it doesn't
-            // resolve, so ordinary phrases stay split (本を読む/トイレを
+            // 身につけた). A verb continuing right after (取り|過ぎ,
+            // 食べ|ちゃ) belongs to a verb compound instead, so the
+            // exemption yields there. Longest-first falls back when nothing
+            // resolves, so ordinary phrases stay split (本を読む/トイレを
             // 使う/費用を出す are not dictionary entries).
             let pp_compound_end: Option<usize> = match token_at_pos {
                 Some(t) if t.pos == "名詞" && position == t.start => {
@@ -594,12 +620,16 @@ pub(crate) fn lookup_from_position(
                         .filter(|v| v.pos == "動詞" && v.base_form != "*");
                     match (p, v) {
                         (Some(p), Some(v)) => {
+                            let continued = tokens
+                                .iter()
+                                .find(|tok| tok.start == v.end)
+                                .map_or(false, |tok| tok.pos == "動詞");
                             let compound: String =
                                 format!("{}{}{}", t.surface, p.surface, v.base_form);
                             let known = normalize::normalize_variants(&compound)
                                 .iter()
                                 .any(|k| index.by_text.contains_key(k));
-                            if known {
+                            if known && !continued {
                                 Some(v.end)
                             } else {
                                 None
@@ -1294,6 +1324,22 @@ pub(crate) fn lookup_from_position(
                                 tokens,
                                 position,
                             ) {
+                                // A strictly more common winner keeps the
+                                // whole span (出来ても -> 出来る 950 over
+                                // 出来 910/800): shortening to a rarer stem
+                                // would name the wrong word, while a rare
+                                // or equally-ranked winner still shortens
+                                // (諷する 0 < 風船 950; 不快 ties with
+                                // itself). The stem stays reachable by
+                                // cycling shorter either way.
+                                let winner_score = entries
+                                    .first()
+                                    .map_or(0, |e| priority_score(e));
+                                let stem_score =
+                                    se.first().map_or(0, |e| priority_score(e));
+                                if winner_score > stem_score {
+                                    break;
+                                }
                                 eff_end = position + stem.chars().count();
                                 candidate = stem;
                                 entries = se;
@@ -1429,6 +1475,17 @@ pub(crate) fn lookup_from_position(
                                 tokens,
                                 position,
                             ) {
+                                // A verb stem keeps its verb (炒めちゃう ->
+                                // 炒める): only non-verb stems (そう, お菓子)
+                                // shorten here. Otherwise a real verb stem
+                                // that happens to be a key (炒め as a dish)
+                                // would split the contraction it heads.
+                                let cursor_is_verb = token_at_pos.map_or(false, |t| {
+                                    t.start == position && t.pos == "動詞"
+                                });
+                                if cursor_is_verb {
+                                    break;
+                                }
                                 // Word-split, not substring (see causative
                                 // rule above): adverb stems count as words.
                                 let stem_is_word = se.first().map_or(false, |e| {
@@ -2004,13 +2061,14 @@ pub(crate) fn lookup_from_position(
                         }
                     }
                 }
-                // Adverb + したい (どうしたい -> どう + したい): the whole
-                // run slurred-deconjugates to a coincidental noun (どうし ->
-                // 動詞/同志), hiding the どうする "what to do" construction.
-                // Only どう/そう/こう plus exactly したい (する + want-to):
-                // して-forms are excluded on purpose (そうして is そして).
-                // The したい remainder must resolve to する on its own or
-                // the span stays as it was.
+                // Adverb + したい (どうしたい -> どう + したい): the run
+                // resolves to a coincidental noun (どうしたい never wins —
+                // どうし -> 動詞/同志 does), hiding the どうする "what to
+                // do" construction. Only どう/そう/こう followed by したい
+                // (する + want-to): して-forms are excluded on purpose
+                // (そうして is そして). The したい remainder is read from
+                // the stem end (it usually extends past the winning span)
+                // and must resolve to する on its own, or the span stays.
                 {
                     let adv = token_at_pos.filter(|t| {
                         t.start == position
@@ -2018,10 +2076,9 @@ pub(crate) fn lookup_from_position(
                             && matches!(t.surface.as_str(), "どう" | "そう" | "こう")
                     });
                     if let Some(a) = adv {
-                        let want: String =
-                            format!("{}したい", a.surface);
-                        if candidate.starts_with(&want) && candidate != a.surface {
-                            let rest: String = chars[a.end..eff_end].iter().collect();
+                        let stem_len = a.surface.chars().count();
+                        if candidate.chars().count() > stem_len {
+                            let rest: String = chars[a.end..len].iter().collect();
                             if rest.starts_with("したい") {
                                 if let Some((se, _)) = lookup_candidate(
                                     "したい",
@@ -2082,12 +2139,18 @@ pub(crate) fn lookup_from_position(
                             )
                     });
                     // The word the fusion attaches to: a directly-adjacent
-                    // noun (pronouns live under 名詞).
-                    let prev_is_noun = tokens
+                    // noun (pronouns live under 名詞) or auxiliary
+                    // (兼ねないよ, だよ, ですね). Anything else before it —
+                    // a particle (うさぎが跳ね), a verb/adjective/adverb
+                    // (大きく跳ね), a comma, or sentence start — means the
+                    // stem is real.
+                    let prev_is_host = tokens
                         .iter()
                         .filter(|t| t.end <= position)
                         .last()
-                        .map_or(false, |p| p.end == position && p.pos == "名詞");
+                        .map_or(false, |p| {
+                            p.end == position && matches!(p.pos.as_str(), "名詞" | "助動詞")
+                        });
                     // Sentence-final ね/よ/わ: punctuation or end of text
                     // follows (anything else continues the word).
                     let tail_is_final = tokens
@@ -2097,7 +2160,7 @@ pub(crate) fn lookup_from_position(
                     if fused.is_some()
                         && tchars.len() >= 2
                         && matches!(tchars.last(), Some('ね' | 'よ' | 'わ'))
-                        && prev_is_noun
+                        && prev_is_host
                         && tail_is_final
                         && !entries.iter().any(|e| {
                             e.pos.iter().any(|p| {
@@ -2182,6 +2245,49 @@ pub(crate) fn lookup_from_position(
                                         entries = se;
                                         deconj_info = si;
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Sentence-final particle after an auxiliary (兼ねない|よ,
+                // だ|よ, です|ね): the particle starts its own span instead
+                // of gluing to the inflection, so both stay hoverable. Only
+                // auxiliaries split: nouns/pronouns/adverbs/adjectives
+                // (これ|よ, いい|よ, すごい|よ, ごめん|ね), te-forms
+                // (食べて|よ), conditionals (ば|よかった), continuatives
+                // (ながら|よ), contractions (ちゃう|よ) and verbs
+                // (来い|よ, しろ|よ) all keep whole — as do sentence-final
+                // う/か/な/っけ/かな/かしら shapes, which never match.
+                {
+                    let last_tok = tokens.iter().find(|t| t.end == eff_end);
+                    let ends_particle = last_tok.map_or(false, |t| {
+                        t.start == eff_end - 1
+                            && t.pos == "助詞"
+                            && matches!(t.surface.as_str(), "ね" | "よ" | "わ")
+                    });
+                    if ends_particle {
+                        let prev_is_aux = tokens
+                            .iter()
+                            .find(|t| t.end == eff_end - 1)
+                            .map_or(false, |t| t.pos == "助動詞");
+                        if prev_is_aux && eff_end - 1 > position {
+                            let stem: String =
+                                chars[position..eff_end - 1].iter().collect();
+                            if let Some((se, si)) = lookup_candidate(
+                                &stem,
+                                index,
+                                decon,
+                                context_reading,
+                                morph_base,
+                                tokens,
+                                position,
+                            ) {
+                                if !se.is_empty() {
+                                    eff_end -= 1;
+                                    candidate = stem;
+                                    entries = se;
+                                    deconj_info = si;
                                 }
                             }
                         }
