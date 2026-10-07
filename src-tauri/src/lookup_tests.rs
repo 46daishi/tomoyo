@@ -15,7 +15,7 @@
 
     impl Harness {
         pub(crate) fn new() -> Self {
-            let file = std::fs::File::open("resources/ipadic-mecab.dic.zst").unwrap();
+            let file = std::fs::File::open("resources/unidic.dic.zst").unwrap();
             let mut reader = Decoder::new(file).unwrap();
             let mut buf = Vec::new();
             reader.read_to_end(&mut buf).unwrap();
@@ -37,15 +37,12 @@
                 .token_iter()
                 .map(|t| {
                     let range = t.range_char();
-                    let fields: Vec<&str> = t.feature().split(',').collect();
-                    MorphToken {
-                        start: range.start,
-                        end: range.end,
-                        surface: t.surface().to_string(),
-                        base_form: fields.get(6).map(|s| s.to_string()).unwrap_or_else(|| t.surface().to_string()),
-                        pos: fields.get(0).unwrap_or(&"").to_string(),
-                        reading: normalize::normalize_text(fields.get(7).unwrap_or(&"")),
-                    }
+                    crate::types::morph_token_from(
+                        range.start,
+                        range.end,
+                        t.surface().to_string(),
+                        t.feature(),
+                    )
                 })
                 .collect()
         }

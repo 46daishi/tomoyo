@@ -283,6 +283,7 @@ pub(crate) fn lookup_candidate(
             .iter()
             .all(|(e, _, _, _, _)| priority_score(e) == 0);
         if all_orphan {
+            let pre_len = candidates.len();
             let stripped: String = candidate
                 .chars()
                 .take(candidate.chars().count().saturating_sub(1))
@@ -299,6 +300,22 @@ pub(crate) fn lookup_candidate(
                             }
                         }
                     }
+                }
+            }
+            // The fallback's whole point is letting frequency decide
+            // (メシー -> 盲 orphan vs メシ -> 飯 common): a full-surface
+            // orphan match would otherwise keep winning on entry_full
+            // (盲 matches めしい, a variant of メシー) ahead of the common
+            // partial word. Demote the pre-existing orphans below
+            // deconjugation rank when the strip surfaced a prioritized
+            // entry — but only then, so all-orphan pools keep their
+            // relative order when nothing better appears.
+            let surfaced_common = candidates[pre_len..]
+                .iter()
+                .any(|(e, _, _, _, _)| priority_score(e) != 0);
+            if surfaced_common {
+                for (.., kind, _) in candidates.iter_mut().take(pre_len) {
+                    *kind = MatchKind::Deconjugated;
                 }
             }
         }
@@ -326,6 +343,20 @@ pub(crate) fn lookup_candidate(
             .get(&base_norm)
             .map(|es| es.iter().map(|e| e.id).collect())
             .unwrap_or_default();
+        // The base form may be kanji (言う) while deconjugation forms
+        // are kana (いう): text equality against the raw base never
+        // fires then, so the morph label silently degrades to first_rule
+        // (言いませんでした read "past" instead of "polite past
+        // negative"). Also match the base entries' readings.
+        let base_readings: HashSet<String> = index
+            .by_text
+            .get(&base_norm)
+            .map(|es| {
+                es.iter()
+                    .flat_map(|e| e.readings.iter().map(|r| normalize::normalize_text(r)))
+                    .collect()
+            })
+            .unwrap_or_default();
         // A kana reading deconjugates to kana text while the base form may
         // be kanji (あり -> ある vs 有る), so a reading form also counts
         // when it resolves to the base's dictionary entry — ったく -> 九
@@ -336,11 +367,13 @@ pub(crate) fn lookup_candidate(
         // analysis winning on its own merits, not morphology to trust —
         // 知らされなかった keeps resolving to 知る.
         let via_deconj = reading_forms.iter().any(|f| {
-            normalize::normalize_text(&f.text) == base_norm
+            let f_norm = normalize::normalize_text(&f.text);
+            f_norm == base_norm
+                || base_readings.contains(&f_norm)
                 || (f.proper_steps <= 1
                     && index
                         .by_text
-                        .get(&normalize::normalize_text(&f.text))
+                        .get(&f_norm)
                         .map_or(false, |es| es.iter().any(|e| base_ids.contains(&e.id))))
         });
         let tail_tokens: Vec<&MorphToken> = tokens
@@ -352,6 +385,35 @@ pub(crate) fn lookup_candidate(
                 .iter()
                 .all(|t| matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞"));
         if via_deconj || via_aux_tail {
+            // A verb stem that is also a dictionary noun, feeding a
+            // nominal suffix (もやし|炒め): the nominal reading is
+            // intended — claiming the verb (燃やす, which outranks the
+            // noun 萌やし on kind) would name the wrong word. The suffix
+            // never continues a real verb conjugation, so morphology
+            // sleeps here and the literal noun wins. (The span-level
+            // twin of this lives in the extension loop's verb+suffix
+            // stop.)
+            let nominal_suffix_head = tokens
+                .iter()
+                .find(|t| t.start == position)
+                .filter(|t| {
+                    t.pos == "動詞"
+                        && t.base_form != t.surface
+                        && normalize::normalize_variants(&t.surface)
+                            .iter()
+                            .flat_map(|k| index.by_text.get(k).into_iter().flatten())
+                            .any(|e| {
+                                e.pos.iter().any(|p| {
+                                    p.split(|c: char| !c.is_alphabetic())
+                                        .any(|w| w.starts_with("noun"))
+                                })
+                            })
+                })
+                .and_then(|t| tokens.iter().find(|n| n.start == t.end))
+                .map_or(false, |n| n.pos == "接尾辞");
+            if nominal_suffix_head {
+                // Fall through to the non-morphological pools below.
+            } else {
             // Name the deconjugation (e.g. した -> "past") rather than the bare
             // base form in the tooltip. The deconjugation forms are kana while
             // the base form may be kanji (のむ vs 飲む), so they are matched by
@@ -425,6 +487,7 @@ pub(crate) fn lookup_candidate(
                         candidates.push((Arc::clone(e), 1, Some(label.clone()), MatchKind::Morphological, ctx));
                     }
                 }
+            }
             }
         }
     }
@@ -1201,13 +1264,15 @@ pub(crate) fn lookup_candidate(
 
     // Structural wrappers resolve through what they wrap: when the whole
     // span came up empty, retry after peeling the piece the tokenizer
-    // already marked as structure — an honorific お/ご prefix (おじい ->
-    // じい -> 爺, おまたせ -> またせ -> 待つ) or a trailing small-vowel coda
-    // (おばぁ -> おば -> 祖母: the ぁ spells the previous mora's vowel, it
-    // adds no mora of its own). Both run only when nothing else resolved,
-    // so they can only replace "no answer" with an answer. Recursion
-    // terminates: the prefix token is consumed by the sub-span's own
-    // cursor, and the coda strip removes one trailing small kana per call.
+    // already marked as structure — a trailing small-vowel coda (おばぁ
+    // -> おば -> 祖母: the ぁ spells the previous mora's vowel, it adds
+    // no mora of its own) or an honorific お/ご prefix (おじい -> じい
+    // -> 爺, おまたせ -> またせ -> 待つ). Both run only when nothing
+    // else resolved, so they can only replace "no answer" with an
+    // answer. Recursion terminates: the coda strip removes one trailing
+    // small kana per call, and the prefix token is consumed by the
+    // sub-span's own cursor. Coda first: おばぁ is both (お + ばぁ),
+    // and the prefix path would resolve ばぁ through ば instead.
     if candidates.is_empty() {
         // A wrapper strip never justifies crossing a particle: おじい + と
         // must stay おじい | と, since the reduced じいと resolves as
@@ -1217,47 +1282,6 @@ pub(crate) fn lookup_candidate(
             t.start >= position && t.end <= span_end && t.pos == "助詞"
         });
         if !crosses_particle {
-            // An honorific お/ご/御 prefix (おじい -> 爺, おまたせ -> 待つ):
-            // usually tagged 接頭詞, but sentence-initial お often comes
-            // out as 感動詞 (お待たせっ), a noun reading (尾), or worse —
-            // either way the prefix adds no meaning of its own, so resolve
-            // through the stem. Runs only when nothing else resolved, so it
-            // can only replace "no answer" with an answer (おはよう resolves
-            // literally and never reaches here). Particles, auxiliaries and
-            // bound/unknown pieces are excluded; everything else is tried.
-            if let Some(pre) = tokens
-                .iter()
-                .find(|t| {
-                    t.start == position
-                        && !matches!(
-                            t.pos.as_str(),
-                            "助詞" | "助動詞" | "記号" | "接頭辞" | "接尾辞"
-                        )
-                })
-                .filter(|t| matches!(t.surface.as_str(), "お" | "ご" | "御"))
-            {
-                let plen = pre.surface.chars().count();
-                let stem: String = candidate.chars().skip(plen).collect();
-                // The prefix's own reading says nothing about the stem, so
-                // the sub-span is looked up without reading context.
-                if !stem.is_empty() {
-                    if let Some((mut sub, sub_label)) =
-                        lookup_candidate(&stem, index, decon, None, None, tokens, position + plen)
-                    {
-                        let label = match sub_label {
-                            Some(l) => Some(format!("honorific + {l}")),
-                            None => Some("honorific".to_string()),
-                        };
-                        let key = normalize::normalize_text(&stem);
-                        for e in sub.drain(..) {
-                            let kind = match_kind(&e, &key);
-                            if !candidates.iter().any(|(p, _, _, _, _)| p.id == e.id) {
-                                candidates.push((e, 1, label.clone(), kind, false));
-                            }
-                        }
-                    }
-                }
-            }
             if candidates.is_empty() {
                 const SMALL_VOWELS: &[char] = &[
                     'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'ゃ', 'ゅ', 'ょ', 'ゎ', 'ァ', 'ィ', 'ゥ', 'ェ',
@@ -1291,6 +1315,56 @@ pub(crate) fn lookup_candidate(
                         }
                     }
                 }
+            }
+            // An honorific お/ご/御 prefix (おじい -> 爺, おまたせ -> 待つ):
+            // usually tagged 接頭詞, but sentence-initial お often comes
+            // out as 感動詞 (お待たせっ), a noun reading (尾), or worse —
+            // either way the prefix adds no meaning of its own, so resolve
+            // through the stem. Runs only when nothing else resolved, so it
+            // can only replace "no answer" with an answer (おはよう resolves
+            // literally and never reaches here). Particles, auxiliaries and
+            // bound/unknown pieces are excluded; everything else is tried.
+            if candidates.is_empty() {
+            if let Some(pre) = tokens
+                .iter()
+                .find(|t| {
+                    t.start == position
+                        && !matches!(
+                            t.pos.as_str(),
+                            // UniDic files honorific prefixes as 接頭辞
+                            // (IPAdic's sentence-initial お often came out
+                            // 感動詞, which was never excluded): excluding
+                            // them strands おじい/おまたせ whenever the stem
+                            // only resolves through the wrapper. Literal
+                            // お-words still hit first, so this only fires
+                            // when nothing else resolved.
+                            "助詞" | "助動詞" | "記号" | "接尾辞"
+                        )
+                })
+                .filter(|t| matches!(t.surface.as_str(), "お" | "ご" | "御"))
+            {
+                let plen = pre.surface.chars().count();
+                let stem: String = candidate.chars().skip(plen).collect();
+                // The prefix's own reading says nothing about the stem, so
+                // the sub-span is looked up without reading context.
+                if !stem.is_empty() {
+                    if let Some((mut sub, sub_label)) =
+                        lookup_candidate(&stem, index, decon, None, None, tokens, position + plen)
+                    {
+                        let label = match sub_label {
+                            Some(l) => Some(format!("honorific + {l}")),
+                            None => Some("honorific".to_string()),
+                        };
+                        let key = normalize::normalize_text(&stem);
+                        for e in sub.drain(..) {
+                            let kind = match_kind(&e, &key);
+                            if !candidates.iter().any(|(p, _, _, _, _)| p.id == e.id) {
+                                candidates.push((e, 1, label.clone(), kind, false));
+                            }
+                        }
+                    }
+                }
+            }
             }
         }
     }
@@ -1519,11 +1593,22 @@ pub(crate) fn lookup_candidate(
         };
         let spellingish =
             |k: &MatchKind| matches!(k, MatchKind::PrimarySpelling | MatchKind::Spelling | MatchKind::Morphological);
+        // A morphological claim on an unattested (priority-less) entry is
+        // coincidental more often than not (知らされなかった -> 知らす,
+        // which UniDic reports as the stem's base where IPAdic reported
+        // the root 知る): rank it with deconjugations so a common word
+        // reached by rules (知る) wins by frequency instead of losing on
+        // kind. Attested bases (食べる, する, 有る) keep full
+        // morphological precedence.
+        let effective_kind = |c: &(Arc<DictEntry>, usize, Option<String>, MatchKind, bool)| match c.3 {
+            MatchKind::Morphological if c.0.priority.is_empty() => MatchKind::Deconjugated,
+            k => k,
+        };
         let a_tate = is_tate(a) && !spellingish(&b.3);
         let b_tate = is_tate(b) && !spellingish(&a.3);
         let ord = b_tate
             .cmp(&a_tate)
-            .then(a.3.cmp(&b.3))
+            .then(effective_kind(a).cmp(&effective_kind(b)))
             .then(b.4.cmp(&a.4)) // context-match: true first
             .then({
                 // Single-kana surfaces are almost always their particle

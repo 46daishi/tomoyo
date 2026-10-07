@@ -177,7 +177,7 @@ pub fn run() {
             // by lookup_at_position and scan_sentence. lookup_at_position
             // still resolves spans from the dictionary index, but morphology
             // informs the reading and base-form candidates. ──
-            let resource_path = resolve_resource(app.handle(), "resources/ipadic-mecab.dic.zst")?;
+            let resource_path = resolve_resource(app.handle(), "resources/unidic.dic.zst")?;
 
             let reader = Decoder::new(std::fs::File::open(&resource_path).map_err(|e| {
                 std::io::Error::new(

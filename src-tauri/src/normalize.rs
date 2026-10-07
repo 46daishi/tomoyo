@@ -322,6 +322,39 @@ pub fn normalize_variants(input: &str) -> Vec<String> {
     variants
 }
 
+/// Single deterministic ー resolution for tokenizer readings: the
+/// convention arm of `chouonpu_variants` (お-row → う, え-row → い),
+/// matching JMdict reading conventions (どう, せい). Applied to token
+/// readings at construction so deconjugation inputs are plain kana —
+/// UniDic's pron field leans on ー where IPAdic spelled vowels out
+/// (ドー vs ドウ, イー vs イイ), and rules only match plain kana.
+/// Surface-derived variants still carry both arms into deconjugation,
+/// so nothing is lost by picking one here. Unresolvable ー (after ん,
+/// っ, or at string start) is left in place.
+pub fn resolve_chouonpu(text: &str) -> String {
+    if !text.contains('ー') {
+        return text.to_string();
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let mut out: Vec<char> = Vec::with_capacity(chars.len());
+    for &c in &chars {
+        if c == 'ー' {
+            let vowel = match out.last().copied().and_then(kana_row) {
+                Some(Row::A) => 'あ',
+                Some(Row::I) => 'い',
+                Some(Row::U) => 'う',
+                Some(Row::E) => 'い',
+                Some(Row::O) => 'う',
+                None => 'ー',
+            };
+            out.push(vowel);
+        } else {
+            out.push(c);
+        }
+    }
+    out.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

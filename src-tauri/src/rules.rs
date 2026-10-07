@@ -111,6 +111,53 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     ("ちゃっ", "ちゃっと", false),
     ("ちゃ", "ちゃと", false),
     ("ちゃ", "ちゃっと", false),
+    // まずは ("first of all"): UniDic splits まず|は (IPAdic keeps one
+    // adverb token), and the は never extends on its own. The tail
+    // matches readings (は reads わ). Any head may start it — the exact
+    // tail plus longest-first fallback keep it safe.
+    ("まず", "わ", false),
+    // いいよ ("it's fine"): UniDic splits いい|よ|っ (IPAdic keeps one
+    // token, so the sub-token ends used to reach いいよ). The よ never
+    // extends on its own. Any head may start it — longest-first falls
+    // back when no expression entry resolves.
+    ("いい", "よ", false),
+    // もう一つ ("one more"): UniDic splits もう|一|つ (一 is a 数詞
+    // noun, つ a suffix). The tail accumulates readings (ひと|つ).
+    ("もう", "ひとつ", false),
+    // Conditional として ("assuming"): UniDic splits と|し|て. と
+    // followed by し|て is always this construction or と+する-te.
+    ("と", "して", true),
+    // でも ("even"): UniDic splits で|も (風船でも割れる must stay
+    // 風船 / でも / 割れる). でも is a real entry; longest-first falls
+    // back when it doesn't apply.
+    ("で", "も", true),
+    // だろうか ("I wonder"): UniDic keeps だろう whole but か never
+    // attaches on its own. だろう|か is always this construction.
+    ("だろう", "か", true),
+    // だから/ですから ("so, because"): the causal から never attaches
+    // on its own, and だ/です are function-locked. A だ never precedes
+    // from-から (that から attaches to nouns), so every だ|から split
+    // is this construction. (だろうから has no headword — it correctly
+    // stays だろう|か|ら.)
+    ("だ", "から", true),
+    ("です", "から", true),
+    // かもしれない ("maybe"): UniDic splits か|も|しれ|ない with
+    // function-locked heads, so the expression never forms (あるの
+    // absorbs のか instead). Headed at か, not の: の is the
+    // explanatory particle (its own span) and isn't part of the
+    // headword (かも知れない/かもしれない). The tail accumulates
+    // readings across all four tokens; polite かもしれません works
+    // the same way through the same tail string.
+    ("か", "もしれない", true),
+    // でしたり (copula continuative + たり, 彼からでしたり): UniDic
+    // splits で|し|たり with a 助詞 で, so the copula-たり merge never
+    // forms. で followed by し|たり is always this construction.
+    ("で", "したり", true),
+    // ゴメンなさい: UniDic keeps なさい whole as a 動詞 (base なさる),
+    // so the な|さ|い completion never fires and the expression splits.
+    // Any head may start it — the exact tail keeps it safe.
+    ("ゴメン", "なさい", false),
+    ("ごめん", "なさい", false),
 ];
 
 /// Single-char particles a clipped emphasis can attach to (sokuon-span

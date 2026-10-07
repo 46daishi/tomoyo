@@ -34,6 +34,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["resources/*.dic.zst", "resources/*.json"]
+    "resources": ["resources/*.dic.zst", "resources/*.json", "resources/unidic-NOTICE", "resources/unidic-BSD"]
   }
 }

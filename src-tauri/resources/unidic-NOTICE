@@ -1,0 +1,7 @@
+This software includes a binary version of data from
+
+  https://clrd.ninjal.ac.jp/unidic_archive/cwj/3.1.1/unidic-cwj-3.1.1-full.zip
+
+where the connection ids are remapped using CORE data in BCCWJ (except the PN category)
+
+  https://clrd.ninjal.ac.jp/bccwj/.

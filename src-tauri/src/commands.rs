@@ -6,7 +6,6 @@ use crate::lookup::lookup_candidate;
 use crate::spans::lookup_from_position;
 use crate::deconjugate::Deconjugator;
 use crate::index::{find_containing, DictState};
-use crate::normalize;
 use crate::types::{MatchSpan, MorphToken, TokenOut};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -33,18 +32,12 @@ fn tokenize_tokens(tokenizer_mutex: &Mutex<Tokenizer>, text: &str) -> Vec<MorphT
         .token_iter()
         .map(|t| {
             let range = t.range_char();
-            let feature = t.feature(); // comma-separated MeCab features
-            let fields: Vec<&str> = feature.split(',').collect();
-            MorphToken {
-                start: range.start,
-                end: range.end,
-                surface: t.surface().to_string(),
-                base_form: fields.get(6).map(|s| s.to_string()).unwrap_or_else(|| t.surface().to_string()),
-                pos: fields.get(0).unwrap_or(&"").to_string(),
-                // readings come out in katakana; normalize to hiragana so they
-                // can be compared against dictionary readings.
-                reading: normalize::normalize_text(fields.get(7).unwrap_or(&"")),
-            }
+            crate::types::morph_token_from(
+                range.start,
+                range.end,
+                t.surface().to_string(),
+                t.feature(),
+            )
         })
         .collect()
 }
@@ -121,8 +114,17 @@ pub(crate) fn lookup_exact(
     let morph_base = tokens
         .iter()
         .find(|t| t.start == start && t.end == end)
-        .filter(|t| t.pos == "動詞" && t.base_form != t.surface && t.surface != "っ")
-        .map(|t| t.base_form.as_str());
+        .filter(|t| {
+            (t.pos == "動詞" && t.base_form != t.surface && t.surface != "っ")
+                || (t.surface == "あり" && t.reading == "あり")
+        })
+        .map(|t| {
+            if t.surface == "あり" && t.reading == "あり" {
+                "有る"
+            } else {
+                t.base_form.as_str()
+            }
+        });
     let (entries, deconj_info) = lookup_candidate(
         &candidate,
         &dict_state.0,
@@ -205,16 +207,7 @@ pub(crate) fn tokenize_text(state: tauri::State<TokenizerState>, text: String) -
 
     worker
         .token_iter()
-        .map(|t| {
-            let feature = t.feature(); // comma-separated MeCab features
-            let fields: Vec<&str> = feature.split(',').collect();
-            TokenOut {
-                surface: t.surface().to_string(),
-                reading: fields.get(7).unwrap_or(&"").to_string(), // reading field position varies by dict
-                pos: fields.get(0).unwrap_or(&"").to_string(),
-                base_form: fields.get(6).unwrap_or(&t.surface()).to_string(),
-            }
-        })
+        .map(|t| crate::types::token_out_from(t.surface().to_string(), t.feature()))
         .collect()
 }
 

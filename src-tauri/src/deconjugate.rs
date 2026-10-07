@@ -851,6 +851,13 @@ fn supplemental_rules() -> Vec<VirtualRule> {
         ("り", "る", "v5r"),
         ("り", "る", "v5r-i"),
         ("き", "くる", "vk"),
+        // Causative continuative (待たせ -> 待たせる, させ -> させる):
+        // UniDic reports the lexicalized causative stem as the base
+        // (IPAdic reported the root), so these stems only resolve through
+        // this. v1: all せる-verbs are ichidan. The emphatic-sokuon twin
+        // (待たせっ) covers clipped slang the same way.
+        ("せ", "せる", "v1"),
+        ("せっ", "せる", "v1"),
     ] {
         rules.push(VirtualRule {
             rule_type: RuleKind::OnlyFinal,
