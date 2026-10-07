@@ -5,6 +5,7 @@
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS } from '$lib/constants';
     import { getKnownWordsMap, updateWordStatus, getWordImages } from '$lib/dictionary.js';
+    import { distributeFurigana } from '$lib/furigana.js';
     import WordImageButton from '$lib/components/WordImageButton.svelte';
 
     let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {}, onStatusChanged } = $props();
@@ -128,6 +129,7 @@
                             {@const btnState = mineButtonState(entry.id)}
                             {@const forms = spellingChoices(entry, tooltipSpan.surface)}
                             {@const entryStatus = getEntryStatus(entry.id)}
+                            {@const furigana = distributeFurigana(entry.spellings[0] ?? '', entry.readings[0] ?? '')}
                             <li>
                                 <div class="entry-row">
                                     <div class="entry-body">
@@ -141,14 +143,20 @@
                                             {/if}
                                         {:else}
                                             <span class="entry-readings">
-                                                <span
-                                                    class="entry-spelling"
-                                                    class:known-word={entryStatus != null}
-                                                    style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
-                                                    onclick={(e) => handleEntryReadingClick(entry, e)}
-                                                >{entry.spellings[0] ?? entry.readings[0]}</span>
-                                                {#if entry.readings[0] && entry.spellings.length > 0}
-                                                    <span class="entry-reading-kana">{entry.readings[0]}</span>
+                                                {#if furigana.some((s) => s.reading)}
+                                                    <span
+                                                        class="entry-spelling"
+                                                        class:known-word={entryStatus != null}
+                                                        style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
+                                                        onclick={(e) => handleEntryReadingClick(entry, e)}
+                                                    >{#each furigana as seg}{#if seg.reading}<ruby><rb>{seg.text}</rb><rt class="entry-reading-kana">{seg.reading}</rt></ruby>{:else}{seg.text}{/if}{/each}</span>
+                                                {:else}
+                                                    <span
+                                                        class="entry-spelling"
+                                                        class:known-word={entryStatus != null}
+                                                        style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
+                                                        onclick={(e) => handleEntryReadingClick(entry, e)}
+                                                    >{entry.spellings[0] ?? entry.readings[0]}</span>
                                                 {/if}
                                             </span>
                                             <div class="entry-pos">{entry.pos.join(', ')}</div>

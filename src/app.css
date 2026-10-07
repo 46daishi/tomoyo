@@ -523,9 +523,12 @@ body {
 }
 
 .entry-reading-kana {
-    font-size: 1rem;
+    font-size: 0.7rem;
     font-weight: 500;
     color: var(--theme-accent, #b3b3b3);
+    line-height: 1;
+    margin-bottom: -3px;
+    margin-top: -7px;
 }
 
 .entry-pos {
@@ -577,7 +580,7 @@ body.mini-mode .entry-readings {
 }
 
 body.mini-mode .entry-reading-kana {
-    font-size: clamp(0.7rem, 2.5vh, 0.85rem);
+    font-size: clamp(0.5rem, 2vh, 0.65rem);
 }
 
 body.mini-mode .entry-definitions {
