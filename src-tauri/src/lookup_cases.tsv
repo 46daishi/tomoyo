@@ -232,7 +232,7 @@ spans-174	constructions	調査して	lookup			top_reading	ちょうさ
 spans-175	constructions	調査して	lookup			label	te	
 spans-176	spans	ジイさんじゃない。	lookup			surface	ジイさんじゃない	unknown leading token uses surface deconjugation
 spans-177	spans	ジイさんじゃない。	lookup			top_reading	じいさん	
-spans-178	spans	ジイさんじゃない。	lookup			label	copula	
+spans-178	spans	ジイさんじゃない。	lookup			label	negative	negative copula names the negation, not just copula
 spans-179	spans	マズいんだ	lookup			surface	マズいんだ	false boundary crossed to the real word
 spans-180	spans	マズいんだ	lookup			top_reading	まずい	
 labels-57	labels	急がなくても	lookup			top_reading	いそぐ	も-ending te-forms name the condition
@@ -565,3 +565,11 @@ bugs-12	bugs	そんな思いがあるのかもしれない。	scan			has_span	�
 bugs-13	bugs	そんな思いがあるのかもしれない。	scan			no_span	あるのか	
 bugs-14	bugs	そんな思いがあるのかもしれない。	scan			has_span	ある	
 bugs-15	bugs	少しも食べない	scan			has_span	少しも	negative polarity keeps 少しも whole
+bugs2-01	bugs	部員じゃないと、駄目かな?	lookup	じ		surface	じゃない	split じゃ|ない forms from じ-cursor
+bugs2-02	bugs	部員じゃないと、駄目かな?	scan		部員じゃない	label	negative	negative copula names the negation
+bugs2-03	bugs	だからぁ、穹ちゃんも一緒にどうかなーって?	scan		どうかなー	top_reading	どうかな	どうか never stands alone before な
+bugs2-04	bugs	とりつく島もなく、穹は背中を向けて早足で逃げていく。	scan		とりつく島もなく	top_spelling	取り付く島もない	verb+noun idiom stays whole
+bugs2-05	bugs	今日は休みだから、まだ寝ているんだろうか。	scan			has_span	今日	
+bugs2-06	bugs	今日は休みだから、まだ寝ているんだろうか。	scan			no_span	今日は	topic は never reads as greeting
+bugs2-07	bugs	亮平はプールのスタート台の上に立って、短い髪をかき上げてカッコつける。	scan		かき上げて	top_spelling	かき上げる	exact script match beats frequency
+bugs2-08	bugs	カズちゃんとらぶらぶ	lookup	ちゃんとらぶらぶ	ちゃん	top_pos_contains	suffix	primary reading beats secondary (ちゃん-suffix over 父)

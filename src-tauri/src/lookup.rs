@@ -1599,10 +1599,44 @@ pub(crate) fn lookup_candidate(
         // the root 知る): rank it with deconjugations so a common word
         // reached by rules (知る) wins by frequency instead of losing on
         // kind. Attested bases (食べる, する, 有る) keep full
-        // morphological precedence.
+        // morphological precedence — and so do script-faithful ones: when
+        // the tokenizer's base IS that entry's dictionary form spelled in
+        // the surface's own script (かき上げて -> かき上げる, 4 shared
+        // chars), the analysis agrees with the text and stays trusted.
+        // Coincidental overlaps don't qualify (知らす shares only 知ら,
+        // 惹く only 惹 with their surfaces).
+        let lcp_len = |a: &str, b: &str| -> usize {
+            a.chars().zip(b.chars()).take_while(|(x, y)| x == y).count()
+        };
+        let morph_is_faithful = |e: &Arc<DictEntry>| match morph_base {
+            Some(base) => e.spellings.iter().any(|s| {
+                normalize::normalize_text(s) == base && lcp_len(candidate, s) >= 3
+            }),
+            None => false,
+        };
         let effective_kind = |c: &(Arc<DictEntry>, usize, Option<String>, MatchKind, bool)| match c.3 {
-            MatchKind::Morphological if c.0.priority.is_empty() => MatchKind::Deconjugated,
+            MatchKind::Morphological
+                if c.0.priority.is_empty() && !morph_is_faithful(&c.0) =>
+            {
+                MatchKind::Deconjugated
+            }
             k => k,
+        };
+        // Exact-base precedence among morphological answers: the tokenizer
+        // named this exact dictionary form (かき上げる over 書き上げる),
+        // so frequency bows to direct morphological evidence. Only
+        // effective-morphological entries qualify — demoted ones (知らす)
+        // already lost on kind above and keep losing below.
+        let morph_exact = |c: &(Arc<DictEntry>, usize, Option<String>, MatchKind, bool)| {
+            effective_kind(c) == MatchKind::Morphological
+                && match morph_base {
+                    Some(base) => c
+                        .0
+                        .spellings
+                        .iter()
+                        .any(|s| normalize::normalize_text(s) == base),
+                    None => false,
+                }
         };
         let a_tate = is_tate(a) && !spellingish(&b.3);
         let b_tate = is_tate(b) && !spellingish(&a.3);
@@ -1690,6 +1724,7 @@ pub(crate) fn lookup_candidate(
         if has_kanji {
             ord.then(b_kanji_share.cmp(&a_kanji_share)) // kanji match: true first
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
+                .then(morph_exact(b).cmp(&morph_exact(a))) // tokenizer's exact form first
                 .then(a_orphan.cmp(&b_orphan)) // common word first
                 .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
@@ -1707,8 +1742,24 @@ pub(crate) fn lookup_candidate(
             let a_kana = a.0.kana_only;
             let b_kana = b.0.kana_only;
             // Pure-kana surface: no kanji evidence, most common word wins.
-            ord.then(a_orphan.cmp(&b_orphan)) // common word first
+            // Bound morphemes first: a top-tier suffix entry matching
+            // exactly (ちゃん, くん, さん) IS that morpheme — a kanji word
+            // merely listing the reading (父 lists ちゃん fourth) is the
+            // coincidence, however common. Narrow on purpose: single-pos
+            // suffix entries at ichi1/nf01-05 only, so productive affixes
+            // with real readings (内 spec1, ない-aux, アト-prefix) and
+            // obscure affixes never outrank real words on script alone.
+            let suffix_headword = |e: &Arc<DictEntry>| {
+                e.pos.len() == 1
+                    && e.pos[0] == "suffix"
+                    && priority_score(e) >= 950
+            };
+            let a_suffix = suffix_headword(&a.0);
+            let b_suffix = suffix_headword(&b.0);
+            ord.then(morph_exact(b).cmp(&morph_exact(a))) // tokenizer's exact form first
+                .then(a_orphan.cmp(&b_orphan)) // common word first
                 .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
+                .then(b_suffix.cmp(&a_suffix)) // exact suffix match first
                 .then(b_kana.cmp(&a_kana)) // usually-kana entries first
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
                 .then(b_prio.cmp(&a_prio))

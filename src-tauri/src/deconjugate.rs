@@ -868,6 +868,23 @@ fn supplemental_rules() -> Vec<VirtualRule> {
             detail: "continuative".to_string(),
         });
     }
+    // Negative continuative into na-adjective entries (とりつく島もなく
+    // -> 取り付く島もない, 仕方なく -> 仕方ない): the generic く->い
+    // adjective rule reaches these with an adj-i tag, which can never
+    // validate against keiyodoshi entries — so the idiom dies and the
+    // span shreds. adj-na is POS-unrestricted at lookup, but the form
+    // only enters the pool when it spells a real entry, so 食べなく
+    // and friends still fall through to the verb. Parenthetical detail
+    // keeps the label clean (the expression is the answer, not the
+    // inflection).
+    rules.push(VirtualRule {
+        rule_type: RuleKind::OnlyFinal,
+        dec_end: "ない".to_string(),
+        con_end: "なく".to_string(),
+        dec_tag: "adj-na".to_string(),
+        con_tag: String::new(),
+        detail: "(continuative)".to_string(),
+    });
 
     // Past of the とく contraction on する (しといた -> する, like しとく
     // -> する via JL's toku rule): といた has no JL rule, so the span

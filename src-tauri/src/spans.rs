@@ -1349,6 +1349,20 @@ pub(crate) fn lookup_from_position(
                 let mut candidate = candidate;
                 let mut entries = entries;
                 let mut deconj_info = deconj_info;
+                // A bare "copula" label on a negative copula form reads
+                // wrong (部員じゃない should name the negation, not just
+                // the copula): the tail tables already call じゃない
+                // "negative", so align the deconjugation path with them.
+                // Exact tail match only (じゃない/ではない and their past
+                // forms); じゃないか/じゃないけど keep whatever the tail
+                // machinery named.
+                if deconj_info.as_deref() == Some("copula")
+                    && ["じゃない", "ではない", "じゃなかった", "ではなかった"]
+                        .iter()
+                        .any(|t| candidate.ends_with(t))
+                {
+                    deconj_info = Some("negative".to_string());
+                }
                 // Wrapper-fallback wins (honorific お/ご prefix, small-vowel
                 // coda strip) name how the STEM resolves, not a tail of this
                 // candidate — so the label-keyed tail preferences below must
@@ -1730,6 +1744,36 @@ pub(crate) fn lookup_from_position(
                                 entries = se;
                                 deconj_info = si;
                             }
+                        }
+                    }
+                }
+                // 今日は is almost always 今日 + topic は in running text;
+                // the greeting reading (こんにちは) swallows the noun whenever
+                // the whole matches. Split to 今日 so the day stays reachable
+                // (the kana greeting こんにちは still resolves on its own).
+                // Narrow: only the greeting-topped 今日は splits.
+                if candidate == "今日は"
+                    && entries.first().map_or(false, |e| {
+                        e.readings.iter().any(|r| {
+                            r == "こんにちは" || r == "こんちは" || r == "こにちは"
+                        })
+                    })
+                {
+                    let stem = "今日".to_string();
+                    if let Some((se, si)) = lookup_candidate(
+                        &stem,
+                        index,
+                        decon,
+                        context_reading,
+                        morph_base,
+                        tokens,
+                        position,
+                    ) {
+                        if !se.is_empty() {
+                            eff_end = position + stem.chars().count();
+                            candidate = stem;
+                            entries = se;
+                            deconj_info = si;
                         }
                     }
                 }

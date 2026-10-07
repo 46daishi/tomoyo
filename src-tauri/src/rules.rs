@@ -149,6 +149,20 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     // readings across all four tokens; polite かもしれません works
     // the same way through the same tail string.
     ("か", "もしれない", true),
+    // じゃない ("is not"): UniDic splits じゃ|ない with a
+    // function-locked じゃ head, so hovering じ never forms the span.
+    // The literal じゃない entry resolves it.
+    ("じゃ", "ない", true),
+    // どうかな ("I wonder how"): the なー stretches across tokens and
+    // only the mid-token completion arm can land どうかな-end inside
+    // なー (readings agree in length). Any head may start it.
+    ("どう", "かな", false),
+    // とりつく島もない ("left utterly helpless"): verb + noun + も +
+    // なく idiom that the verb+noun guard would otherwise split. Tail in
+    // reading space like the other split-sensitive rows (島 reads しま):
+    // the なく inflection resolves through the standard ない-strip to
+    // the dictionary form. Kana head only (the reported shape).
+    ("とりつく", "しまもなく", false),
     // でしたり (copula continuative + たり, 彼からでしたり): UniDic
     // splits で|し|たり with a 助詞 で, so the copula-たり merge never
     // forms. で followed by し|たり is always this construction.
