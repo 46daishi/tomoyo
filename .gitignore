@@ -31,4 +31,4 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 src-tauri/resources/*
-!src-tauri/resources/deconjugation-rules.json
+!src-tauri/resources/deconjugation_rules.json
