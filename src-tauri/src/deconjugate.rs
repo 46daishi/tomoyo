@@ -134,6 +134,25 @@ impl Deconjugator {
 
         virtual_rules.extend(supplemental_rules());
 
+        // DIVERGENCE FROM JL (deliberate): JL applies every rule to the
+        // initial (untagged) surface, including ones whose con_tag names a
+        // required intermediate tag. The ke-stem rule (con け -> い, con_tag
+        // stem-ke) is only meaningful as step two after a れば-strip tags
+        // the stem — fired first, it turns any け-final surface into an
+        // i-adjective (コケ -> 濃い), a phonologically impossible mapping
+        // no conjugation or sound change justifies. Constrain it to tagged
+        // forms (NeverFinal); the れば-chains that need it still flow, and
+        // raw surfaces stop reaching adjectives they cannot be.
+        for rule in virtual_rules.iter_mut() {
+            if rule.rule_type == RuleKind::Std
+                && rule.con_end == "け"
+                && rule.dec_end == "い"
+                && rule.con_tag == "stem-ke"
+            {
+                rule.rule_type = RuleKind::NeverFinal;
+            }
+        }
+
         let mut buckets: HashMap<char, RuleBucket> = HashMap::new();
         let mut empty_con_end = RuleBucket::default();
         for rule in virtual_rules {

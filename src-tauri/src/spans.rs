@@ -769,12 +769,53 @@ pub(crate) fn lookup_from_position(
                 // coincidental reading homophones (走破/争覇) — the real
                 // adverb+は words (まずは, または) are single tokens. Other
                 // particles (か/に/も) stay continuable so なぜか/どうか/
-                // そうです keep resolving.
+                // そうです keep resolving — except interrogative か below.
                 if token_at_pos.map_or(false, |t| t.pos == "副詞")
                     && tok.pos == "助詞"
                     && tok.surface == "は"
                 {
                     break;
+                }
+                // Interrogative か after an adverb (こうかな? -> こう + かな,
+                // not こうか -> 効果): when か is followed by a sentence
+                // particle (な/ね/よ and their lengthened forms, ?/?, !/!),
+                // it is the question particle, not part of a word — unless
+                // the adverb+か itself is an adverbial word (なぜか/どうか/
+                // いつか stay whole). Bare/EOS-final か (そうか, どうか) and
+                // non-adverb cursors (何か, マジか, verb+か) are untouched.
+                if token_at_pos.map_or(false, |t| t.pos == "副詞")
+                    && tok.pos == "助詞"
+                    && tok.surface == "か"
+                {
+                    let next = tokens.iter().find(|t| t.start == tok.end);
+                    let interrogative_follow = next.map_or(false, |t| {
+                        matches!(
+                            t.surface.as_str(),
+                            "な" | "ね" | "よ" | "なー" | "ねー" | "よー" | "?" | "？" | "!" | "！"
+                        )
+                    });
+                    if interrogative_follow {
+                        let compound: String =
+                            chars[position..tok.end].iter().collect();
+                        // Strict adverb (not the broad adverbial class):
+                        // a か-suffixed adverb stays an adverb (なぜか/どうか
+                        // stay whole), while na-adjectives that merely read
+                        // the same (高価 for こうか) must not protect the
+                        // merge. Word-split, so "adverbial nouns" never
+                        // counts.
+                        let adverbial = normalize::normalize_variants(&compound)
+                            .iter()
+                            .flat_map(|k| index.by_text.get(k).into_iter().flatten())
+                            .any(|e| {
+                                e.pos.iter().any(|p| {
+                                    p.split(|c: char| !c.is_alphabetic())
+                                        .any(|w| w == "adverb")
+                                })
+                            });
+                        if !adverbial {
+                            break;
+                        }
+                    }
                 }
                 // のか before a かもしれない construction (あるのかもしれない):
                 // the の belongs to のかもしれない, not to an explanatory-のか
@@ -1362,6 +1403,22 @@ pub(crate) fn lookup_from_position(
                         .any(|t| candidate.ends_with(t))
                 {
                     deconj_info = Some("negative".to_string());
+                }
+                // A vulgar auxiliary やがる inside the span (来やがったか ->
+                // 来る "past") must show in the label, or the disdain the
+                // speaker put there vanishes without a trace. Appended
+                // house-style ("suru + do for someone"), never replacing.
+                if !deconj_info.as_deref().map_or(false, |d| d.contains("vulgar"))
+                    && tokens.iter().any(|t| {
+                        t.start >= position
+                            && t.end <= eff_end
+                            && t.base_form == "やがる"
+                    })
+                {
+                    deconj_info = match deconj_info {
+                        Some(l) => Some(format!("{l} + vulgar")),
+                        None => Some("vulgar".to_string()),
+                    };
                 }
                 // Wrapper-fallback wins (honorific お/ご prefix, small-vowel
                 // coda strip) name how the STEM resolves, not a tail of this

@@ -321,6 +321,22 @@ pub(crate) fn lookup_candidate(
         }
     }
 
+    // てみる ("try") fires only on the auxiliary itself: the み must be
+    // the literal kana み or kanji 見 (食べてみる, て見る). A み that
+    // merely reads that way — a kanji noun's reading (水 -> みず in
+    // 絞って水) — must never feed it, or the noun's phrase resolves
+    // as "try doing". Surface-anchored (normalized, so katakana テミル
+    // counts): legit compositions always spell it outright. Applies
+    // everywhere chains are consumed below (morph gate + label, both
+    // deconjugation pools).
+    let try_ok = |f: &DeconjugatedForm| {
+        !(f.rule_chain.as_deref().map_or(false, |c| {
+            c.split('→').any(|seg| seg == "try doing")
+        }) && !["てみ", "でみ", "て見", "で見"]
+            .iter()
+            .any(|s| normalize::normalize_text(candidate).contains(s)))
+    };
+
     // Morphological matches — the tokenizer's base form for the verb at the
     // cursor. High confidence because MeCab resolved the actual conjugation
     // (します -> し -> する), so it outranks rule-based deconjugation, which can
@@ -338,7 +354,7 @@ pub(crate) fn lookup_candidate(
     //      いいよる) hijack morphology ahead of the honest reading match.
     if let Some(base) = morph_base {
         let base_norm = normalize::normalize_text(base);
-        let base_ids: HashSet<u32> = index
+        let mut base_ids: HashSet<u32> = index
             .by_text
             .get(&base_norm)
             .map(|es| es.iter().map(|e| e.id).collect())
@@ -348,7 +364,7 @@ pub(crate) fn lookup_candidate(
         // fires then, so the morph label silently degrades to first_rule
         // (言いませんでした read "past" instead of "polite past
         // negative"). Also match the base entries' readings.
-        let base_readings: HashSet<String> = index
+        let mut base_readings: HashSet<String> = index
             .by_text
             .get(&base_norm)
             .map(|es| {
@@ -357,6 +373,39 @@ pub(crate) fn lookup_candidate(
                     .collect()
             })
             .unwrap_or_default();
+        // Passive-lexicalized bases (魅入られる, 食べられる): the tokenizer
+        // reports the passive as the lemma, but no such headword exists —
+        // the real word is the root (魅入る, 食べる). When the base itself
+        // has no entry and stripping られる yields one, trust the root as
+        // well (ids, readings, and pushed entries below all include it):
+        // godan bogus roots (書かれる -> 書かる) simply miss and change
+        // nothing, and hit-bases (待たせる, 知らす) never reach this.
+        let root_norm: Option<String> = {
+            let cs: Vec<char> = base.chars().collect();
+            if base_ids.is_empty()
+                && cs.len() > 3
+                && cs[cs.len() - 3..] == ['ら', 'れ', 'る']
+            {
+                let stem: String = cs[..cs.len() - 3].iter().collect();
+                let rnorm = normalize::normalize_text(&format!("{stem}る"));
+                if index.by_text.get(&rnorm).map_or(false, |es| !es.is_empty()) {
+                    Some(rnorm)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+        if let Some(rn) = &root_norm {
+            if let Some(es) = index.by_text.get(rn) {
+                base_ids.extend(es.iter().map(|e| e.id));
+                base_readings.extend(
+                    es.iter()
+                        .flat_map(|e| e.readings.iter().map(|r| normalize::normalize_text(r))),
+                );
+            }
+        }
         // A kana reading deconjugates to kana text while the base form may
         // be kanji (あり -> ある vs 有る), so a reading form also counts
         // when it resolves to the base's dictionary entry — ったく -> 九
@@ -367,14 +416,14 @@ pub(crate) fn lookup_candidate(
         // analysis winning on its own merits, not morphology to trust —
         // 知らされなかった keeps resolving to 知る.
         let via_deconj = reading_forms.iter().any(|f| {
-            let f_norm = normalize::normalize_text(&f.text);
-            f_norm == base_norm
-                || base_readings.contains(&f_norm)
-                || (f.proper_steps <= 1
-                    && index
-                        .by_text
-                        .get(&f_norm)
-                        .map_or(false, |es| es.iter().any(|e| base_ids.contains(&e.id))))
+            try_ok(f)
+                && (normalize::normalize_text(&f.text) == base_norm
+                    || base_readings.contains(&normalize::normalize_text(&f.text))
+                    || (f.proper_steps <= 1
+                        && index
+                            .by_text
+                            .get(&normalize::normalize_text(&f.text))
+                            .map_or(false, |es| es.iter().any(|e| base_ids.contains(&e.id)))))
         });
         let tail_tokens: Vec<&MorphToken> = tokens
             .iter()
@@ -455,7 +504,7 @@ pub(crate) fn lookup_candidate(
                 if let Some(chain) = decon
                     .deconjugate(reading)
                     .iter()
-                    .find(|f| resolves_to_base(f))
+                    .find(|f| try_ok(f) && resolves_to_base(f))
                     .and_then(|f| f.rule_chain.as_deref())
                 {
                     label = combined_label(chain);
@@ -480,11 +529,19 @@ pub(crate) fn lookup_candidate(
                     .or_else(|| label_readings.last().and_then(|r| decon.first_rule(r)))
                     .unwrap_or_else(|| base.to_string())
             };
-            if let Some(entries) = index.by_text.get(&base_norm) {
-                for e in entries {
-                    if seen_ids.insert(e.id) {
-                        let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
-                        candidates.push((Arc::clone(e), 1, Some(label.clone()), MatchKind::Morphological, ctx));
+            let mut push_norms = vec![base_norm.clone()];
+            if let Some(rn) = &root_norm {
+                if rn != &base_norm {
+                    push_norms.push(rn.clone());
+                }
+            }
+            for norm_key in push_norms {
+                if let Some(entries) = index.by_text.get(&norm_key) {
+                    for e in entries {
+                        if seen_ids.insert(e.id) {
+                            let ctx = context_reading.map_or(false, |r| reading_matches_context(e, r));
+                            candidates.push((Arc::clone(e), 1, Some(label.clone()), MatchKind::Morphological, ctx));
+                        }
                     }
                 }
             }
@@ -804,6 +861,25 @@ pub(crate) fn lookup_candidate(
     // deconjugation result is also validated against the entry's POS (the
     // rule's word class must appear among the entry's parts of speech), so a
     // coincidental conjugation like しる -> 知る (v5r) never surfaces.
+    //
+    // Katakana words don't inflect, so rule-derived inflections of a
+    // pure-katakana surface are noise by construction (コケ -> 濃い via the
+    // ke-stem rule): when a real entry already resolved, skip this pool
+    // entirely. The top cannot change — deconjugation ranks below every
+    // literal kind — this only truncates impossible tail entries. Spans
+    // without literals (スゴッ, イヤッホーッ) still deconjugate as before.
+    let skip_rule_deconj = !candidate.is_empty()
+        && candidate.chars().all(|c| {
+            matches!(c, '\u{30A0}'..='\u{30FF}' | '\u{FF61}'..='\u{FF9F}')
+        })
+        && candidates
+            .iter()
+            .any(|(e, _, _, _, _)| priority_score(e) != 0);
+    let deconj_pool: &[DeconjugatedForm] = if skip_rule_deconj {
+        &[]
+    } else {
+        &deconj_forms
+    };
     let starts_at_position = tokens.iter().any(|t| t.start == position);
     let span_has_verb_token = tokens
         .iter()
@@ -815,7 +891,10 @@ pub(crate) fn lookup_candidate(
     let single_token_span = tokens
         .iter()
         .any(|t| t.start == position && t.end >= position + span_len);
-    for form in &deconj_forms {
+    for form in deconj_pool {
+        if !try_ok(form) {
+            continue;
+        }
         // Verb-class results need a real verb token backing them (see
         // is_verb_class) — otherwise 好きな (名詞+な) resolves to 好く via the
         // imperative な rule. Sub-span candidates (cursor mid-token, e.g. the
@@ -1434,6 +1513,11 @@ pub(crate) fn lookup_candidate(
                 && is_verb_class(&form.tag)
                 && !span_has_verb_token
             {
+                continue;
+            }
+            // Same てみる gate as the modern pool (see above): classical
+            // forms route through the same てみる-strip rule.
+            if !try_ok(form) {
                 continue;
             }
             let is_na_imperative = form.rule_chain.as_deref().map_or(false, |c| {

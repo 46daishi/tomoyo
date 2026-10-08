@@ -573,3 +573,17 @@ bugs2-05	bugs	今日は休みだから、まだ寝ているんだろうか。	sc
 bugs2-06	bugs	今日は休みだから、まだ寝ているんだろうか。	scan			no_span	今日は	topic は never reads as greeting
 bugs2-07	bugs	亮平はプールのスタート台の上に立って、短い髪をかき上げてカッコつける。	scan		かき上げて	top_spelling	かき上げる	exact script match beats frequency
 bugs2-08	bugs	カズちゃんとらぶらぶ	lookup	ちゃんとらぶらぶ	ちゃん	top_pos_contains	suffix	primary reading beats secondary (ちゃん-suffix over 父)
+bugs3-01	bugs	ちっ、来やがったか......	lookup	来やがった		surface	来やがったか	general verbs name やがる too
+bugs3-02	bugs	ちっ、来やがったか......	lookup	来やがった		label_contains	vulgar	
+bugs3-03	bugs	バーカ、アンタはプールの底に降りてコケ落としよ。	scan		コケ	top_spelling	苔	katakana moss stays moss
+bugs3-04	bugs	バーカ、アンタはプールの底に降りてコケ落としよ。	scan		コケ	no_entry	濃い|こい	phonologically impossible matches never list
+bugs3-05	bugs	イヤッホーッ!!!	scan		イヤッホー	top_reading	イヤッホー	split interjection resolves almost whole
+bugs3-06	bugs	ズボンまでびしょ濡れだけど、冷たくて気分が一瞬ですっきりする。	scan			has_span	だけど	copula だ + けど merges
+bugs3-07	bugs	僕も、その瞳に魅入られたかのように、目が離せないでいた。	scan		魅入られたかの	top_spelling	魅入る	passive lemma resolves to the root
+bugs3-08	bugs	僕は、上着を脱ぐとぎゅっと絞って水を切る。	scan		絞って	top_spelling	絞る	te-form stays out of てみる
+bugs3-09	bugs	僕は、上着を脱ぐとぎゅっと絞って水を切る。	scan		水を切る	top_spelling	水を切る	
+bugs3-10	bugs	.........こ、こうかな?	scan			has_span	こう	
+bugs3-11	bugs	.........こ、こうかな?	scan		かな	has_entry_pos	particle	question concord forms its span
+bugs3-12	bugs	.........こ、こうかな?	scan			no_span	こうか	coincidental 効果 never swallows こう
+bugs3-13	bugs	そうかな?	scan			has_span	そう	
+bugs3-14	bugs	そうかな?	scan		かな	has_entry_pos	particle	

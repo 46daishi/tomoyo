@@ -277,9 +277,13 @@
                 }
             }
             "no_entry" => {
+                // Banned spellings OR readings present anywhere in the list
+                // (こけ must never list 濃い/こい: phonologically impossible
+                // matches are bugs even below the top).
                 let banned: Vec<&str> = expected.split('|').collect();
                 let hit = span.entries.iter().any(|e| {
                     e.spellings.first().map_or(false, |s| banned.contains(&s.as_str()))
+                        || e.readings.iter().any(|r| banned.contains(&r.as_str()))
                 });
                 if hit {
                     fail("banned entry present".to_string())

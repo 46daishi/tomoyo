@@ -102,6 +102,18 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     ("しか", "ない", true),
     // だけど ("but") splits as だけ|ど with the same lock.
     ("だけ", "ど", true),
+    // だけど from copula だ + けど (濡れだけど): UniDic splits だ|けど
+    // with a 助動詞 だ, so the だけ-head never matches. だ followed by
+    // けど is always this conjunction (from-から attaches to nouns, and
+    // contrastive けど after a copula IS だけど). Fires only when だ
+    // stands alone — absorbed copulas (そうだ) never reach this cursor.
+    ("だ", "けど", true),
+    // かな concord ("I wonder") splits as か|な with a function-locked
+    // か head, so it never forms (こうかな? -> こうか -> 効果). か|な
+    // adjacent is always this concord. The span resolves to whatever
+    // the dictionary says (particleかな/仮名/金); the obscure-splitter
+    // skips completion-built ends, so it survives intact.
+    ("か", "な", true),
     // ちゃっちゃと ("quickly") shreds as ちゃっ|ちゃ|と with a
     // function-locked ちゃっ head, so the adverb never forms
     // (and ちゃう wins its list). Any ちゃ head may start the
@@ -172,6 +184,13 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     // Any head may start it — the exact tail keeps it safe.
     ("ゴメン", "なさい", false),
     ("ごめん", "なさい", false),
+    // Exclamatory interjections split across sokuon (イヤッ|ホーッ):
+    // the pieces never resolve alone (イヤ falls back to 嫌). Tail in
+    // reading space without the trailing sokuon so the mid-token arm
+    // lands イヤッホ-end inside ホーッ; the chouonpu deconjugation then
+    // reaches the dictionary form (イヤッホー), exactly as the single-
+    // token segmentation resolves on its own. Kana head only.
+    ("イヤッ", "ほう", false),
 ];
 
 /// Single-char particles a clipped emphasis can attach to (sokuon-span

@@ -528,7 +528,6 @@ body {
     color: var(--theme-accent, #b3b3b3);
     line-height: 1;
     margin-bottom: -3px;
-    margin-top: -7px;
 }
 
 .entry-pos {
