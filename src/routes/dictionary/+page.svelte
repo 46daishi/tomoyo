@@ -233,14 +233,21 @@
         frequentLoaded = true;
     }
 
-    // Distinct spellings a word can be mined as: its primary (kanji) form and
-    // its kana reading. Collapses to a single choice for pure-kana words.
+    // Every distinct form a word can be mined as: all listed spellings,
+    // then all listed readings (deduped). Falls back to the hovered
+    // surface only when the entry lists no forms at all. Collapses to a
+    // single choice for pure-kana words.
     function spellingChoices(entry, surface) {
-        const spelling = entry?.spellings?.[0] ?? surface;
-        const reading = entry?.readings?.[0];
         const choices = [];
-        if (spelling) choices.push({ label: spelling, value: spelling });
-        if (reading && reading !== spelling) choices.push({ label: reading, value: reading });
+        const seen = new Set();
+        const forms = [...(entry?.spellings ?? []), ...(entry?.readings ?? [])];
+        if (forms.length === 0 && surface) forms.push(surface);
+        for (const form of forms) {
+            if (form && !seen.has(form)) {
+                seen.add(form);
+                choices.push({ label: form, value: form });
+            }
+        }
         return choices;
     }
 
