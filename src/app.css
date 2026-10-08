@@ -509,6 +509,13 @@ body {
     padding-top: 0.6rem;
 }
 
+/* Bottom breathing room that survives scrolling: padding on the scroll
+   container itself is ignored at the scroll end by some engines, while
+   padding inside the last item always counts towards the scroll height. */
+.tooltip-entries li:last-child {
+    padding-bottom: 0.5rem;
+}
+
 .tooltip-deconj {
     font-weight: 400;
     font-size: 0.9rem;
@@ -523,7 +530,7 @@ body {
 }
 
 .entry-reading-kana {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 500;
     color: var(--theme-accent, #b3b3b3);
     line-height: 1;
@@ -535,13 +542,17 @@ body {
     color: var(--theme-textSecondary, #36b7bd);
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    margin-top: 0.15rem;
+    /* Small-caps microcopy wraps with a large default leading relative
+       to its size, which reads as a gap between lines — pin it tight. */
+    line-height: 1.6;
+    margin-top: 0.35rem;
 }
 
 .entry-definitions {
     font-size: 0.95rem;
     color: var(--theme-text, #b3b3b3);
-    margin-top: 0rem;
+    margin-top: 0.3rem;
+    line-height: 1.7;
 }
 
 .tooltip-no-match {

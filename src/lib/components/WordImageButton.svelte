@@ -190,6 +190,14 @@
 <style>
     .word-image-wrap {
         position: relative;
+        /* The invisible <select> overlay must never escape this box: if its
+           containing block ever resolves above the wrap, the transparent
+           overlay swallows clicks across the whole tooltip and opens this
+           menu from anywhere. `contain: layout` forces the wrap to be the
+           containing block for absolutely-positioned descendants no matter
+           what, independent of the position rule above. No visual change:
+           no paint/size containment, so the error bubble still shows. */
+        contain: layout;
         display: inline-flex;
         flex-shrink: 0;
         vertical-align: middle;
