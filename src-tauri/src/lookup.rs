@@ -1647,6 +1647,13 @@ pub(crate) fn lookup_candidate(
     candidates.sort_by(|a, b| {
         let a_prio = priority_score(&a.0);
         let b_prio = priority_score(&b.0);
+        // Exact corpus rank as a late tiebreak (lower = more common first);
+        // unlisted entries (0) sort as rarest, so attested corpus presence
+        // wins among tier-equals without disturbing tier dominance.
+        let rank_or_last =
+            |e: &Arc<DictEntry>| if e.freq_rank == 0 { u32::MAX } else { e.freq_rank };
+        let a_freq = rank_or_last(&a.0);
+        let b_freq = rank_or_last(&b.0);
         let a_orphan = a_prio == 0;
         let b_orphan = b_prio == 0;
         let primary_share = |e: &Arc<DictEntry>| {
@@ -1813,6 +1820,7 @@ pub(crate) fn lookup_candidate(
                 .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
                 .then(b_prio.cmp(&a_prio))
+                .then(a_freq.cmp(&b_freq)) // exact corpus rank breaks tier ties
                 .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
         } else {
             // Pure-kana surface: prefer usually-kana words (せい -> 所為,
@@ -1852,6 +1860,7 @@ pub(crate) fn lookup_candidate(
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
                 .then(b_prio.cmp(&a_prio))
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
+                .then(a_freq.cmp(&b_freq)) // exact corpus rank breaks tier ties
                 .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0)))
         }
     });

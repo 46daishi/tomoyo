@@ -525,3 +525,20 @@
             "archaic 哉 should sort last");
     }
 
+    #[test]
+    fn freq_rank_breaks_tier_ties() {
+        // こう: 甲 and 稿 share priority tier 900 with identical match kind,
+        // context, script, and step counts — only the exact corpus ranks
+        // (5531 < 15149) can order them. Tiers alone leave index order.
+        let h = Harness::new();
+        let text = "こう";
+        let tokens = h.tokens(text);
+        let span = lookup_from_position(text, 0, 0, &h.index, &h.decon, &tokens).unwrap();
+        let pair: Vec<String> = span.entries.iter()
+            .filter(|e| e.spellings.first().map_or(false, |s| s == "甲" || s == "稿"))
+            .map(|e| e.spellings[0].clone())
+            .collect();
+        assert_eq!(pair, vec!["甲".to_string(), "稿".to_string()],
+            "甲 (#5531) should precede 稿 (#15149), got {pair:?}");
+    }
+

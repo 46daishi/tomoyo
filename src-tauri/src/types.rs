@@ -53,7 +53,8 @@ pub(crate) struct DictEntry {
     #[serde(default)]
     pub(crate) misc: Vec<String>,
     // Corpus frequency rank (lower is more common); 0 = unranked, in
-    // which case the priority tiers decide as before.
+    // which case the priority tiers decide as before. Ranks break ties
+    // within equal tiers at sort time (unlisted sorts rarest).
     #[serde(default)]
     pub(crate) freq_rank: u32,
 }
