@@ -6,6 +6,8 @@
     import { STATUS_LEVELS } from '$lib/constants';
     import { getKnownWordsMap, updateWordStatus, getWordImages } from '$lib/dictionary.js';
     import { distributeFurigana } from '$lib/furigana.js';
+    import { frequencyTier, frequencyRank } from '$lib/frequency.js';
+    import { formatPosTags } from '$lib/posLabels.js';
     import WordImageButton from '$lib/components/WordImageButton.svelte';
 
     let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {}, onStatusChanged } = $props();
@@ -144,7 +146,7 @@
                                             <span class="entry-readings">
                                                 <span class="entry-spelling">{entry.spellings[0]}</span>
                                             </span>
-                                            <div class="entry-pos">{entry.pos.join(', ')}</div>
+                                            <div class="entry-pos">{formatPosTags(entry.pos)}</div>
                                             {#if entry.definitions.length > 0}
                                                 <div class="entry-definitions">{entry.definitions.join('; ')}</div>
                                             {/if}
@@ -166,7 +168,21 @@
                                                     >{entry.spellings[0] ?? entry.readings[0]}</span>
                                                 {/if}
                                             </span>
-                                            <div class="entry-pos">{entry.pos.join(', ')}</div>
+                                            {@const freqTier = frequencyTier(entry)}
+                                            {@const freqRank = frequencyRank(entry)}
+                                            {@const freqLabel = freqTier === 'common' ? 'Common' : freqTier === 'uncommon' ? 'Uncommon' : 'Rare'}
+                                            {@const freqTitle = freqTier === 'common'
+                                                ? 'Common word (top newspaper frequency or JMdict common flag)'
+                                                : freqTier === 'uncommon'
+                                                    ? 'Less common word (lower newspaper frequency band)'
+                                                    : 'Outside newspaper frequency lists — likely rare or specialized'}
+                                            <div class="entry-freq">
+                                                <span
+                                                    class="freq-tag freq-tier-{freqTier}"
+                                                    title={freqTitle}
+                                                >{freqLabel}{#if freqRank !== null}<span class="freq-num">#{freqRank.toLocaleString('en-US')}</span>{/if}</span>
+                                            </div>
+                                            <div class="entry-pos">{formatPosTags(entry.pos)}</div>
                                             <div class="entry-definitions">{entry.definitions.join('; ')}</div>
                                         {/if}
                                     </div>

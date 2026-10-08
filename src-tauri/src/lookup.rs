@@ -1822,9 +1822,13 @@ pub(crate) fn lookup_candidate(
             // obscure-margin splitter below (どうか must stay whole).
             // Kanji surfaces skip this entirely — kanji evidence dominates
             // there, and a kana match against a kanji surface is
-            // coincidental by definition.
-            let a_kana = a.0.kana_only;
-            let b_kana = b.0.kana_only;
+            // coincidental by definition. Archaic words never ride the
+            // boost: script agreement is among current words, so an old
+            // usually-kana form (哉, arch particle) must not outrank its
+            // modern rivals (かな particle, 仮名) on script alone.
+            let archaic = |e: &Arc<DictEntry>| e.misc.iter().any(|m| m == "arch");
+            let a_kana = a.0.kana_only && !archaic(&a.0);
+            let b_kana = b.0.kana_only && !archaic(&b.0);
             // Pure-kana surface: no kanji evidence, most common word wins.
             // Bound morphemes first: a top-tier suffix entry matching
             // exactly (ちゃん, くん, さん) IS that morpheme — a kanji word

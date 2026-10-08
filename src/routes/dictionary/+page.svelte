@@ -4,6 +4,7 @@
     import { getWords, getMediaTagColors, getSentencesForWord, getAllSentences, updateSentenceTranslation, getLookupCounts, updateWordStatus, mineWordWithTags, deleteSentence, deleteWord, updateWordNotes, getReviewPool, getSentenceReviewPool, parseDefinitions, clearDictionaryData, getDictionaryWordCount } from '$lib/dictionary.js';
     import { getFrequentUnknownWords, getMediaTagsForWordIds, getMediaIdsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
+    import { formatPosTags } from '$lib/posLabels.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -1040,7 +1041,7 @@
                                 <span class="word-reading">{item.entry.readings[0]}</span>
                             {/if}
                         </div>
-                        <div class="entry-pos">{item.entry.pos?.join(', ') ?? ''}</div>
+                        <div class="entry-pos">{formatPosTags(item.entry.pos)}</div>
                         <div class="word-definitions">
                             {(item.entry.definitions ?? []).join('; ')}
                         </div>

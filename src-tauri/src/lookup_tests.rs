@@ -507,3 +507,21 @@
         assert!(span.entries.iter().any(|e| e.readings.first().map_or(false, |r| r == "と")));
     }
 
+    #[test]
+    fn kana_archaic_yields_to_modern() {
+        // Pure-kana かな: the modern particle (spec1) and the ichi1 nouns
+        // must outrank archaic 哉, which previously rode the usually-kana
+        // script preference to the top despite having no priority tags.
+        let h = Harness::new();
+        let text = "行くかな";
+        let pos = cpos(text, "かな");
+        let tokens = h.tokens(text);
+        let span = lookup_from_position(text, pos, 0, &h.index, &h.decon, &tokens).unwrap();
+        assert_eq!(span.surface, "かな");
+        let top = &span.entries[0];
+        assert!(top.spellings.is_empty(),
+            "modern かな particle should lead, got {:?}", top.spellings);
+        assert!(span.entries.last().map_or(false, |e| e.spellings.first().map_or(false, |s| s == "哉")),
+            "archaic 哉 should sort last");
+    }
+

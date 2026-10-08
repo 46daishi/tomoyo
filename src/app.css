@@ -548,6 +548,55 @@ body {
     margin-top: 0.35rem;
 }
 
+/* Frequency tiers: colour-coded commonness pills derived from the JMdict
+   priority tags (see src/lib/frequency.js). Only rendered when an entry
+   actually has tier data. */
+.entry-freq {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    /* Clear the 2px status border-bottom on the spelling line above. */
+    margin-top: 0.45rem;
+}
+
+.freq-tag {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    line-height: 1;
+    padding: 0.2em 0.45em;
+    border-radius: 0.35em;
+    white-space: nowrap;
+}
+
+.freq-tier-common {
+    color: #81c784;
+    background-color: color-mix(in srgb, #4caf50 16%, transparent);
+    border: 1px solid color-mix(in srgb, #4caf50 55%, transparent);
+}
+
+.freq-tier-uncommon {
+    color: #e0a93e;
+    background-color: color-mix(in srgb, #c8901a 14%, transparent);
+    border: 1px solid color-mix(in srgb, #c8901a 55%, transparent);
+}
+
+.freq-tier-rare {
+    color: #a8a8a8;
+    background-color: color-mix(in srgb, #9e9e9e 12%, transparent);
+    border: 1px solid color-mix(in srgb, #9e9e9e 45%, transparent);
+}
+
+/* Exact rank inside the tier pill: heavier tabular figures so the number
+   stands apart from the tier label. */
+.freq-num {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    margin-left: 0.35em;
+}
+
 .entry-definitions {
     font-size: 0.95rem;
     color: var(--theme-text, #b3b3b3);
