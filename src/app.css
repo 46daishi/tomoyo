@@ -402,6 +402,11 @@ body {
     min-width: clamp(220px, 40cqw, 320px);
     max-width: clamp(320px, 55cqw, 420px);
     overflow-y: auto;
+    /* Horizontal scrolling is never intended; without this, setting
+       overflow-y: auto computes overflow-x to auto per spec, and sub-pixel
+       rounding (cqw clamps, 100%-width flex children) trips a ~1px
+       horizontal scrollbar on some words. */
+    overflow-x: hidden;
     padding: 0.9rem 1.6rem 0.9rem 1.1rem; /* extra right padding creates room between content and scrollbar */
     background: color-mix(
         in srgb,
