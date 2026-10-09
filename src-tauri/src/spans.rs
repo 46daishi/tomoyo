@@ -1804,6 +1804,36 @@ pub(crate) fn lookup_from_position(
                         }
                     }
                 }
+                // ここの is almost always ここ + genitive の in running text;
+                // the 九 counter reading (ここの) swallows the pronoun
+                // whenever the whole matches (九 itself is ichi1, so the
+                // margin rule below never fires). Split to ここ so the
+                // place stays reachable (九-as-ここの never stands alone —
+                // counters attach: ここのつ). Narrow: only 九-topped ここの
+                // splits.
+                if candidate == "ここの"
+                    && entries.first().map_or(false, |e| {
+                        e.spellings.iter().any(|s| s == "九")
+                    })
+                {
+                    let stem = "ここ".to_string();
+                    if let Some((se, si)) = lookup_candidate(
+                        &stem,
+                        index,
+                        decon,
+                        context_reading,
+                        morph_base,
+                        tokens,
+                        position,
+                    ) {
+                        if !se.is_empty() {
+                            eff_end = position + stem.chars().count();
+                            candidate = stem;
+                            entries = se;
+                            deconj_info = si;
+                        }
+                    }
+                }
                 // 今日は is almost always 今日 + topic は in running text;
                 // the greeting reading (こんにちは) swallows the noun whenever
                 // the whole matches. Split to 今日 so the day stays reachable

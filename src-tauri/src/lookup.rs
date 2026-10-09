@@ -337,6 +337,53 @@ pub(crate) fn lookup_candidate(
             .any(|s| normalize::normalize_text(candidate).contains(s)))
     };
 
+    // ksb-volitional (お -> おう slur: 行こ for 行こう) only ever leaves a
+    // verb stem: after a te/ta-form (買ったお = past + the honorific お of
+    // お菓子) it fabricates volitionals out of thin air and the span swallows
+    // the next word's prefix. The お must not follow て/で/た/だ.
+    let ksb_volitional_ok = |f: &DeconjugatedForm| {
+        !(f.rule_chain.as_deref().map_or(false, |c| {
+            c.split('→').any(|seg| seg == "ksb")
+        }) && {
+            let cs: Vec<char> = normalize::normalize_text(candidate).chars().collect();
+            cs.len() >= 2
+                && cs[cs.len() - 1] == 'お'
+                && matches!(cs[cs.len() - 2], 'て' | 'で' | 'た' | 'だ')
+        })
+    };
+    // Classical attributive き (き -> い) never follows a modern past
+    // marker: 吹いていた + 気(き) is a te-form verb plus a noun, not
+    // classical grammar (legit てき/でき forms end in き after て/で,
+    // which this leaves alone). The き arrives as kana き or kanji 気
+    // (normalization never maps kanji to readings, so both spellings
+    // must be listed). Without the gate the noun gets absorbed and the
+    // chain reads "classical attributive + want + teiru".
+    let classical_attr_ok = |f: &DeconjugatedForm| {
+        !(f.rule_chain.as_deref().map_or(false, |c| {
+            c.split('→').any(|seg| seg == "classical attributive")
+        }) && {
+            let cs: Vec<char> = normalize::normalize_text(candidate).chars().collect();
+            cs.len() >= 2
+                && matches!(cs[cs.len() - 1], 'き' | '気')
+                && matches!(cs[cs.len() - 2], 'た' | 'だ')
+        })
+    };
+    // Hearsay げ (げ -> ∅: 寒げ "seeming cold") only ever leaves an
+    // adjective or mizenkei stem: after a te/ta-form (吹いていた + 気)
+    // it absorbs a noun 気/げ into a bogus "seeming" reading and the
+    // verb swallows the noun. Legit げ-words leave kanji/kana stems
+    // (寒, 惜し), never て/で/た/だ.
+    let seeming_ok = |f: &DeconjugatedForm| {
+        !(f.rule_chain.as_deref().map_or(false, |c| {
+            c.split('→').any(|seg| seg == "seeming")
+        }) && {
+            let cs: Vec<char> = normalize::normalize_text(candidate).chars().collect();
+            cs.len() >= 2
+                && matches!(cs[cs.len() - 1], 'げ' | '気')
+                && matches!(cs[cs.len() - 2], 'て' | 'で' | 'た' | 'だ')
+        })
+    };
+
     // Morphological matches — the tokenizer's base form for the verb at the
     // cursor. High confidence because MeCab resolved the actual conjugation
     // (します -> し -> する), so it outranks rule-based deconjugation, which can
@@ -417,6 +464,9 @@ pub(crate) fn lookup_candidate(
         // 知らされなかった keeps resolving to 知る.
         let via_deconj = reading_forms.iter().any(|f| {
             try_ok(f)
+                && ksb_volitional_ok(f)
+                && classical_attr_ok(f)
+                && seeming_ok(f)
                 && (normalize::normalize_text(&f.text) == base_norm
                     || base_readings.contains(&normalize::normalize_text(&f.text))
                     || (f.proper_steps <= 1
@@ -432,7 +482,16 @@ pub(crate) fn lookup_candidate(
         let via_aux_tail = !tail_tokens.is_empty()
             && tail_tokens
                 .iter()
-                .all(|t| matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞"));
+                .all(|t| matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞"))
+            // ...but never onto a dangling prefix: prefixes attach forward,
+            // so a verb span ending in お/ご is stealing the next word's
+            // prefix (買ったお of お菓子), not extending a conjugation.
+            // Spans starting with a prefix (お待たせ) end elsewhere and are
+            // unaffected.
+            && !matches!(
+                tail_tokens.last().map(|t| t.pos.as_str()),
+                Some("接頭辞" | "接頭詞")
+            );
         if via_deconj || via_aux_tail {
             // A verb stem that is also a dictionary noun, feeding a
             // nominal suffix (もやし|炒め): the nominal reading is
@@ -504,7 +563,13 @@ pub(crate) fn lookup_candidate(
                 if let Some(chain) = decon
                     .deconjugate(reading)
                     .iter()
-                    .find(|f| try_ok(f) && resolves_to_base(f))
+                    .find(|f| {
+                        try_ok(f)
+                            && ksb_volitional_ok(f)
+                            && classical_attr_ok(f)
+                            && seeming_ok(f)
+                            && resolves_to_base(f)
+                    })
                     .and_then(|f| f.rule_chain.as_deref())
                 {
                     label = combined_label(chain);
@@ -892,7 +957,7 @@ pub(crate) fn lookup_candidate(
         .iter()
         .any(|t| t.start == position && t.end >= position + span_len);
     for form in deconj_pool {
-        if !try_ok(form) {
+        if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) {
             continue;
         }
         // Verb-class results need a real verb token backing them (see
@@ -1466,15 +1531,23 @@ pub(crate) fn lookup_candidate(
     // only) apply unchanged.
     if candidates.is_empty() && !trailing_sokuon {
         if let Some(base) = morph_base {
-            let tail_ok = tokens
+            let tail: Vec<&MorphToken> = tokens
                 .iter()
                 .filter(|t| t.start > position && t.start < position + span_len)
-                .all(|t| {
-                    matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞")
-                });
+                .collect();
             // (An empty tail is vacuously true: bare continuative stems
             // like 食べ are the core case. Anything else was already
             // covered by the morphological path above.)
+            let tail_ok = tail.is_empty()
+                || (tail.iter().all(|t| {
+                    matches!(t.pos.as_str(), "助動詞" | "助詞" | "記号" | "接頭辞" | "接尾辞")
+                })
+                // Same dangling-prefix rule as the morphological path above:
+                // a span ending in お/ご steals the next word's prefix.
+                && !matches!(
+                    tail.last().map(|t| t.pos.as_str()),
+                    Some("接頭辞" | "接頭詞")
+                ));
             if tail_ok {
                 if let Some(entries) = index.by_text.get(&normalize::normalize_text(base)) {
                     for e in entries {
@@ -1516,8 +1589,10 @@ pub(crate) fn lookup_candidate(
                 continue;
             }
             // Same てみる gate as the modern pool (see above): classical
-            // forms route through the same てみる-strip rule.
-            if !try_ok(form) {
+            // forms route through the same てみる-strip rule. The te/ta
+            // gates ride along too: classical forms never license modern
+            // fabrications either.
+            if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) {
                 continue;
             }
             let is_na_imperative = form.rule_chain.as_deref().map_or(false, |c| {

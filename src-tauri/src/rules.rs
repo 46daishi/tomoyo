@@ -191,6 +191,18 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     // reaches the dictionary form (イヤッホー), exactly as the single-
     // token segmentation resolves on its own. Kana head only.
     ("イヤッ", "ほう", false),
+    // バカにならない ("no joke, serious"): UniDic splits バカ|に|なら|
+    // ない, so the idiom never forms (バカ|に|ならない). The literal
+    // 馬鹿にならない entry resolves the merged span. Any head may start
+    // it — the exact tail plus longest-first fallback keep it safe.
+    // Both scripts (バカ/馬鹿).
+    ("バカ", "にならない", false),
+    ("馬鹿", "にならない", false),
+    // やいなや ("no sooner than", や否や): UniDic splits や|いな|や with
+    // a particle や head, so the expression never forms (や|いな|や).
+    // The literal や否や entry resolves the merged span. The head is the
+    // particle, so lock it; いなや occurs only in this expression.
+    ("や", "いなや", true),
 ];
 
 /// Single-char particles a clipped emphasis can attach to (sokuon-span

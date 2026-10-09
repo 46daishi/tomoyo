@@ -587,3 +587,17 @@ bugs3-11	bugs	.........こ、こうかな?	scan		かな	has_entry_pos	particle	q
 bugs3-12	bugs	.........こ、こうかな?	scan			no_span	こうか	coincidental 効果 never swallows こう
 bugs3-13	bugs	そうかな?	scan			has_span	そう	
 bugs3-14	bugs	そうかな?	scan		かな	has_entry_pos	particle	
+bugs4-01	bugs	小さい頃の記憶じゃ、縁側や日陰は涼しくて、いつも良い風が吹いていた気がしてたんだけど...	scan			has_span	吹いていた	te-form verb no longer swallows following 気
+bugs4-02	bugs	小さい頃の記憶じゃ、縁側や日陰は涼しくて、いつも良い風が吹いていた気がしてたんだけど...	scan			no_span	吹いていた気	bogus classical-attributive merge is gone
+bugs4-03	bugs	小さい頃の記憶じゃ、縁側や日陰は涼しくて、いつも良い風が吹いていた気がしてたんだけど...	scan		気がしてた	top_spelling	気がする	気がしてた resolves to the 気がする idiom
+bugs4-04	bugs	高いよ......電気代もバカにならないし。	scan			has_span	バカにならない	idiom merges via completion
+bugs4-05	bugs	高いよ......電気代もバカにならないし。	scan		バカにならない	top_spelling	馬鹿にならない	merged span tops the expression entry
+bugs4-06	bugs	彼らの自転車のカゴには、駄菓子屋で買ったお菓子やジュースがいっぱい入ってた。	scan			has_span	買った	ta-form releases the honorific お
+bugs4-07	bugs	彼らの自転車のカゴには、駄菓子屋で買ったお菓子やジュースがいっぱい入ってた。	scan			has_span	お菓子	お+菓子 forms across the freed boundary
+bugs4-08	bugs	彼らの自転車のカゴには、駄菓子屋で買ったお菓子やジュースがいっぱい入ってた。	scan			no_span	買ったお	ksb-volitional must not eat honorific お after た
+bugs4-09	bugs	彼らの自転車のカゴには、駄菓子屋で買ったお菓子やジュースがいっぱい入ってた。	scan		お菓子	top_spelling	お菓子	
+bugs4-10	bugs	ううん、あたしここのお店番だよっ。	scan			has_span	ここ	ここの splits to ここ + の
+bugs4-11	bugs	ううん、あたしここのお店番だよっ。	scan			no_span	ここの	九-as-ここの never stands alone
+bugs4-12	bugs	ううん、あたしここのお店番だよっ。	scan		ここ	top_spelling	此処	
+bugs4-13	bugs	いきなり現れたかと思うやいなや、話すだけ話してやひろさんは、奥の部屋に戻っていった。	scan			has_span	やいなや	expression merges via completion
+bugs4-14	bugs	いきなり現れたかと思うやいなや、話すだけ話してやひろさんは、奥の部屋に戻っていった。	scan		やいなや	top_spelling	や否や	merged span tops the expression entry
