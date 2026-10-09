@@ -176,13 +176,15 @@
                                                 : freqTier === 'uncommon'
                                                     ? 'Less common word (lower newspaper frequency band)'
                                                     : 'Outside newspaper frequency lists — likely rare or specialized'}
-                                            <div class="entry-freq">
-                                                <span
-                                                    class="freq-tag freq-tier-{freqTier}"
-                                                    title={freqTitle}
-                                                >{freqLabel}{#if freqRank !== null}<span class="freq-num">#{freqRank.toLocaleString('en-US')}</span>{/if}</span>
+                                            <div class="entry-meta">
+                                                <div class="entry-freq">
+                                                    <span
+                                                        class="freq-tag freq-tier-{freqTier}"
+                                                        title={freqTitle}
+                                                    >{freqLabel}{#if freqRank !== null}<span class="freq-num">#{freqRank.toLocaleString('en-US')}</span>{/if}</span>
+                                                </div>
+                                                <div class="entry-pos">{formatPosTags(entry.pos)}</div>
                                             </div>
-                                            <div class="entry-pos">{formatPosTags(entry.pos)}</div>
                                             <div class="entry-definitions">{entry.definitions.join('; ')}</div>
                                         {/if}
                                     </div>
@@ -298,6 +300,26 @@
 
     .entry-spelling.known-word {
         border-bottom: 2px solid var(--status-color, transparent);
-        padding-bottom: 1px;
+        /* Flush against the text: any padding here reads as a gap, and the
+           meta row below already carries the spacing. */
+        padding-bottom: 0;
+    }
+
+    /* Frequency pill and POS share one row — pill leading, vertically
+       centered with the POS text. Child margins from the stacked layout
+       are zeroed; the row carries the spacing instead. */
+    .entry-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    .entry-meta > .entry-freq {
+        margin-top: 0;
+        flex-shrink: 0;
+    }
+    .entry-meta > .entry-pos {
+        margin-top: 0;
+        min-width: 0;
     }
 </style>
