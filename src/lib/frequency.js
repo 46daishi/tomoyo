@@ -2,9 +2,11 @@
  * Frequency display helpers for dictionary entries, mirroring how
  * Yomitan-style dictionaries surface word commonness.
  *
- * `freq_rank` is a per-SPELLING rank (best wordfreq-ja rank across the
- * entry's written forms; 0 = unlisted). Readings are shared by many words,
- * so they are deliberately never used as lookup keys.
+ * `freq_rank` is a per-ENTRY rank from the Jiten Visual Novel frequency
+ * list (scripts of 2,081 VNs, CC BY-SA 4.0): best rank across the entry's
+ * (spelling, reading) pairs — readings alone for usually-kana words, the
+ * kana string itself when a word is never seen in kanji. 0 = unlisted.
+ * Archaic entries never inherit a living kana string's rank.
  */
 
 /**
@@ -18,32 +20,24 @@ export function frequencyRank(entry) {
 }
 
 /**
- * Frequency tier for display: 'common', 'uncommon', or 'rare'. The tiers
- * are built on the per-entry JMdict priority tags — editorial judgments
- * in the Jisho/Takoboto "Common word" spirit — while `frequencyRank`
- * above carries the exact per-spelling corpus number for entries that
- * have one.
+ * Frequency tier for display: 'common', 'uncommon', or 'rare', cut from
+ * the same VN rank — so "Common" means common in visual novels, not in
+ * newspapers. Cutoffs validated against tier members (dialogue staples
+ * land ≤20k: 食べる #176, ぶっ殺す #11229; literary/technical words land
+ * beyond 60k: 侯 #67652, 稿 #61469).
  *
- * - common: ichi1/news1 (top newspaper lists), nf01-nf12 (roughly the top
- *   6k), spec1/gai1 (editors' explicit "common" flags).
- * - uncommon: the remaining measured bands (nf13-nf48, ichi2/news2,
- *   spec2/gai2).
- * - rare: no frequency data at all (86% of entries). Overwhelmingly
- *   specialized, literary, or archaic words — though a few ordinary words
- *   also lack tags, so read it as "outside the ~30k listed words" rather
- *   than a proven rarity verdict.
- * @param {{ priority?: string[] } | null | undefined} entry
+ * - common: rank 1-20,000.
+ * - uncommon: rank 20,001-60,000 (仮名 #45036 lives here).
+ * - rare: rank 60,000+ or unlisted (79% of entries — dictionaries are
+ *   mostly rare words). Read as "outside the VN top 60k" rather than a
+ *   proven rarity verdict.
+ * @param {{ freq_rank?: number } | null | undefined} entry
  * @returns {'common' | 'uncommon' | 'rare'}
  */
 export function frequencyTier(entry) {
-    const prio = entry?.priority ?? [];
-    /** @param {...string} tags */
-    const has = (...tags) => tags.some((t) => prio.includes(t));
-    const nfBands = prio
-        .filter((t) => /^nf\d+$/.test(t))
-        .map((t) => parseInt(t.slice(2), 10));
-    const bestNf = nfBands.length > 0 ? Math.min(...nfBands) : Infinity;
-    if (has('ichi1', 'news1') || bestNf <= 12 || has('spec1', 'gai1')) return 'common';
-    if (bestNf <= 48 || has('ichi2', 'news2', 'spec2', 'gai2')) return 'uncommon';
+    const rank = frequencyRank(entry);
+    if (rank === null) return 'rare';
+    if (rank <= 20000) return 'common';
+    if (rank <= 60000) return 'uncommon';
     return 'rare';
 }

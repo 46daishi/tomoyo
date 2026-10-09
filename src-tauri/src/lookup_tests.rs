@@ -526,10 +526,29 @@
     }
 
     #[test]
+    fn related_ranked_above_unlisted() {
+        // 日陰's related entries: 日陰者 (#47163) must lead the unlisted
+        // clubmosses (all priority-less, previously HashSet-ordered). The
+        // related sort carries the same VN-rank tiebreak as main results,
+        // with id as the final key so the order is deterministic.
+        let h = Harness::new();
+        let text = "日陰で休む";
+        let pos = cpos(text, "日陰");
+        let tokens = h.tokens(text);
+        let span = lookup_from_position(text, pos, 0, &h.index, &h.decon, &tokens).unwrap();
+        assert_eq!(span.surface, "日陰");
+        assert_eq!(span.entries[0].spellings[0], "日陰");
+        assert!(!span.related_entries.is_empty(), "日陰 should have related entries");
+        assert_eq!(span.related_entries[0].spellings[0], "日陰者",
+            "ranked 日陰者 should lead unlisted related entries, got {:?}",
+            span.related_entries.iter().map(|e| e.spellings[0].clone()).collect::<Vec<_>>());
+    }
+
+    #[test]
     fn freq_rank_breaks_tier_ties() {
         // こう: 甲 and 稿 share priority tier 900 with identical match kind,
         // context, script, and step counts — only the exact corpus ranks
-        // (5531 < 15149) can order them. Tiers alone leave index order.
+        // (17243 < 61469) can order them. Tiers alone leave index order.
         let h = Harness::new();
         let text = "こう";
         let tokens = h.tokens(text);
@@ -539,6 +558,6 @@
             .map(|e| e.spellings[0].clone())
             .collect();
         assert_eq!(pair, vec!["甲".to_string(), "稿".to_string()],
-            "甲 (#5531) should precede 稿 (#15149), got {pair:?}");
+            "甲 (#17243) should precede 稿 (#61469), got {pair:?}");
     }
 

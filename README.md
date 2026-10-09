@@ -75,5 +75,6 @@ A: Either create a GH issue or post about it in the **#tomoyo** channel on my [D
 - [JL](https://github.com/rampaa/JL): direct inspiration for the lookup mechanism
 - [LingQ](https://www.lingq.com/en/): inspiration for learning philosophy and the word level system
 - [JMdict](https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project): dictionary used in the look-ups
+- [Jiten](https://jiten.moe/frequency-dictionaries): visual-novel word frequency data (CC BY-SA 4.0)
 - [VNDB](https://vndb.org/): used as a data source for importing and VN stats
 - [絆 Kizuna](https://kizuna-texthooker-ui.app/): inspiration for tracking Japanese immersion

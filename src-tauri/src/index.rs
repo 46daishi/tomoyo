@@ -130,9 +130,17 @@ pub(crate) fn find_containing(query: &str, index: &DictionaryIndex, limit: usize
         }
     }
     
+    // Exact matches first, then newspaper priority, then the VN corpus rank
+    // (same tiebreak as the main results, so a ranked containing-word like
+    // 日陰者 #47163 outranks unlisted ones), then id: the candidate set is a
+    // HashSet, so without a total order the related list would shuffle
+    // between lookups.
+    let rank_or_last = |e: &Arc<DictEntry>| if e.freq_rank == 0 { u32::MAX } else { e.freq_rank };
     results.sort_by(|(a, a_exact), (b, b_exact)| {
         b_exact.cmp(a_exact)
             .then(priority_score(b).cmp(&priority_score(a)))
+            .then(rank_or_last(a).cmp(&rank_or_last(b)))
+            .then(a.id.cmp(&b.id))
     });
     results.truncate(limit);
     

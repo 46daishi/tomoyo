@@ -172,10 +172,10 @@
                                             {@const freqRank = frequencyRank(entry)}
                                             {@const freqLabel = freqTier === 'common' ? 'Common' : freqTier === 'uncommon' ? 'Uncommon' : 'Rare'}
                                             {@const freqTitle = freqTier === 'common'
-                                                ? 'Common word (top newspaper frequency or JMdict common flag)'
+                                                ? 'Common in visual novels (top 20k of the Jiten VN list)'
                                                 : freqTier === 'uncommon'
-                                                    ? 'Less common word (lower newspaper frequency band)'
-                                                    : 'Outside newspaper frequency lists — likely rare or specialized'}
+                                                    ? 'Less common in visual novels (rank 20k–60k)'
+                                                    : 'Rare or unlisted in visual novels'}
                                             <div class="entry-meta">
                                                 <div class="entry-freq">
                                                     <span
