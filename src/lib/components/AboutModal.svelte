@@ -4,8 +4,8 @@
 
     let { show = $bindable(false) } = $props();
 
-    const VERSION = '1.1.0';
-    const VERSION_DATE = 'September 23, 2026';
+    const VERSION = '1.2.0';
+    const VERSION_DATE = '2026年 10月 10日';
     const LINKS = [
         { label: 'tomoyo on GitHub', url: 'https://github.com/46daishi/tomoyo', icon: ICONS.github, iconClass: 'github-icon' },
         { label: '46dai X (Twitter)', url: 'https://x.com/46daishi', icon: ICONS.twitter },
