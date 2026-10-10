@@ -601,3 +601,22 @@ bugs4-11	bugs	ううん、あたしここのお店番だよっ。	scan			no_span
 bugs4-12	bugs	ううん、あたしここのお店番だよっ。	scan		ここ	top_spelling	此処	
 bugs4-13	bugs	いきなり現れたかと思うやいなや、話すだけ話してやひろさんは、奥の部屋に戻っていった。	scan			has_span	やいなや	expression merges via completion
 bugs4-14	bugs	いきなり現れたかと思うやいなや、話すだけ話してやひろさんは、奥の部屋に戻っていった。	scan		やいなや	top_spelling	や否や	merged span tops the expression entry
+bugs5-01	bugs	あ、ゴメンね、大丈夫だから、そんな気を遣わないでね?	scan			has_span	そんな	noun-気 splits off the verb-derived winner
+bugs5-02	bugs	あ、ゴメンね、大丈夫だから、そんな気を遣わないでね?	scan			no_span	そんな気	そんな気 must never resolve to 反る/剃る
+bugs5-03	bugs	あ、ゴメンね、大丈夫だから、そんな気を遣わないでね?	scan		気を遣わないで	top_spelling	気を使う	freed 気 forms the 気を遣う idiom
+bugs5-04	bugs	あ......これもらえる?  あと、そこのお菓子二つ。	scan		そこ	top_spelling	其処	pronoun 其処 outranks 底 via the priority-aware kana boost
+bugs5-05	bugs	どうしちゃったのかな......	scan			has_span	どう	verb-し feeding ちゃう splits off
+bugs5-06	bugs	どうしちゃったのかな......	scan			no_span	どうし	どうし must not swallow the する-stem
+bugs5-07	bugs	どうしちゃったのかな......	scan		どう	top_spelling	如何	
+bugs5-08	bugs	うん、ありがとう。あ、私んちで使ってない扇風機、あったらあげようか?	scan			has_span	私んち	needs patched entry 2524850: わたしんち reading + 私んち spelling added (JMdict gap, re-apply after from-scratch rebuilds)
+bugs5-09	bugs	うん、ありがとう。あ、私んちで使ってない扇風機、あったらあげようか?	scan		私んち	top_spelling	私ん家	
+bugs5-10	bugs	やっぱり、生鮮品の減りが早い。	scan			has_span	生鮮	neg+pot chain gated on verbless suffix-final surfaces
+bugs5-11	bugs	やっぱり、生鮮品の減りが早い。	scan			no_span	生鮮品	生鮮品 must never resolve to 制する
+bugs5-12	bugs	やっぱり、生鮮品の減りが早い。	scan		生鮮	top_spelling	生鮮	
+bugs5-13	bugs	ちゃんとお礼すべきだよな......	scan			has_span	お礼	honorific-winner す splits before べき
+bugs5-14	bugs	ちゃんとお礼すべきだよな......	scan			has_span	すべき	す+べき merges via completion
+bugs5-15	bugs	ちゃんとお礼すべきだよな......	scan			no_span	お礼す	お礼す must not swallow the する-stem
+bugs5-16	bugs	ちゃんとお礼すべきだよな......	scan		すべき	has_entry	する	beki arm contributes the する entry
+bugs5-17	bugs	ちゃんとお礼すべきだよな......	scan		すべき	top_spelling	す可き	aux entry tops (mining すべき as する would make a useless card), する below via beki arm
+bugs6-01	bugs	張り	scan		張り	top_reading	はり	bare 張り is the needle (はり #6247), not suffix-ばり: affix tokens give no reading context, free words beat bound morphemes
+bugs6-02	bugs	指に張りがあって痛い	scan		張り	top_reading	はり	in-context noun reading keeps はり first too

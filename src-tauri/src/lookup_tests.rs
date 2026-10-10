@@ -560,4 +560,3 @@
         assert_eq!(pair, vec!["甲".to_string(), "稿".to_string()],
             "甲 (#17243) should precede 稿 (#61469), got {pair:?}");
     }
-

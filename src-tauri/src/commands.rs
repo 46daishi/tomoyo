@@ -102,10 +102,17 @@ pub(crate) fn lookup_exact(
     // In-context reading from the token under the cursor (as in the
     // single-char fallback); the tokenizer's base form only when the
     // selection is exactly that token, otherwise morphology would name a
-    // word the selection merely overlaps.
+    // word the selection merely overlaps. Bound-morpheme tokens give no
+    // reading context (same reason as spans.rs: suffix-ばり must not
+    // outrank はり for a bare 張り selection).
     let containing = tokens.iter().find(|t| start >= t.start && start < t.end);
     let context_reading = containing.and_then(|t| {
         if t.reading.is_empty() {
+            None
+        } else if matches!(
+            t.pos.as_str(),
+            "接尾辞" | "接頭辞" | "接尾詞" | "接頭詞"
+        ) {
             None
         } else {
             Some(t.reading.as_str())

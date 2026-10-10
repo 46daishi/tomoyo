@@ -87,10 +87,19 @@ pub(crate) fn lookup_from_position(
     // The base form is only used when the cursor is at the very start of a
     // verb token, since that's when the whole token's conjugation is what the
     // user is looking at (e.g. the し of します -> する).
+    // Bound-morpheme tokens (suffix ばり in bare 張り) give no reading
+    // context: their reading reflects the attached use (rendaku), but a
+    // bare hover asks about the word — echoing the tokenizer's analysis
+    // here would defeat independent ranking (はり #6247 must beat ばり).
     let token_at_pos = tokens.iter().find(|t| position >= t.start && position < t.end);
     let context_reading = token_at_pos
         .and_then(|t| {
             if t.reading.is_empty() {
+                None
+            } else if matches!(
+                t.pos.as_str(),
+                "接尾辞" | "接頭辞" | "接尾詞" | "接頭詞"
+            ) {
                 None
             } else {
                 Some(t.reading.as_str())
@@ -1831,6 +1840,129 @@ pub(crate) fn lookup_from_position(
                             candidate = stem;
                             entries = se;
                             deconj_info = si;
+                        }
+                    }
+                }
+                // A trailing standalone 気 (noun token) absorbed by verb
+                // deconjugation (そんな気 -> 反る, 吹いていた気 -> 吹く):
+                // 気 here is a noun use (mind/attention), never a verb
+                // ending — deconjugation consuming it fabricates verbs out
+                // of noun phrases (気がする's 気, 寒げ's げ keep working:
+                // the former never ends a span in 気, the latter is kana げ,
+                // and literal winners are untouched since they carry no
+                // deconjugation label). Split to the stem when it resolves,
+                // so そんな|気|を遣う forms. Narrow: kanji 気 as its own
+                // noun token only, winner must be deconjugation-derived.
+                if deconj_info.is_some()
+                    && candidate.chars().count() > 1
+                    && candidate.ends_with('気')
+                    && tokens.iter().any(|t| {
+                        t.surface == "気" && t.start > position && t.end == eff_end
+                    })
+                {
+                    let stem: String =
+                        candidate.chars().take(candidate.chars().count() - 1).collect();
+                    if let Some((se, si)) = lookup_candidate(
+                        &stem,
+                        index,
+                        decon,
+                        context_reading,
+                        morph_base,
+                        tokens,
+                        position,
+                    ) {
+                        if !se.is_empty() {
+                            eff_end = position + stem.chars().count();
+                            candidate = stem;
+                            entries = se;
+                            deconj_info = si;
+                        }
+                    }
+                }
+                // Verb-し feeding a ちゃう/じゃう contraction (どうしちゃった
+                // -> どう + しちゃった): the tail し is a する-stem verb
+                // token and the next token is the contraction auxiliary
+                // itself, so the winner (どうし = 同市…) swallowed the verb
+                // feeding what follows. Split to the stem when it resolves;
+                // the contraction tail stays reachable on hover and resolves
+                // to する on its own. Narrow: し-stem (する only, so
+                // させちゃう keeps its causative) + contraction-aux next +
+                // resolving stem.
+                if let Some(last) = tokens
+                    .iter()
+                    .filter(|t| t.start > position && t.end == eff_end)
+                    .last()
+                {
+                    let shisuru_tail = last.pos == "動詞"
+                        && last.surface == "し"
+                        && last.base_form == "する"
+                        && tokens.iter().any(|n| {
+                            n.start == eff_end
+                                && CONTRACTION_AUX_VERBS.contains(&n.base_form.as_str())
+                        });
+                    if shisuru_tail {
+                        let stem: String =
+                            chars[position..last.start].iter().collect();
+                        if !stem.is_empty() {
+                            if let Some((se, si)) = lookup_candidate(
+                                &stem,
+                                index,
+                                decon,
+                                context_reading,
+                                morph_base,
+                                tokens,
+                                position,
+                            ) {
+                                if !se.is_empty() {
+                                    let same_entry = se
+                                        .iter()
+                                        .any(|e| entries.first().map_or(false, |w| w.id == e.id));
+                                    if !same_entry {
+                                        eff_end = last.start;
+                                        candidate = stem;
+                                        entries = se;
+                                        deconj_info = si;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Honorific-winner す feeding べき/べし (お礼すべき ->
+                // お礼 + すべき): the winner came through the honorific
+                // prefix wrapper (お + 礼す), but the す is really する's
+                // stem heading a should-construction. Split to the stem
+                // when it resolves; すべき resolves to する on its own
+                // below. Narrow: honorific winners ending in す with
+                // べき/べし immediately after only.
+                if wrapper_win
+                    && (candidate.ends_with('す') || candidate.ends_with("する"))
+                    && tokens.iter().any(|n| {
+                        n.start == eff_end
+                            && matches!(n.surface.as_str(), "べき" | "べし")
+                    })
+                {
+                    let strip = if candidate.ends_with("する") { 2 } else { 1 };
+                    let stem: String = candidate
+                        .chars()
+                        .take(candidate.chars().count() - strip)
+                        .collect();
+                    if !stem.is_empty() {
+                        if let Some((se, si)) = lookup_candidate(
+                            &stem,
+                            index,
+                            decon,
+                            context_reading,
+                            morph_base,
+                            tokens,
+                            position,
+                        ) {
+                            if !se.is_empty() {
+                                eff_end = position + stem.chars().count();
+                                candidate = stem;
+                                entries = se;
+                                deconj_info = si;
+                            }
                         }
                     }
                 }

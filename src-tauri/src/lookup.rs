@@ -368,6 +368,30 @@ pub(crate) fn lookup_candidate(
                 && matches!(cs[cs.len() - 2], 'た' | 'だ')
         })
     };
+    // Negative+potential chains (…ず + …られる → する, classical or
+    // modern) on a verbless suffix-final surface fabricate verbs out of
+    // noun compounds (生鮮品 -> 制する): legit uses inflect real verbs
+    // (a verb token sits inside the span: 食べられない, 愛せられず) or
+    // end elsewhere. Nouns don't negate or potentialize, so a neg+pot
+    // chain on [no verb … suffix] is always bogus — the literal stem
+    // (生鮮) plus the suffix then form on their own.
+    let negpot_ok = |f: &DeconjugatedForm| {
+        let combo = f.rule_chain.as_deref().map_or(false, |c| {
+            c.split('→').any(|seg| seg.contains("negative"))
+                && c.split('→').any(|seg| seg.contains("potential"))
+        });
+        if !combo {
+            return true;
+        }
+        let span_end = position + span_len;
+        let has_verb = tokens
+            .iter()
+            .any(|t| t.start >= position && t.end <= span_end && t.pos == "動詞");
+        let ends_suffix = tokens.iter().any(|t| {
+            t.end == span_end && matches!(t.pos.as_str(), "接尾辞" | "接尾詞")
+        });
+        !(combo && !has_verb && ends_suffix)
+    };
     // Hearsay げ (げ -> ∅: 寒げ "seeming cold") only ever leaves an
     // adjective or mizenkei stem: after a te/ta-form (吹いていた + 気)
     // it absorbs a noun 気/げ into a bogus "seeming" reading and the
@@ -467,6 +491,7 @@ pub(crate) fn lookup_candidate(
                 && ksb_volitional_ok(f)
                 && classical_attr_ok(f)
                 && seeming_ok(f)
+                && negpot_ok(f)
                 && (normalize::normalize_text(&f.text) == base_norm
                     || base_readings.contains(&normalize::normalize_text(&f.text))
                     || (f.proper_steps <= 1
@@ -568,6 +593,7 @@ pub(crate) fn lookup_candidate(
                             && ksb_volitional_ok(f)
                             && classical_attr_ok(f)
                             && seeming_ok(f)
+                            && negpot_ok(f)
                             && resolves_to_base(f)
                     })
                     .and_then(|f| f.rule_chain.as_deref())
@@ -920,6 +946,53 @@ pub(crate) fn lookup_candidate(
         }
     }
 
+    // すべき/すべし ("should do"): す (する-stem, surface す/する) +
+    // べき/べし auxiliary. No deconjugation rule strips べき, so resolve
+    // entries + label directly, mirroring the compound-aux arm above. A
+    // す-stem plus べき/べし is always this construction. The span must
+    // end exactly at the auxiliary (すべきだ keeps its copula): べき
+    // takes no inflection of its own here. Ranks as Deconjugated, below
+    // the literal す可き: the "should" meaning lives in the auxiliary,
+    // and mining すべき as する would make a useless card.
+    let beki: Option<String> = tokens
+        .iter()
+        .find(|t| t.start == position)
+        .and_then(|v1| {
+            // UniDic lemmas are orthographic per short unit: し maps to
+            // する but す stays す, so both count as the する verb here.
+            if v1.pos != "動詞" || !matches!(v1.base_form.as_str(), "する" | "す") {
+                return None;
+            }
+            if !matches!(v1.surface.as_str(), "す" | "する") {
+                return None;
+            }
+            let v2 = tokens.iter().find(|t| t.start == v1.end)?;
+            if v2.pos != "助動詞" || v2.base_form != "べし" {
+                return None;
+            }
+            if position + span_len != v2.end {
+                return None;
+            }
+            Some(normalize::normalize_text("する"))
+        });
+    if let Some(head_norm) = beki {
+        if let Some(entries) = index.by_text.get(&head_norm) {
+            for e in entries {
+                if seen_ids.insert(e.id) {
+                    let ctx =
+                        context_reading.map_or(false, |r| reading_matches_context(e, r));
+                    candidates.push((
+                        Arc::clone(e),
+                        1,
+                        Some("should".to_string()),
+                        MatchKind::Deconjugated,
+                        ctx,
+                    ));
+                }
+            }
+        }
+    }
+
     // Rule-based deconjugation — fallback beneath morphology. Entries already
     // found via literal/morphological paths are skipped via seen_ids, so a
     // word never appears twice just because both paths resolved to it. Each
@@ -957,7 +1030,7 @@ pub(crate) fn lookup_candidate(
         .iter()
         .any(|t| t.start == position && t.end >= position + span_len);
     for form in deconj_pool {
-        if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) {
+        if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) {
             continue;
         }
         // Verb-class results need a real verb token backing them (see
@@ -1592,7 +1665,7 @@ pub(crate) fn lookup_candidate(
             // forms route through the same てみる-strip rule. The te/ta
             // gates ride along too: classical forms never license modern
             // fabrications either.
-            if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) {
+            if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) {
                 continue;
             }
             let is_na_imperative = form.rule_chain.as_deref().map_or(false, |c| {
@@ -1891,12 +1964,12 @@ pub(crate) fn lookup_candidate(
             ord.then(b_kanji_share.cmp(&a_kanji_share)) // kanji match: true first
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
                 .then(morph_exact(b).cmp(&morph_exact(a))) // tokenizer's exact form first
+                .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // free words beat bound morphemes (はり over suffix-ばり) — bound readings never bury free words, orphan or not
                 .then(a_orphan.cmp(&b_orphan)) // common word first
                 .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
                 .then(b_prio.cmp(&a_prio))
                 .then(a_freq.cmp(&b_freq)) // exact corpus rank breaks tier ties
-                .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // false (not bound) sorts before true
         } else {
             // Pure-kana surface: prefer usually-kana words (せい -> 所為,
             // not 性) before falling back to frequency — but only among
@@ -1905,11 +1978,15 @@ pub(crate) fn lookup_candidate(
             // obscure-margin splitter below (どうか must stay whole).
             // Kanji surfaces skip this entirely — kanji evidence dominates
             // there, and a kana match against a kanji surface is
-            // coincidental by definition. Archaic words never ride the
-            // boost: script agreement is among current words, so an old
-            // usually-kana form (哉, arch particle) must not outrank its
-            // modern rivals (かな particle, 仮名) on script alone.
-            let archaic = |e: &Arc<DictEntry>| e.misc.iter().any(|m| m == "arch");
+            // coincidental by definition. Archaic words ride the boost only
+            // with editorial currency behind them: priority-less archaisms
+            // (哉) must not outrank modern rivals on script alone, but a
+            // tagged archaism (其処 spec1 — same bundled-sense situation as
+            // the かな particle) is a living word and keeps it. This mirrors
+            // the regen's owner rule: priority tags are currency judgments.
+            let archaic = |e: &Arc<DictEntry>| {
+                e.misc.iter().any(|m| m == "arch") && e.priority.is_empty()
+            };
             let a_kana = a.0.kana_only && !archaic(&a.0);
             let b_kana = b.0.kana_only && !archaic(&b.0);
             // Pure-kana surface: no kanji evidence, most common word wins.
@@ -1927,7 +2004,13 @@ pub(crate) fn lookup_candidate(
             };
             let a_suffix = suffix_headword(&a.0);
             let b_suffix = suffix_headword(&b.0);
+            // Bound morphemes sink below free words (はり over suffix-ばり),
+            // except top-tier exact suffixes (ちゃん/くん/さん), which keep
+            // their boost below untouched.
+            let a_bound = is_bound_only(&a.0) && !suffix_headword(&a.0);
+            let b_bound = is_bound_only(&b.0) && !suffix_headword(&b.0);
             ord.then(morph_exact(b).cmp(&morph_exact(a))) // tokenizer's exact form first
+                .then(a_bound.cmp(&b_bound)) // free words beat bound morphemes (はり over ばり) — bound readings never bury free words, orphan or not
                 .then(a_orphan.cmp(&b_orphan)) // common word first
                 .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
                 .then(b_suffix.cmp(&a_suffix)) // exact suffix match first
@@ -1936,7 +2019,6 @@ pub(crate) fn lookup_candidate(
                 .then(b_prio.cmp(&a_prio))
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
                 .then(a_freq.cmp(&b_freq)) // exact corpus rank breaks tier ties
-                .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0)))
         }
     });
 

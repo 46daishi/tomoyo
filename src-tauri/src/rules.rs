@@ -203,6 +203,14 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     // The literal や否や entry resolves the merged span. The head is the
     // particle, so lock it; いなや occurs only in this expression.
     ("や", "いなや", true),
+    // すべき/すべし ("should do"): UniDic splits す|べき (する-stem +
+    // auxiliary), so the construction never forms a span. The beki arm in
+    // lookup resolves the merged span to する ("should"). Any head may
+    // start it — a す-stem plus べき/べし is always this construction.
+    ("す", "べき", false),
+    ("す", "べし", false),
+    ("する", "べき", false),
+    ("する", "べし", false),
 ];
 
 /// Single-char particles a clipped emphasis can attach to (sokuon-span
