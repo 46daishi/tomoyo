@@ -628,27 +628,35 @@ body.mini-mode .logo
 }
 
 body.mini-mode .lookup-tooltip {
-    min-width: clamp(160px, 40vw, 260px);
-    max-width: clamp(200px, 60vw, 320px);
+    min-width: clamp(280px, 85vw, 480px);
+    max-width: clamp(340px, 92vw, 560px);
     padding: clamp(0.4rem, 2vh, 0.75rem) clamp(0.5rem, 3vw, 1rem);
 }
 
 body.mini-mode .tooltip-surface {
-    font-size: clamp(0.85rem, 4vh, 1.1rem);
+    font-size: clamp(1rem, 4.5vh, 1.25rem);
     margin-bottom: clamp(0.3rem, 1.5vh, 0.5rem);
     padding-bottom: clamp(0.3rem, 1.5vh, 0.5rem);
 }
 
 body.mini-mode .entry-readings {
-    font-size: clamp(0.85rem, 3.5vh, 1.1rem);
+    font-size: clamp(1rem, 4vh, 1.2rem);
 }
 
 body.mini-mode .entry-reading-kana {
-    font-size: clamp(0.5rem, 2vh, 0.65rem);
+    font-size: clamp(0.6rem, 2.2vh, 0.75rem);
 }
 
 body.mini-mode .entry-definitions {
+    font-size: clamp(0.85rem, 3vh, 1rem);
+}
+
+body.mini-mode .entry-pos {
     font-size: clamp(0.7rem, 2.5vh, 0.85rem);
+}
+
+body.mini-mode .freq-tag {
+    font-size: clamp(0.65rem, 2.5vh, 0.8rem);
 }
 
 body.mini-mode .tooltip-entries {
