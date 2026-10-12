@@ -53,39 +53,30 @@ const IMAGE_MIME_TYPES = {
     svg: 'image/svg+xml',
 };
 
-// Session cache of loaded images (path -> data URL, or null when the file
-// could not be read, so failures don't retry on every render).
+// Session cache of loaded images (path -> object URL, or null when the
+// file could not be read, so failures don't retry on every render).
 const imageUrlCache = new Map();
 const imageUrlPending = new Map();
 
 /**
- * @param {Uint8Array} bytes
- * @returns {string}
- */
-function bytesToBase64(bytes) {
-    // Manual byte->char mapping (never TextDecoder: the 'latin1' label is
-    // windows-1252 in browsers, which maps 0x80-0x9F above U+00FF and makes
-    // btoa throw InvalidCharacterError on real image files).
-    const parts = [];
-    const chunk = 0x1000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-        parts.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk))));
-    }
-    return btoa(parts.join(''));
-}
-
-/**
  * Load a stored image file (covers, word images, profile pictures) as a
- * same-origin `data:` URL for `<img>` tags.
+ * same-origin `blob:` URL for `<img>` tags.
  *
  * File URLs must NOT be used here: `asset://` subresource loads are subject
  * to the WebView's origin check, which newer WebKitGTK versions reject
  * ("Unsafe attempt to load URL ... Domains, protocols and ports must
- * match"), breaking every image. `data:` URLs carry no origin, so they
- * render everywhere — including inside `<canvas>` pixel reads.
+ * match"), breaking every image. `blob:` URLs are minted by the page
+ * itself, so they are same-origin and render everywhere — including inside
+ * `<canvas>` pixel reads (drawing a `blob:` URL never taints the canvas).
+ *
+ * Deliberately minimal (bytes -> URL, no processing): the pre-regression
+ * path resolved every image synchronously with zero framework churn, and
+ * any per-image JS work (base64, downscale canvases, entrance fades) shows
+ * up as load lag and transition strobing. The engine decodes and caches
+ * each blob URL exactly once, same as it did for direct file URLs.
  *
  * @param {string | null | undefined} path absolute file path, as stored in the DB
- * @returns {Promise<string | null>} the data URL, or null when unreadable
+ * @returns {Promise<string | null>} the object URL, or null when unreadable
  */
 export function loadImageSrc(path) {
     if (!path) return Promise.resolve(null);
@@ -95,7 +86,7 @@ export function loadImageSrc(path) {
         .then((bytes) => {
             const ext = path.split('.').pop()?.toLowerCase() ?? '';
             const mime = IMAGE_MIME_TYPES[ext] ?? 'image/png';
-            const url = `data:${mime};base64,${bytesToBase64(bytes)}`;
+            const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
             imageUrlCache.set(path, url);
             imageUrlPending.delete(path);
             return url;

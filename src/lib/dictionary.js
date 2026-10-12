@@ -104,6 +104,40 @@ export async function getWordMineStatus({ dictId, sentenceText, mediaId = null }
     return matching.length > 0 ? 'same' : 'different';
 }
 
+// Batched version of getWordMineStatus for tooltip opens: two queries total
+// instead of two per entry, so mine buttons settle in milliseconds rather
+// than landing mid-transition (which reads as flicker on open/close).
+/**
+ * @param {{ dictIds: number[], sentenceText: string, mediaId: number | null }} args
+ * @returns {Promise<Record<number, string>>}
+ */
+export async function getWordsMineStatuses({ dictIds, sentenceText, mediaId = null }) {
+    if (!dictIds || dictIds.length === 0) return {};
+    const db = await getDb();
+    const uniqueIds = [...new Set(dictIds)];
+    const placeholders = uniqueIds.map((_, i) => `$${i + 1}`).join(', ');
+    /** @type {{ id: number }[]} */
+    const existingRows = await db.select(`SELECT id FROM words WHERE id IN (${placeholders})`, uniqueIds);
+    const existing = new Set(existingRows.map((r) => r.id));
+    if (existing.size === 0) return Object.fromEntries(uniqueIds.map((id) => [id, 'new']));
+    const existingIds = [...existing];
+    const matchPlaceholders = existingIds.map((_, i) => `$${i + 1}`).join(', ');
+    const textParam = existingIds.length + 1;
+    const mediaParam = existingIds.length + 2;
+    /** @type {{ word_id: number }[]} */
+    const matchingRows = await db.select(
+        `SELECT word_id FROM word_sentences
+         WHERE word_id IN (${matchPlaceholders})
+           AND sentence_text = $${textParam}
+           AND ((media_id IS NULL AND $${mediaParam} IS NULL) OR media_id = $${mediaParam})`,
+        [...existingIds, sentenceText, mediaId]
+    );
+    const matching = new Set(matchingRows.map((r) => r.word_id));
+    return Object.fromEntries(
+        uniqueIds.map((id) => [id, !existing.has(id) ? 'new' : matching.has(id) ? 'same' : 'different'])
+    );
+}
+
 export async function addSentenceEntry({ sentenceText, tag = null, translation = null, mediaId = null }) {
     const db = await getDb();
     await db.execute(

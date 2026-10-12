@@ -159,6 +159,10 @@
         tooltipVisible = false;
         hoveredSpan = null;
         cycleSkip = 0;
+        // Invalidate any in-flight hover lookup so a slow lookupAtPosition
+        // resolving after the pointer left can't reopen the tooltip under
+        // a gone cursor (visible as a flicker around close).
+        ++hoverRequestId;
     }
 
     async function handleMine(entry, spelling) {

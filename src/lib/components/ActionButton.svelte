@@ -55,13 +55,12 @@
     }
 
     /* ── Hover / active states ── */
+    /* Hover feedback avoids transform: lifting the hovered button itself
+       makes :hover flap for cursors resting at its edge (visible flicker).
+       Border/shadow/color carry the affordance instead. */
     .action-button:hover:not(:disabled) {
         border-color: var(--theme-primary, #36b7bd);
-        transform: translateY(-1px);
         box-shadow: 0 4px 12px var(--theme-shadow, rgba(0, 0, 0, 0.3));
-    }
-    .action-button:active:not(:disabled) {
-        transform: translateY(0);
     }
     .action-button:disabled {
         opacity: 0.5;

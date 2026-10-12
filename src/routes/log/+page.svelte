@@ -250,13 +250,10 @@
         display: flex;
         flex-direction: column;
         gap: 0.85rem;
-        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-        will-change: transform;
-        transform: translateZ(0);
+        transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
     }
 
     .session-card:hover {
-        transform: translateY(-3px);
         box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
     }
 

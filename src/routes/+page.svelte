@@ -120,6 +120,7 @@
                     {:else}
                         <div class="cover-placeholder"></div>
                     {/if}
+                    <div class="cover-shade" aria-hidden="true"></div>
 
                     <div class="cover-actions" onclick={(e) => e.stopPropagation()}>
                         <ActionButton
@@ -259,7 +260,20 @@
     .cover-placeholder {
         position: relative;
         top: 0;
-        transition: filter 0.3s ease;
+    }
+
+    /* Hover dimming via an opacity shade, not an animated filter: fading
+       a black overlay (opacity 0 -> 0.4) renders identically to
+       brightness(60%) but never re-rasters the photo, so the fade can't
+       strobe on weaker compositors. The shade sits above the image and
+       below the action buttons. */
+    .cover-shade {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
     }
 
     .card:hover .cover {
@@ -267,9 +281,8 @@
         transform: translateY(-2px);
     }
 
-    .card:hover .cover :global(img),
-    .card:hover .cover-placeholder {
-        filter: brightness(60%);
+    .card:hover .cover-shade {
+        opacity: 0.4;
     }
 
     .cover-actions {

@@ -4,7 +4,7 @@
     import { startClipboardListener, stopClipboardListener } from '$lib/clipboardListener.js';
     import { startWebsocketListener, stopWebsocketListener } from '$lib/websocketListener.js';
     import { logLookupEvent } from '$lib/lookupEvents.js';
-    import { mineWord, getWordMineStatus, getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
+    import { mineWord, getWordsMineStatuses, getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
     import { onMount } from 'svelte';
     
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
@@ -163,16 +163,17 @@
         );
         const requestId = ++mineStatusRequestId;
 
-        const results = await Promise.all(
-            entries.map((entry) =>
-                getWordMineStatus({ dictId: entry.id, sentenceText: displayedText, mediaId }).then(
-                    (status) => [entry.id, status]
-                )
-            )
-        );
+        const statuses = await getWordsMineStatuses({
+            dictIds: entries.map((entry) => entry.id),
+            sentenceText: displayedText,
+            mediaId,
+        });
 
         if (requestId !== mineStatusRequestId) return;
-        mineStatuses = Object.fromEntries(results);
+        // Drop results for a tooltip that already moved on or closed:
+        // applying them mid-transition reads as flicker on open/close.
+        if (span !== tooltipSpan || !tooltipVisible) return;
+        mineStatuses = statuses;
     }
 
     function openTooltipAndLog(span, charEl) {
@@ -204,6 +205,12 @@
 
     function closeHoverTooltip() {
         tooltipVisible = false;
+        // Invalidate any in-flight hover lookup: without this, a slow
+        // lookupAtPosition resolving after the pointer left reopens the
+        // tooltip under a gone cursor (visible as a flicker around close).
+        // Callers only run when the pointer leaves the interactive area,
+        // so a later mouseenter always issues a fresh request id.
+        ++hoverRequestId;
     }
 
     async function handleCharHover(index, event) {

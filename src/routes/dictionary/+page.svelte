@@ -1714,13 +1714,10 @@
         border: 1px solid var(--theme-border, #404040);
         border-radius: 12px;
         padding: 1rem 1.25rem;
-        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-        will-change: transform;
-        transform: translateZ(0);
+        transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
     }
 
     .word-card:hover {
-        transform: translateY(-3px);
         box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
     }
 
@@ -1737,11 +1734,12 @@
         background: var(--status-color, #6c7086);
         border-top-left-radius: 12px;
         border-bottom-left-radius: 12px;
-        transition: width 0.15s ease;
     }
 
+    /* Hover brightens instead of widening: animating width under the
+       cursor makes :hover flap on a 6px target (visible flicker). */
     .status-bar:hover {
-        width: 10px;
+        filter: brightness(1.6);
     }
 
     .word-main {
@@ -1884,7 +1882,6 @@
     .mine-select:hover :global(.action-button.primary) {
         background-color: var(--theme-primaryHover, #17a4ab);
         border-color: var(--theme-primaryHover, #17a4ab);
-        transform: translateY(-1px);
         box-shadow: 0 4px 12px var(--theme-shadow, rgba(0, 0, 0, 0.3));
     }
     .mine-select:hover :global(.action-button.secondary) {

@@ -329,7 +329,6 @@
 
     .next-btn:hover {
         border-color: var(--theme-primary, #36b7bd);
-        transform: translateY(-1px);
     }
 
     .key-hint {
@@ -445,7 +444,6 @@
 
     .reveal-btn:hover {
         background: var(--theme-primaryHover, #17a4ab);
-        transform: translateY(-1px);
     }
 
     .reveal-btn .key-hint {
@@ -480,7 +478,6 @@
     .status-btn:hover {
         background: color-mix(in srgb, var(--theme-primary, #36b7bd) 15%, transparent);
         border-color: color-mix(in srgb, var(--theme-primary, #36b7bd) 40%, transparent);
-        transform: translateY(-1px);
     }
 
     .status-btn.active {

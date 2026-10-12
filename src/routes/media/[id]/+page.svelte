@@ -514,11 +514,12 @@
         background: var(--status-color, #6c7086);
         border-top-left-radius: 10px;
         border-bottom-left-radius: 10px;
-        transition: width 0.15s ease;
     }
 
+    /* Hover brightens instead of widening: animating width under the
+       cursor makes :hover flap on a 6px target (visible flicker). */
     .mined-word-status:hover {
-        width: 9px;
+        filter: brightness(1.6);
     }
 
     .name-delete-btn {

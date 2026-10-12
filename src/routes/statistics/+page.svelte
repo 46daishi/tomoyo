@@ -754,12 +754,11 @@
         border: 1px solid var(--theme-border, #404040);
         border-radius: 12px;
         padding: 1.1rem 1.25rem;
-        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        transition: box-shadow 0.15s ease, border-color 0.15s ease;
         overflow: hidden;
     }
 
     .stat-tile:hover {
-        transform: translateY(-3px);
         box-shadow: 0 10px 22px var(--theme-shadow, rgba(0, 0, 0, 0.35));
     }
 
@@ -918,11 +917,11 @@
         border-radius: 50%;
         cursor: pointer;
         outline: none;
-        transition: filter 0.15s ease, box-shadow 0.15s ease;
+        transition: opacity 0.15s ease, box-shadow 0.15s ease;
     }
 
     .avatar-btn:hover {
-        filter: brightness(90%);
+        opacity: 0.85;
     }
 
     .avatar-btn:focus-visible {

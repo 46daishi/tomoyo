@@ -22,6 +22,7 @@
     let wordImages = $state({});
 
     async function loadWordImages() {
+        const span = tooltipSpan;
         const ids = [
             ...tooltipSpan.entries,
             ...(tooltipSpan.related_entries ?? []),
@@ -29,8 +30,13 @@
             .filter((e) => !e.customName)
             .map((e) => e.id);
         try {
-            wordImages = await getWordImages(ids);
+            const images = await getWordImages(ids);
+            // Drop results for a tooltip that already moved on or closed:
+            // inserting image buttons mid-transition reads as flicker.
+            if (span !== tooltipSpan) return;
+            wordImages = images;
         } catch {
+            if (span !== tooltipSpan) return;
             wordImages = {};
         }
     }
@@ -284,7 +290,6 @@
     .mine-select:hover :global(.action-button.primary) {
         background-color: var(--theme-primaryHover, #17a4ab);
         border-color: var(--theme-primaryHover, #17a4ab);
-        transform: translateY(-1px);
         box-shadow: 0 4px 12px var(--theme-shadow, rgba(0, 0, 0, 0.3));
     }
     .mine-select:hover :global(.action-button.secondary) {

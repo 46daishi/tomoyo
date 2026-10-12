@@ -244,7 +244,6 @@
 
     .next-btn:hover {
         border-color: var(--theme-primary, #36b7bd);
-        transform: translateY(-1px);
     }
 
     .key-hint {
