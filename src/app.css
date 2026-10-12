@@ -663,3 +663,142 @@ body.mini-mode .tooltip-entries {
     max-height: clamp(80px, 40vh, 160px);
     gap: clamp(0.3rem, 1.5vh, 0.5rem);
 }
+
+/* ── Light-mode contrast overrides ──────────────────────────────────────
+   Dark themes use light primary/accent/status hues as foreground text;
+   on light surfaces those wash out, so light themes darken the same
+   foreground roles. Dark rendering is untouched (everything is scoped
+   to html[data-theme-mode="light"], set by applyTheme). */
+
+/* Headwords + readings (tooltip core): primary/accent text darkened. */
+html[data-theme-mode="light"] .entry-readings {
+    color: color-mix(in srgb, var(--theme-primary) 72%, black);
+}
+html[data-theme-mode="light"] .entry-reading-kana {
+    color: color-mix(in srgb, var(--theme-accent) 62%, black);
+}
+
+/* Primary/accent foreground text across pages (links, tabs, headings,
+   icons, badges, highlights). Borders and filled buttons keep working
+   as-is and are deliberately not touched. */
+html[data-theme-mode="light"] .sentence-highlight,
+html[data-theme-mode="light"] .meta-icon,
+html[data-theme-mode="light"] .vndb-link,
+html[data-theme-mode="light"] .about-link,
+html[data-theme-mode="light"] .sw-icon,
+html[data-theme-mode="light"] .tab-btn.active,
+html[data-theme-mode="light"] .view-toggle-btn.active,
+html[data-theme-mode="light"] .translation-toggle-btn.active,
+html[data-theme-mode="light"] .count-badge {
+    color: color-mix(in srgb, var(--theme-primary) 72%, black);
+}
+html[data-theme-mode="light"] .vndb-link:hover,
+html[data-theme-mode="light"] .about-link:hover {
+    color: color-mix(in srgb, var(--theme-primaryHover) 72%, black);
+}
+
+/* Tooltip + selection popup: their backgrounds mix toward black, which
+   reads as near-black blobs on light themes. Solid surface instead. */
+html[data-theme-mode="light"] .lookup-tooltip,
+html[data-theme-mode="light"] .selection-popup {
+    background: var(--theme-surface);
+}
+
+/* Known-word status underlines: pastel 2px lines go faint on white. */
+html[data-theme-mode="light"] .char-token.known-word,
+html[data-theme-mode="light"] .entry-spelling.known-word {
+    border-bottom-color: color-mix(in srgb, var(--status-color) 60%, black);
+}
+
+/* Frequency pills: fixed greens/ambers go weak on white. */
+html[data-theme-mode="light"] .freq-tier-common {
+    color: #2e7d32;
+    background-color: color-mix(in srgb, #4caf50 14%, transparent);
+    border-color: color-mix(in srgb, #4caf50 60%, transparent);
+}
+html[data-theme-mode="light"] .freq-tier-uncommon {
+    color: #8a5f00;
+    background-color: color-mix(in srgb, #c8901a 16%, transparent);
+    border-color: color-mix(in srgb, #c8901a 60%, transparent);
+}
+
+/* Review reveal button: transparent bg + white text is invisible on
+   light surfaces. */
+html[data-theme-mode="light"] .reveal-btn {
+    color: var(--theme-text);
+}
+html[data-theme-mode="light"] .reveal-btn .key-hint {
+    color: var(--theme-textSecondary);
+    border-color: var(--theme-border);
+}
+
+/* App logo ships on a black backdrop: round it into an icon-like badge
+   on light themes instead of a harsh rectangle. */
+html[data-theme-mode="light"] .about-logo,
+html[data-theme-mode="light"] .logo img {
+    border-radius: 14px;
+}
+
+/* ── Light-mode surfaces ────────────────────────────────────────────────
+   Many panels mix theme-surface toward black for depth (70/80/55%), which
+   inverts to grey on light themes: the reader, cards, tiles, modals, and
+   session lists all sat on grey. Light themes use solid surface instead —
+   depth comes from the tinted page background showing around them. */
+html[data-theme-mode="light"] .sentence-window,
+html[data-theme-mode="light"] .modal,
+html[data-theme-mode="light"] .word-card,
+html[data-theme-mode="light"] .stat-tile,
+html[data-theme-mode="light"] .panel,
+html[data-theme-mode="light"] .session-words-section,
+html[data-theme-mode="light"] .mined-word-card,
+html[data-theme-mode="light"] .session-card,
+html[data-theme-mode="light"] .modal-tabs,
+html[data-theme-mode="light"] .pager,
+html[data-theme-mode="light"] .pager-btn {
+    background: var(--theme-surface);
+}
+html[data-theme-mode="light"] .pager-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--theme-primary) 15%, var(--theme-surface));
+}
+
+/* Mini-mode reader: same inversion through its own veil. */
+html[data-theme-mode="light"] body.mini-mode .sentence-window {
+    background: color-mix(in srgb, var(--theme-surface) 88%, transparent);
+}
+
+/* History sentences are hardcoded yellow: invisible on light panels. */
+html[data-theme-mode="light"] .sentence-text.history-text {
+    color: #8a5f00;
+}
+
+/* Cover placeholders: dark accent glow becomes a muddy patch on light
+   themes; glow toward white instead. */
+html[data-theme-mode="light"] .cover-placeholder,
+html[data-theme-mode="light"] .mb-cover-placeholder {
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--cover-accent, var(--mb-accent, var(--theme-primary, #36b7bd))) 35%, #fff),
+        var(--theme-surface, #ffffff)
+    );
+}
+
+/* Primary-filled controls keep white text from dark mode, which vanishes
+   on light primaries (amber/cyan especially). Dark theme-text wins on
+   every primary in the set, so light themes use it instead. Hover states
+   inherit (none of them redeclare color). */
+html[data-theme-mode="light"] .action-button.primary,
+html[data-theme-mode="light"] .modal-btn.primary,
+html[data-theme-mode="light"] .settings-tab.active,
+html[data-theme-mode="light"] .review-kind-toggle button.active {
+    color: var(--theme-text);
+}
+
+/* Custom-name underline is fixed cyan: faint on white. */
+html[data-theme-mode="light"] .char-token.name-word {
+    border-bottom-color: #0b7d99;
+}
+
+/* Lookup-limit badge pink text goes weak on white. */
+html[data-theme-mode="light"] .lookup-limit-badge.depleted {
+    color: #c7436b;
+}

@@ -342,6 +342,180 @@ export const themes = {
       accent:        "#9fa6f0",
     },
   },
+
+  // ── Light themes ───────────────────────────────────────────────────────────
+  // Same main colours as the dark set; only the chrome flips to
+  // hue-tinted light surfaces with dark text.
+
+  "tomoyo-light": {
+    label: "Tomoyo Light",
+    colors: {
+      background:    "#eef3fa",
+      surface:       "#ffffff",
+      text:          "#1a2436",
+      textSecondary: "#5a6d8a",
+      border:        "#d3deeb",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#e8eef7",
+      buttonText:    "#1a2436",
+      primary:       "#5b8dd6",
+      primaryHover:  "#4874bb",
+      accent:        "#8fb2e8",
+    },
+  },
+
+  "dusk-violet-light": {
+    label: "Dusk Violet Light",
+    colors: {
+      background:    "#f1ebf9",
+      surface:       "#ffffff",
+      text:          "#241a33",
+      textSecondary: "#6f5f87",
+      border:        "#ddd2ec",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#efe7f8",
+      buttonText:    "#241a33",
+      primary:       "#a374e0",
+      primaryHover:  "#8c5cc9",
+      accent:        "#c9a6f0",
+    },
+  },
+
+  "forest-canopy-light": {
+    label: "Forest Canopy Light",
+    colors: {
+      background:    "#e9f3ee",
+      surface:       "#ffffff",
+      text:          "#16281f",
+      textSecondary: "#57766a",
+      border:        "#cfdfd5",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#e6f1ea",
+      buttonText:    "#16281f",
+      primary:       "#5cb87f",
+      primaryHover:  "#47a068",
+      accent:        "#8fd6a8",
+    },
+  },
+
+  "amber-glow-light": {
+    label: "Amber Glow Light",
+    colors: {
+      background:    "#faf3e6",
+      surface:       "#ffffff",
+      text:          "#2f2413",
+      textSecondary: "#7a6a4d",
+      border:        "#e8dcc2",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#f5eddc",
+      buttonText:    "#2f2413",
+      primary:       "#e8a53d",
+      primaryHover:  "#cc8e2c",
+      accent:        "#f0c47a",
+    },
+  },
+
+  "crimson-night-light": {
+    label: "Crimson Night Light",
+    colors: {
+      background:    "#faecee",
+      surface:       "#ffffff",
+      text:          "#33191d",
+      textSecondary: "#8a5f66",
+      border:        "#ecd3d7",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#f7e9eb",
+      buttonText:    "#33191d",
+      primary:       "#e0495a",
+      primaryHover:  "#c33547",
+      accent:        "#f08a95",
+    },
+  },
+
+  "slate-graphite-light": {
+    label: "Slate Graphite Light",
+    colors: {
+      background:    "#eef0f2",
+      surface:       "#ffffff",
+      text:          "#1d2126",
+      textSecondary: "#5f6b76",
+      border:        "#d5dade",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#e9edf0",
+      buttonText:    "#1d2126",
+      primary:       "#7c93a8",
+      primaryHover:  "#647c92",
+      accent:        "#a4b8c9",
+    },
+  },
+
+  "plum-orchid-light": {
+    label: "Plum Orchid Light",
+    colors: {
+      background:    "#f8ecf7",
+      surface:       "#ffffff",
+      text:          "#2e1c2e",
+      textSecondary: "#7e5f7e",
+      border:        "#e9d4e8",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#f4e7f3",
+      buttonText:    "#2e1c2e",
+      primary:       "#c467bd",
+      primaryHover:  "#ab4ea3",
+      accent:        "#e29bd9",
+    },
+  },
+
+  "arctic-cyan-light": {
+    label: "Arctic Cyan Light",
+    colors: {
+      background:    "#e9f4f8",
+      surface:       "#ffffff",
+      text:          "#14252c",
+      textSecondary: "#54707b",
+      border:        "#ccdee6",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#e4f0f5",
+      buttonText:    "#14252c",
+      primary:       "#3fc1e0",
+      primaryHover:  "#2ea8c6",
+      accent:        "#7fdcf0",
+    },
+  },
+
+  "copper-forge-light": {
+    label: "Copper Forge Light",
+    colors: {
+      background:    "#f9efe8",
+      surface:       "#ffffff",
+      text:          "#2f2115",
+      textSecondary: "#7c6650",
+      border:        "#e9d6c3",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#f5ebe0",
+      buttonText:    "#2f2115",
+      primary:       "#d97a45",
+      primaryHover:  "#bd6534",
+      accent:        "#eda06f",
+    },
+  },
+
+  "midnight-indigo-light": {
+    label: "Midnight Indigo Light",
+    colors: {
+      background:    "#ebecf8",
+      surface:       "#ffffff",
+      text:          "#1b1e35",
+      textSecondary: "#5d6189",
+      border:        "#d2d5ec",
+      shadow:        "rgba(30,40,60,0.15)",
+      button:        "#e7e9f6",
+      buttonText:    "#1b1e35",
+      primary:       "#6b74e0",
+      primaryHover:  "#555ec7",
+      accent:        "#9fa6f0",
+    },
+  },
 };
 
 /** Flat list for ThemeSelector to render swatches. */
@@ -362,14 +536,24 @@ export const currentTheme = writable("tomoyo");
  * updates the store, and persists to localStorage.
  * @param {string} themeKey  key in `themes`
  */
- export function applyTheme(themeKey) {
-     const theme = themes[themeKey];
-     if (!theme) return;
- 
-     const root = document.documentElement;
-     for (const [k, v] of Object.entries(theme.colors))
-         root.style.setProperty(`--theme-${k}`, v);
- 
+  export function applyTheme(themeKey) {
+      const theme = themes[themeKey];
+      if (!theme) return;
+  
+      const root = document.documentElement;
+      for (const [k, v] of Object.entries(theme.colors))
+          root.style.setProperty(`--theme-${k}`, v);
+      // Native controls/scrollbars follow the theme family; dark themes
+      // keep the browser default (unchanged existing behavior). The mode
+      // attribute also scopes light-only contrast overrides in app.css.
+      if (themeKey.endsWith("-light")) {
+          root.style.colorScheme = "light";
+          root.dataset.themeMode = "light";
+      } else {
+          root.style.removeProperty("color-scheme");
+          root.dataset.themeMode = "dark";
+      }
+  
      currentTheme.set(themeKey);
      localStorage.setItem("tomoyo-theme", themeKey);
  }
