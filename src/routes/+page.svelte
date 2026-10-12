@@ -7,7 +7,8 @@
     import { ICONS } from "$lib/icons.js";
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
-    import { getDb, coverSrc } from '$lib/db';
+    import { getDb } from '$lib/db';
+    import AppImage from '$lib/components/AppImage.svelte';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_COLORS, FILTER_OPTIONS, STATUS_OPTIONS } from '$lib/constants.js';
     import { clearDictionaryData } from "$lib/dictionary";
@@ -19,8 +20,6 @@
     let editingMedia = $state(null);
     let settings = $state(/** @type {Record<string, any> | null} */ (null));
     let showAbout = $state(false);
-
-    let profilePicSrc = $derived(settings?.profile_picture ? coverSrc(settings.profile_picture) : null);
 
     const STATUS_ORDER = Object.fromEntries(STATUS_OPTIONS.map((o, i) => [o.value, i]));
 
@@ -117,7 +116,7 @@
             >
                 <div class="cover">
                     {#if media.cover_path}
-                        <img src={coverSrc(media.cover_path)} alt={media.title} />
+                        <AppImage path={media.cover_path} alt={media.title} />
                     {:else}
                         <div class="cover-placeholder"></div>
                     {/if}
@@ -162,8 +161,8 @@
 
 <SideNav>
     <div class="stats-btn-wrap">
-        {#if profilePicSrc}
-            <img class="profile-cover" src={profilePicSrc} alt="Your profile" />
+        {#if settings?.profile_picture}
+            <AppImage path={settings.profile_picture} class="profile-cover" alt="Your profile" />
         {/if}
         <ActionButton
         icon={ICONS.stats}
@@ -256,7 +255,7 @@
         transition: border-color 0.15s ease, transform 0.15s ease;
     }
 
-    .cover img,
+    .cover :global(img),
     .cover-placeholder {
         position: relative;
         top: 0;
@@ -268,7 +267,7 @@
         transform: translateY(-2px);
     }
 
-    .card:hover .cover img,
+    .card:hover .cover :global(img),
     .card:hover .cover-placeholder {
         filter: brightness(60%);
     }
@@ -289,7 +288,7 @@
         opacity: 1;
     }
 
-    .cover img {
+    .cover :global(img) {
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -347,7 +346,7 @@
         display: inline-flex;
     }
 
-    .profile-cover {
+    :global(.profile-cover) {
         position: absolute;
         top: 2px;
         left: 2px;
@@ -360,7 +359,7 @@
         transition: opacity 0.2s ease;
     }
 
-    .stats-btn-wrap:hover .profile-cover {
+    .stats-btn-wrap:hover :global(.profile-cover) {
         opacity: 0.3;
     }
 </style>

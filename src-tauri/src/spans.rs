@@ -229,10 +229,31 @@ pub(crate) fn lookup_from_position(
                     acc.push_str(&cur);
                     end = tok.end;
                     if acc == tail_norm {
+                        // にとって must not swallow a verb compound's te-form:
+                        // 取ってくる/おく/しまう/いる keep resolving
+                        // compositionally (verb + aux), so the merge yields
+                        // whenever a lexical verb continues right after.
+                        // Copulas and politeness auxiliaries (だ/です/ます)
+                        // are 助動詞, not 動詞, so にとってだ still merges.
+                        // (Mirrors pp_compound's yield rule.)
+                        if *tail == "とって"
+                            && tokens
+                                .iter()
+                                .any(|tok| tok.start == end && tok.pos == "動詞")
+                        {
+                            break;
+                        }
                         let mut nend = end.min(len);
                         if nend > position {
                             ends.push(nend);
                             completion_ends.insert(nend);
+                        }
+                        // …except for にとって: the absorbed end (にとっては)
+                        // resolves compositionally (te + は) and would beat
+                        // the expression on length. にとって's particles
+                        // (は/が/を/も) always split off instead.
+                        if *tail == "とって" {
+                            break;
                         }
                         // Absorb immediately-following particles (になると's
                         // と): function-word heads have no extension loop of
@@ -2131,6 +2152,254 @@ pub(crate) fn lookup_from_position(
                                         entries = se;
                                         deconj_info = si;
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Grammar-tail split (はるちゃんたら -> ちゃん + たら,
+                // NOT loanword チャンタ): the winner is a literal
+                // non-expression word, but a substring split gives an
+                // attested stem plus a 2+-char grammatical tail
+                // (particle/conjunction) resolving on its own — the tail
+                // is its own construction. Single-char tails belong to the
+                // particle/copula arms above; kana-exact winners (kanji
+                // fidelity), same-entry stems, sokuon tails, and
+                // completion-built spans never split. (いい鴨 stays whole:
+                // expression-tagged winners are exempt.)
+                if deconj_info.is_none() && !completion_ends.contains(&eff_end) {
+                    let wkind_ok = entries.first().map_or(false, |e| {
+                        matches!(
+                            match_kind(e, &normalize::normalize_text(&candidate)),
+                            MatchKind::Spelling | MatchKind::Reading
+                        )
+                    });
+                    let wplain = entries.first().map_or(false, |e| {
+                        !e.pos.iter().any(|p| p.contains("expression"))
+                    });
+                    // tail_end extends past eff_end through the token
+                    // containing it, so mid-token winners (ちゃんた inside
+                    // ちゃんたら) still find their tail; token-clean
+                    // winners keep tail_end == eff_end.
+                    let tail_end = tokens
+                        .iter()
+                        .find(|t| t.start < eff_end && eff_end < t.end)
+                        .map(|t| t.end)
+                        .or_else(|| {
+                            tokens.iter().find(|t| t.start == eff_end).map(|t| t.end)
+                        })
+                        .unwrap_or(eff_end);
+                    if wkind_ok && wplain && candidate.chars().count() >= 3 {
+                        let winner_score =
+                            entries.first().map_or(0, |e| priority_score(e));
+                        // Right-to-left (longest head first): conservative,
+                        // least fragmentation.
+                        for b in ((position + 1)..eff_end).rev() {
+                            let head: String =
+                                chars[position..b].iter().collect();
+                            let tail: String =
+                                chars[b..tail_end].iter().collect();
+                            if tail.chars().count() < 2 {
+                                continue;
+                            }
+                            if tail.starts_with(&['っ', 'ッ'][..]) {
+                                continue;
+                            }
+                            // Cheap gates before any lookup.
+                            let hit = |s: &str| {
+                                normalize::normalize_variants(s)
+                                    .iter()
+                                    .any(|k| index.by_text.contains_key(k))
+                            };
+                            if !hit(&head) || !hit(&tail) {
+                                continue;
+                            }
+                            if let Some((se, si)) = lookup_candidate(
+                                &head,
+                                index,
+                                decon,
+                                context_reading,
+                                morph_base,
+                                tokens,
+                                position,
+                            ) {
+                                if se.is_empty() {
+                                    continue;
+                                }
+                                if se.iter().any(|e| {
+                                    entries.first().map_or(false, |w| w.id == e.id)
+                                }) {
+                                    continue;
+                                }
+                                let head_ok = se.first().map_or(false, |e| {
+                                    (priority_score(e) > 0 || e.freq_rank > 0)
+                                        && e.pos.first().map_or(false, |p| {
+                                            !p.split(|c: char| !c.is_alphabetic()).any(
+                                                |w| {
+                                                    w == "particle"
+                                                        || w == "conjunction"
+                                                        || w == "auxiliary"
+                                                },
+                                            )
+                                        })
+                                });
+                                if !head_ok {
+                                    continue;
+                                }
+                                if let Some((te, _)) = lookup_candidate(
+                                    &tail,
+                                    index,
+                                    decon,
+                                    context_reading,
+                                    morph_base,
+                                    tokens,
+                                    b,
+                                ) {
+                                    if te.is_empty() {
+                                        continue;
+                                    }
+                                    let tail_grammar =
+                                        te.first().map_or(false, |e| {
+                                            e.pos.iter().any(|p| {
+                                                p.split(|c: char| !c.is_alphabetic()).any(
+                                                    |w| {
+                                                        w == "particle"
+                                                            || w == "conjunction"
+                                                    },
+                                                )
+                                            })
+                                        });
+                                    if !tail_grammar {
+                                        continue;
+                                    }
+                                    let head_best = se
+                                        .iter()
+                                        .map(|e| priority_score(e))
+                                        .max()
+                                        .unwrap_or(0);
+                                    if head_best.saturating_sub(winner_score) < 50 {
+                                        continue;
+                                    }
+                                    eff_end = b;
+                                    candidate = head;
+                                    entries = se;
+                                    deconj_info = si;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                // Verb-te tail split (こうして -> こう + して, NOT lecturer
+                // 講師): the winner matches only by reading, but a split
+                // gives an attested non-particle stem plus a te-form verb
+                // tail resolving to a verb — the tail is its own inflection.
+                // Kanji-exact winners (script fidelity), same-entry stems,
+                // and completion-built spans never split; no frequency
+                // margin here (structural evidence suffices: 行使 950 still
+                // yields to 斯う 800 when the tail is a real te-form).
+                if deconj_info.is_none() && !completion_ends.contains(&eff_end) {
+                    let wkind_ok = entries.first().map_or(false, |e| {
+                        matches!(
+                            match_kind(e, &normalize::normalize_text(&candidate)),
+                            MatchKind::Reading
+                        )
+                    });
+                    let wplain = entries.first().map_or(false, |e| {
+                        !e.pos.iter().any(|p| p.contains("expression"))
+                    });
+                    let tail_end = tokens
+                        .iter()
+                        .find(|t| t.start < eff_end && eff_end < t.end)
+                        .map(|t| t.end)
+                        .or_else(|| {
+                            tokens.iter().find(|t| t.start == eff_end).map(|t| t.end)
+                        })
+                        .unwrap_or(eff_end);
+                    if wkind_ok && wplain && candidate.chars().count() >= 3 {
+                        for b in ((position + 1)..eff_end).rev() {
+                            let head: String =
+                                chars[position..b].iter().collect();
+                            let tail: String =
+                                chars[b..tail_end].iter().collect();
+                            if tail.chars().count() < 2 {
+                                continue;
+                            }
+                            if !tail.ends_with(&['て', 'で'][..]) {
+                                continue;
+                            }
+                            let hit = |s: &str| {
+                                normalize::normalize_variants(s)
+                                    .iter()
+                                    .any(|k| index.by_text.contains_key(k))
+                            };
+                            if !hit(&head) {
+                                continue;
+                            }
+                            if let Some((se, si)) = lookup_candidate(
+                                &head,
+                                index,
+                                decon,
+                                context_reading,
+                                morph_base,
+                                tokens,
+                                position,
+                            ) {
+                                if se.is_empty() {
+                                    continue;
+                                }
+                                if se.iter().any(|e| {
+                                    entries.first().map_or(false, |w| w.id == e.id)
+                                }) {
+                                    continue;
+                                }
+                                let head_ok = se.first().map_or(false, |e| {
+                                    (priority_score(e) > 0 || e.freq_rank > 0)
+                                        && e.pos.first().map_or(false, |p| {
+                                            !p.split(|c: char| !c.is_alphabetic()).any(
+                                                |w| {
+                                                    w == "particle"
+                                                        || w == "conjunction"
+                                                        || w == "auxiliary"
+                                                },
+                                            )
+                                        })
+                                });
+                                if !head_ok {
+                                    continue;
+                                }
+                                if let Some((te, _)) = lookup_candidate(
+                                    &tail,
+                                    index,
+                                    decon,
+                                    context_reading,
+                                    morph_base,
+                                    tokens,
+                                    b,
+                                ) {
+                                    if te.is_empty() {
+                                        continue;
+                                    }
+                                    // Any verb entry counts, not just the top:
+                                    // te-forms share their surface with nouns
+                                    // (して = 仕手 the sumo referee vs する-te),
+                                    // and the literal outranks the inflection
+                                    // on kind. What matters is that the tail
+                                    // inflects.
+                                    let tail_verb = te.iter().any(|e| {
+                                        e.pos.iter().any(|p| {
+                                            p.split(|c: char| !c.is_alphabetic())
+                                                .any(|w| w == "verb")
+                                        })
+                                    });
+                                    if !tail_verb {
+                                        continue;
+                                    }
+                                    eff_end = b;
+                                    candidate = head;
+                                    entries = se;
+                                    deconj_info = si;
+                                    break;
                                 }
                             }
                         }

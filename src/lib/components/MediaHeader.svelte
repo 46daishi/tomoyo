@@ -1,5 +1,5 @@
 <script>
-    import { coverSrc } from '$lib/db';
+    import AppImage from '$lib/components/AppImage.svelte';
     import { STATUS_COLORS } from '$lib/constants.js';
     import { openUrl } from '@tauri-apps/plugin-opener';
     import { vndbUrl } from '$lib/vndb.js';
@@ -16,7 +16,7 @@
 <div class="media-header">
     <div class="cover">
         {#if media.cover_path}
-            <img src={coverSrc(media.cover_path)} alt={media.title} />
+            <AppImage path={media.cover_path} alt={media.title} />
         {:else}
             <div class="cover-placeholder"></div>
         {/if}
@@ -75,7 +75,7 @@
         background: var(--surface1, #313244);
     }
 
-    .cover img {
+    .cover :global(img) {
         width: 100%;
         height: 100%;
         object-fit: cover;

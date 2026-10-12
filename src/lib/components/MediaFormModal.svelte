@@ -1,5 +1,6 @@
 <script>
-    import { getDb, pickCoverImage, coverSrc } from '$lib/db';
+    import { getDb, pickCoverImage } from '$lib/db';
+    import AppImage from '$lib/components/AppImage.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
     import { STATUS_OPTIONS } from '$lib/constants.js';
     import { searchVn, getVn, downloadCover, findExactVn, parseVndbId, preferredTitle } from '$lib/vndb.js';
@@ -211,7 +212,7 @@
                 <div class="modal-body">
                     <button class="cover-picker" onclick={handlePickCover}>
                         {#if coverPath}
-                            <img src={coverSrc(coverPath)} alt="cover preview" />
+                            <AppImage path={coverPath} alt="cover preview" />
                         {:else}
                             <span>+ Cover</span>
                         {/if}
@@ -315,7 +316,7 @@
         border-color: var(--theme-primary, #36b7bd);
     }
 
-    .cover-picker img {
+    .cover-picker :global(img) {
         width: 100%;
         height: 100%;
         object-fit: cover;

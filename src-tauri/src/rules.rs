@@ -211,6 +211,12 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     ("す", "べし", false),
     ("する", "べき", false),
     ("する", "べし", false),
+    // にとって ("to/for"): UniDic splits に|とっ|て, so the expression
+    // never forms (に|とっては). The literal にとって entry resolves the
+    // merged span. The head is the particle, so lock it. Guarded below:
+    // a verb continuing right after (取ってくる/おく/しまう) belongs to
+    // a verb compound instead, so the merge yields there.
+    ("に", "とって", true),
 ];
 
 /// Single-char particles a clipped emphasis can attach to (sokuon-span

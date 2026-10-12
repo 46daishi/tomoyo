@@ -2,7 +2,8 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/state';
-    import { getDb, coverSrc } from '$lib/db';
+    import { getDb } from '$lib/db';
+    import AppImage from '$lib/components/AppImage.svelte';
     import { loadSettings } from '$lib/settings.js';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import ActionButton from '$lib/components/ActionButton.svelte';
@@ -317,8 +318,6 @@
         return media && media !== 'All media' ? `${tf} · ${media}` : tf;
     });
 
-    let coverSrcValue = $derived(mediaInfo?.cover_path ? coverSrc(mediaInfo.cover_path) : null);
-    let profilePicSrc = $derived(settings?.profile_picture ? coverSrc(settings.profile_picture) : null);
     let username = $derived((settings?.username ?? 'Reader').trim());
     let initials = $derived((username.charAt(0) || 'R').toUpperCase());
 
@@ -403,8 +402,8 @@
                         aria-label="Go to settings"
                         onclick={() => goto('/settings')}
                     >
-                        {#if profilePicSrc}
-                            <img class="avatar" src={profilePicSrc} alt="" />
+                        {#if settings?.profile_picture}
+                            <AppImage path={settings.profile_picture} class="avatar" alt="" />
                         {:else}
                             <div class="avatar avatar-placeholder">{initials}</div>
                         {/if}
@@ -451,8 +450,8 @@
                         tabindex="0"
                         title={info.title}
                     >
-                        {#if coverSrcValue}
-                            <img src={coverSrcValue} alt={mediaInfo.title} />
+                        {#if mediaInfo?.cover_path}
+                            <AppImage path={mediaInfo.cover_path} alt={mediaInfo.title} />
                         {:else}
                             <div class="cover-placeholder"></div>
                         {/if}
@@ -565,7 +564,7 @@
                                     title={m.title}
                                 >
                                 {#if m.coverPath}
-                                    <span class="mb-cover"><img src={coverSrc(m.coverPath)} alt="" /></span>
+                                    <span class="mb-cover"><AppImage path={m.coverPath} alt="" /></span>
                                 {:else}
                                     <span class="mb-cover mb-cover-placeholder" style="--mb-accent: {m.color || 'var(--theme-primary, #36b7bd)'}"></span>
                                 {/if}
@@ -891,7 +890,7 @@
         transform: translateY(-2px);
     }
 
-    .cover-frame img,
+    .cover-frame :global(img),
     .cover-placeholder {
         width: 100%;
         height: 100%;
@@ -930,7 +929,7 @@
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-primary, #36b7bd) 60%, transparent);
     }
 
-    .avatar {
+    :global(.avatar) {
         width: 100%;
         height: 100%;
         border-radius: 50%;
@@ -1165,7 +1164,7 @@
         background: var(--theme-surface, #2d2d2d);
     }
 
-    .mb-cover img {
+    .mb-cover :global(img) {
         width: 100%;
         height: 100%;
         object-fit: cover;

@@ -2,7 +2,7 @@
     import { page } from '$app/state';
     import { onMount } from 'svelte';
     import { fly } from 'svelte/transition'; // Added missing transition import
-    import { getDb, coverSrc } from '$lib/db';
+    import { getDb, loadImageSrc } from '$lib/db';
     import { setMediaTitle } from '$lib/stores/presence.svelte.js';
     import { loadSettings } from '$lib/settings.js';
     import { goto } from '$app/navigation';
@@ -23,6 +23,7 @@
 
     import { STATUS_LEVELS } from '$lib/constants';
     import { parseDefinitions, updateWordStatus } from '$lib/dictionary.js';
+    import AppImage from '$lib/components/AppImage.svelte';
     import { getNames, deleteName } from '$lib/names.js';
     import { confirm } from '@tauri-apps/plugin-dialog';
 
@@ -32,7 +33,6 @@
 
     let mediaId = $derived(Number(page.params.id));
     let media = $state(/** @type {Record<string, any> | null} */ (null));
-    let mediaCoverSrc = $derived(media?.cover_path ? coverSrc(media.cover_path) : null);
 
     let mediaRequestId = 0;
 
@@ -79,7 +79,7 @@
             return;
         }
     
-        extractDominantColor(coverSrc(path)).then((color) => {
+        loadImageSrc(path).then(extractDominantColor).then((color) => {
             if (requestId === glowRequestId) {
                 pageGlow = color;
             }
@@ -319,8 +319,8 @@
     onAction={() => history.back()} 
   />
   <div class="stats-btn-wrap">
-    {#if mediaCoverSrc}
-        <img class="cover-cover" src={mediaCoverSrc} alt={media?.title ?? 'Stats'} />
+    {#if media?.cover_path}
+        <AppImage path={media.cover_path} class="cover-cover" alt={media?.title ?? 'Stats'} />
     {/if}
     <ActionButton 
       icon={ICONS.stats} 
@@ -595,7 +595,7 @@
         display: inline-flex;
     }
 
-    .cover-cover {
+    :global(.cover-cover) {
         position: absolute;
         top: 2px;
         left: 2px;
@@ -608,7 +608,7 @@
         transition: opacity 0.2s ease;
     }
 
-    .stats-btn-wrap:hover .cover-cover {
+    .stats-btn-wrap:hover :global(.cover-cover) {
         opacity: 0.3;
     }
 </style>

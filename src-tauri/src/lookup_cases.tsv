@@ -620,3 +620,28 @@ bugs5-16	bugs	ちゃんとお礼すべきだよな......	scan		すべき	has_ent
 bugs5-17	bugs	ちゃんとお礼すべきだよな......	scan		すべき	top_spelling	す可き	aux entry tops (mining すべき as する would make a useless card), する below via beki arm
 bugs6-01	bugs	張り	scan		張り	top_reading	はり	bare 張り is the needle (はり #6247), not suffix-ばり: affix tokens give no reading context, free words beat bound morphemes
 bugs6-02	bugs	指に張りがあって痛い	scan		張り	top_reading	はり	in-context noun reading keeps はり first too
+bugs6-03	bugs	も......もぅ、はるちゃんたら......	scan			has_span	ちゃん	grammar tail たら splits off
+bugs6-04	bugs	も......もぅ、はるちゃんたら......	scan			no_span	ちゃんた	loanword チャンタ must not swallow ちゃん
+bugs6-05	bugs	も......もぅ、はるちゃんたら......	scan		たら	top_has_reading	たら	たら conditional resolves on its own
+bugs6-06	bugs	俺にとっては	scan			has_span	にとって	expression merges via completion
+bugs6-07	bugs	俺にとっては	scan		にとって	top_spelling	に取って	merged span tops the literal entry
+bugs6-08	bugs	俺にとっては	scan			has_span	は	particles split off after the expression
+bugs6-09	bugs	俺にとっては	scan			no_span	にとっては	te+は must not win over the expression
+bugs6-10	bugs	猫に取ってきた。	scan			no_span	にとって	verb continuation yields to the compound
+bugs6-11	bugs	猫に取ってきた。	scan			has_span	取ってきた	take-and-bring stays whole
+bugs6-12	bugs	猫に取っておく。	scan			no_span	にとって	ておく continuation also yields
+bugs6-13	bugs	こうして	scan			has_span	こう	verb-te tail splits off
+bugs6-14	bugs	こうして	scan			no_span	こうし	行使 must not swallow こう
+bugs6-15	bugs	こうして	scan		して	has_entry	為る|する	te-form resolves to する verbs
+bugs6-16	bugs	行使は権利だ。	scan			has_span	行使	kanji-exact winners never split
+bugs6-17	bugs	効果がない。	scan			has_span	効果	
+bugs6-18	bugs	明日にしよう。	scan			has_span	明日	
+bugs6-19	bugs	食べ物を買う。	scan			has_span	食べ物	
+bugs6-20	bugs	気がする。	scan			has_span	気がする	気-first shapes untouched
+bugs6-21	bugs	寒気がする。	scan			has_span	寒気	literal wins keep single-token compounds whole
+bugs6-22	bugs	寒げな空。	scan			has_span	寒げ	kana-げ deconjugation untouched by the 気 gate
+bugs6-23	bugs	多く作っちゃったから、明日のお弁当に入れてもいいかもよ。	scan			has_span	いいかも	expression-tagged winners stay whole (kept per report)
+bugs6-24	bugs	鴨が泳いでいる。	scan			has_span	鴨	
+bugs6-25	bugs	同市出身だ。	scan			has_span	同市	
+bugs6-26	bugs	さくらが咲いた。	scan			has_span	さくら	noun tails never split
+bugs6-27	bugs	食べるのかな?	scan			has_span	食べるのか	verb+particle-tail wholes stay whole by design

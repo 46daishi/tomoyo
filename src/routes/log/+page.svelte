@@ -1,7 +1,8 @@
 <script>
     import { onMount } from 'svelte';
     import { page } from '$app/state';
-    import { getDb, coverSrc } from '$lib/db';
+    import { getDb } from '$lib/db';
+    import AppImage from '$lib/components/AppImage.svelte';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
     import { ICONS } from '$lib/icons';
@@ -105,13 +106,13 @@
     {:else}
         <div class="session-grid">
             {#each sessions as session (session.id)}
-                {@const cover = session.media_cover ? coverSrc(session.media_cover) : null}
+                {@const cover = session.media_cover ? session.media_cover : null}
                 {@const wordList = session.minedWords}
                 <div class="session-card" style={`--accent: ${session.media_color ?? '#89b4fa'}`}>
                     <div class="session-head">
                         <div class="session-cover-wrap">
                             {#if cover}
-                                <img class="session-cover" src={cover} alt={session.media_title ?? ''} />
+                                <AppImage path={cover} class="session-cover" alt={session.media_title ?? ''} />
                             {:else}
                                 <div class="session-cover session-cover-placeholder" aria-hidden="true"></div>
                             {/if}
@@ -276,7 +277,7 @@
         background: var(--surface1, #313244);
     }
 
-    .session-cover {
+    :global(.session-cover) {
         width: 100%;
         height: 100%;
         object-fit: cover;

@@ -1,5 +1,6 @@
 <script>
-    import { pickWordImage, pasteWordImageFromClipboard, coverSrc } from '$lib/db';
+    import { pickWordImage, pasteWordImageFromClipboard, loadImageSrc } from '$lib/db';
+    import AppImage from '$lib/components/AppImage.svelte';
     import { updateWordImage } from '$lib/dictionary.js';
     import { ICONS } from '$lib/icons';
 
@@ -97,10 +98,14 @@
         const portal = ensurePortal();
         portal.replaceChildren();
         if (!imagePath) return;
-        const img = document.createElement('img');
-        img.src = coverSrc(imagePath);
-        img.alt = '';
-        portal.appendChild(img);
+        const path = imagePath;
+        loadImageSrc(path).then((url) => {
+            if (!url || imagePath !== path) return;
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = '';
+            portal.appendChild(img);
+        });
     }
 
     function positionPortal() {
@@ -154,7 +159,7 @@
         onclick={(e) => e.stopPropagation()}
     >
         {#if imagePath}
-            <img src={coverSrc(imagePath)} alt="" />
+            <AppImage path={imagePath} alt="" />
         {:else}
             <span class="word-image-icon">{@html ICONS.image}</span>
         {/if}
@@ -179,7 +184,7 @@
     </select>
     {#if imagePath && !fixedPreview}
         <div class="word-image-preview" aria-hidden="true">
-            <img src={coverSrc(imagePath)} alt="" />
+            <AppImage path={imagePath} alt="" />
         </div>
     {/if}
     {#if error}
@@ -243,7 +248,7 @@
         border-width: 1px;
     }
 
-    .word-image-btn img {
+    .word-image-btn :global(img) {
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -273,7 +278,7 @@
             transform 0.18s ease 0.5s;
     }
 
-    .word-image-preview img {
+    .word-image-preview :global(img) {
         width: 100%;
         max-height: 16rem;
         object-fit: contain;

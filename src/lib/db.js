@@ -1,9 +1,8 @@
 import Database from '@tauri-apps/plugin-sql';
 import { open } from '@tauri-apps/plugin-dialog';
 import { appDataDir, join } from '@tauri-apps/api/path';
-import { copyFile, mkdir, exists, writeFile } from '@tauri-apps/plugin-fs';
+import { copyFile, mkdir, exists, readFile, writeFile } from '@tauri-apps/plugin-fs';
 import { readImage } from '@tauri-apps/plugin-clipboard-manager';
-import { convertFileSrc } from '@tauri-apps/api/core';
 
 /** @type {import('@tauri-apps/plugin-sql').default | null} */
 let dbInstance = null;
@@ -43,8 +42,72 @@ export async function pickCoverImage() {
     return destPath; // store this in the DB
 }
 
-export function coverSrc(path) {
-    return path ? convertFileSrc(path) : null;
+/** @type {Object<string, string>} */
+const IMAGE_MIME_TYPES = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    bmp: 'image/bmp',
+    svg: 'image/svg+xml',
+};
+
+// Session cache of loaded images (path -> data URL, or null when the file
+// could not be read, so failures don't retry on every render).
+const imageUrlCache = new Map();
+const imageUrlPending = new Map();
+
+/**
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+function bytesToBase64(bytes) {
+    // Manual byte->char mapping (never TextDecoder: the 'latin1' label is
+    // windows-1252 in browsers, which maps 0x80-0x9F above U+00FF and makes
+    // btoa throw InvalidCharacterError on real image files).
+    const parts = [];
+    const chunk = 0x1000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+        parts.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk))));
+    }
+    return btoa(parts.join(''));
+}
+
+/**
+ * Load a stored image file (covers, word images, profile pictures) as a
+ * same-origin `data:` URL for `<img>` tags.
+ *
+ * File URLs must NOT be used here: `asset://` subresource loads are subject
+ * to the WebView's origin check, which newer WebKitGTK versions reject
+ * ("Unsafe attempt to load URL ... Domains, protocols and ports must
+ * match"), breaking every image. `data:` URLs carry no origin, so they
+ * render everywhere — including inside `<canvas>` pixel reads.
+ *
+ * @param {string | null | undefined} path absolute file path, as stored in the DB
+ * @returns {Promise<string | null>} the data URL, or null when unreadable
+ */
+export function loadImageSrc(path) {
+    if (!path) return Promise.resolve(null);
+    if (imageUrlCache.has(path)) return Promise.resolve(imageUrlCache.get(path));
+    if (imageUrlPending.has(path)) return imageUrlPending.get(path);
+    const promise = readFile(path)
+        .then((bytes) => {
+            const ext = path.split('.').pop()?.toLowerCase() ?? '';
+            const mime = IMAGE_MIME_TYPES[ext] ?? 'image/png';
+            const url = `data:${mime};base64,${bytesToBase64(bytes)}`;
+            imageUrlCache.set(path, url);
+            imageUrlPending.delete(path);
+            return url;
+        })
+        .catch((err) => {
+            console.warn(`Could not load image: ${path}`, err);
+            imageUrlCache.set(path, null);
+            imageUrlPending.delete(path);
+            return null;
+        });
+    imageUrlPending.set(path, promise);
+    return promise;
 }
 
 export async function pickProfilePicture() {

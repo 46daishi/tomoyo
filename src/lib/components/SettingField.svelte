@@ -3,7 +3,7 @@
     import ThemeGrid from '$lib/components/ThemeGrid.svelte';
     import HotkeyInput from '$lib/components/HotkeyInput.svelte';
     import MultiSelectInput from './MultiSelectInput.svelte';
-    import { coverSrc } from '$lib/db.js';
+    import AppImage from '$lib/components/AppImage.svelte';
 
     let { option, settings = $bindable(), onChange, onAction } = $props();
 
@@ -87,7 +87,7 @@
                 onclick={() => onAction('pick_profile_picture')}
             >
                 {#if settings[option.key]}
-                    <img src={coverSrc(settings[option.key])} alt="" />
+                    <AppImage path={settings[option.key]} alt="" />
                 {:else}
                     <span>+ Picture</span>
                 {/if}
@@ -162,7 +162,7 @@
         color: var(--theme-primary, #36b7bd);
     }
 
-    .profile-picker img {
+    .profile-picker :global(img) {
         width: 100%;
         height: 100%;
         object-fit: cover;

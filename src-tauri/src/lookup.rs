@@ -392,6 +392,20 @@ pub(crate) fn lookup_candidate(
         });
         !(combo && !has_verb && ends_suffix)
     };
+    // Trailing standalone 気 (noun token) absorbed by verb
+    // deconjugation (そんな気 -> 反る): 気 here is a noun use, never a
+    // verb ending — verb-targeted derivations that drop it fabricate
+    // verbs out of noun phrases. Kana げ (寒げ) never matches (the token
+    // itself must be 気), single-token compounds (病気) have no 気 token
+    // to match, and classical adjectives (寒い) survive via the verb-class
+    // requirement. Literal winners are untouched (this only filters
+    // deconjugation forms).
+    let trailing_ki_noun = tokens
+        .iter()
+        .any(|t| t.end == position + span_len && t.surface == "気");
+    let ki_noun_ok = |f: &DeconjugatedForm| {
+        !(trailing_ki_noun && !f.text.contains('気') && is_verb_class(&f.tag))
+    };
     // Hearsay げ (げ -> ∅: 寒げ "seeming cold") only ever leaves an
     // adjective or mizenkei stem: after a te/ta-form (吹いていた + 気)
     // it absorbs a noun 気/げ into a bogus "seeming" reading and the
@@ -492,6 +506,7 @@ pub(crate) fn lookup_candidate(
                 && classical_attr_ok(f)
                 && seeming_ok(f)
                 && negpot_ok(f)
+                && ki_noun_ok(f)
                 && (normalize::normalize_text(&f.text) == base_norm
                     || base_readings.contains(&normalize::normalize_text(&f.text))
                     || (f.proper_steps <= 1
@@ -594,6 +609,7 @@ pub(crate) fn lookup_candidate(
                             && classical_attr_ok(f)
                             && seeming_ok(f)
                             && negpot_ok(f)
+                            && ki_noun_ok(f)
                             && resolves_to_base(f)
                     })
                     .and_then(|f| f.rule_chain.as_deref())
@@ -1030,7 +1046,7 @@ pub(crate) fn lookup_candidate(
         .iter()
         .any(|t| t.start == position && t.end >= position + span_len);
     for form in deconj_pool {
-        if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) {
+        if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) || !ki_noun_ok(form) {
             continue;
         }
         // Verb-class results need a real verb token backing them (see
@@ -1665,7 +1681,7 @@ pub(crate) fn lookup_candidate(
             // forms route through the same てみる-strip rule. The te/ta
             // gates ride along too: classical forms never license modern
             // fabrications either.
-            if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) {
+            if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) || !ki_noun_ok(form) {
                 continue;
             }
             let is_na_imperative = form.rule_chain.as_deref().map_or(false, |c| {

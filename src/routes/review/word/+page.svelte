@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation';
     import { onMount, onDestroy } from 'svelte';
     import ActionButton from '$lib/components/ActionButton.svelte';
-    import { coverSrc } from '$lib/db';
+    import AppImage from '$lib/components/AppImage.svelte';
     import { ICONS } from '$lib/icons';
     import { STATUS_LEVELS } from '$lib/constants.js';
     import { loadSettings } from '$lib/settings.js';
@@ -208,7 +208,7 @@
                 <div class="review-definitions">{parseDefinitions(currentWord.definitions).join('; ')}</div>
                 {#if currentWord.image_path}
                     <div class="review-image-row">
-                        <img class="review-image" src={coverSrc(currentWord.image_path)} alt="" />
+                        <AppImage path={currentWord.image_path} class="review-image" alt="" />
                     </div>
                 {/if}
                 {#if currentSentence}
@@ -375,7 +375,7 @@
         margin-top: 0.6rem;
     }
 
-    .review-image {
+    :global(.review-image) {
         max-width: min(420px, 80vw);
         max-height: 60vh;
         border-radius: 12px;

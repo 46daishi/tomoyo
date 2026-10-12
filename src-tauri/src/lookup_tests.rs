@@ -560,3 +560,25 @@
         assert_eq!(pair, vec!["甲".to_string(), "稿".to_string()],
             "甲 (#17243) should precede 稿 (#61469), got {pair:?}");
     }
+
+
+
+
+
+    #[test]
+    fn exact_kimochi_no_verb_smear() {
+        // The exact path (lookup_exact / selection lookup) runs no spans
+        // splitter: the lookup-level 気-gate alone must keep verb
+        // deconjugation from swallowing noun-気 (そんな気 -> 反る).
+        let h = Harness::new();
+        let text = "そんな気";
+        let tokens = h.tokens(text);
+        let result =
+            crate::lookup::lookup_candidate("そんな気", &h.index, &h.decon, None, None, &tokens, 0);
+        let bad_top = result.map_or(false, |(entries, _)| {
+            entries.first().map_or(false, |e| {
+                e.spellings.first().map_or(false, |s| s == "反る" || s == "剃る")
+            })
+        });
+        assert!(!bad_top, "exact そんな気 must not top 反る/剃る");
+    }
