@@ -60,6 +60,11 @@
     // Text-selection "Save name" popup.
     let selPopup = $state(/** @type {{ x: number, y: number } | null} */ (null)); // relative to the sentence window
     let selText = $state('');
+    // Snapshot of the selection taken while it is guaranteed alive (at
+    // mouseup). The click handler must NOT re-read the live selection:
+    // WebView2 clears it on button mousedown where WebKitGTK preserves it,
+    // which silently broke "Look up selected" on Windows.
+    let selRange = $state(/** @type {{ start: number, end: number, text: string } | null} */ (null));
     let suppressClick = false;
     let showNameModal = $state(false);
 
@@ -235,7 +240,7 @@
         } else {
             cycleSkip = 0;
             result = await lookupAtPosition(displayedText, anchorPos, 0);
-            if (requestId !== hoverRequestId) return;
+        if (requestId !== hoverRequestId) return;
             hoveredSpan = withCustomName(result, anchorPos);
         }
 
@@ -559,8 +564,14 @@
         const text = sel.toString().trim();
         if (!text) {
             selPopup = null;
+            selRange = null;
             return;
         }
+        // Snapshot the range while the selection is guaranteed alive. The
+        // popup itself is still gated on text alone (unchanged behavior);
+        // a null snapshot just means the click handler falls back to a
+        // live read.
+        selRange = selectedRange();
         const rect = sel.getRangeAt(0).getBoundingClientRect();
         const containerRect = sentenceWindowEl.getBoundingClientRect();
         selText = text;
@@ -611,29 +622,61 @@
 
     // Look up exactly what was selected — no extending, no shortening — and
     // pin its tooltip open, even when nothing resolves (the tooltip then
-    // says no entry was found).
+    // says no entry was found). Uses the snapshot taken at mouseup, never
+    // the live selection (see selRange).
     /** @param {MouseEvent} event */
     async function handleLookupSelected(event) {
         event.stopPropagation();
         selPopup = null;
         suppressClick = false;
-        const range = selectedRange();
-        if (!range) return;
+        const snapshot = selRange ?? selectedRange();
+        selRange = null;
+        if (!snapshot) {
+            console.error('Look up selected has no selection range (snapshot and live read both missing)');
+            showMineToast('Lookup failed — no selection found');
+            return;
+        }
+        const textLen = [...displayedText].length;
+        const start = Math.max(0, Math.min(snapshot.start, textLen));
+        const end = Math.min(snapshot.end, textLen);
+        if (start >= end) {
+            console.error('Look up selected has an empty range', snapshot);
+            showMineToast('Lookup found nothing for the selection');
+            return;
+        }
         cycleSkip = 0;
-        const requestId = ++hoverRequestId;
-        const result = await lookupExact(displayedText, range.start, range.end);
-        if (requestId !== hoverRequestId) return;
-        if (!result) return;
+        // Explicit clicks win ties: bump the shared counter so stale
+        // in-flight hovers can't overwrite the fresh selection tooltip,
+        // but never discard our own result for a later hover — a hover
+        // that resolves after us still correctly replaces it.
+        ++hoverRequestId;
+        let result;
+        try {
+            result = await lookupExact(displayedText, start, end);
+        } catch (err) {
+            console.error('Look up selected failed:', err);
+            showMineToast('Lookup failed — see console for details');
+            return;
+        }
+        if (!result) {
+            console.error('Look up selected returned nothing for range', { start, end });
+            showMineToast('Lookup found nothing for the selection');
+            return;
+        }
         // A selection exactly covering a saved name shows the name entry
         // first, without widening (the surface stays what was selected).
-        const hit = findNameAt(names, displayedText, range.start);
+        const hit = findNameAt(names, displayedText, start);
         let span = result;
-        if (hit && hit.start === range.start && hit.end === range.end) {
+        if (hit && hit.start === start && hit.end === end) {
             span = { ...result, entries: [nameToEntry(hit.row), ...(result.entries ?? [])] };
         }
         hoveredSpan = span;
-        const charEl = sentenceWindowEl.querySelectorAll('.char-token')[range.start];
-        if (!charEl) return;
+        const charEl = sentenceWindowEl.querySelectorAll('.char-token')[start];
+        if (!charEl) {
+            console.error('Look up selected could not find the starting character element', { start });
+            showMineToast('Lookup failed — could not position the tooltip');
+            return;
+        }
         lastHoverEl = charEl;
         openTooltipAndLog(hoveredSpan, charEl);
     }
@@ -645,6 +688,7 @@
     $effect(() => {
         displayedText;
         selPopup = null;
+        selRange = null;
     });
 
     $effect(() => {
@@ -702,6 +746,7 @@
             suppressClick = false;
         } else {
             selPopup = null;
+            selRange = null;
         }
     }}
     onkeydown={handleGlobalKeydown}
@@ -768,9 +813,11 @@
             <button
                 type="button"
                 class="selection-save-btn"
+                onmousedown={(event) => event.preventDefault()}
                 onclick={(event) => {
                     event.stopPropagation();
                     selPopup = null;
+                    selRange = null;
                     suppressClick = false;
                     showNameModal = true;
                 }}
@@ -780,6 +827,7 @@
             <button
                 type="button"
                 class="selection-save-btn"
+                onmousedown={(event) => event.preventDefault()}
                 onclick={(event) => handleLookupSelected(event)}
             >
                 Look up selected
