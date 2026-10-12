@@ -182,6 +182,12 @@
                                                         class="freq-tag freq-tier-{freqTier}"
                                                         title={freqTitle}
                                                     >{freqLabel}{#if freqRank !== null}<span class="freq-num">#{freqRank.toLocaleString('en-US')}</span>{/if}</span>
+                                                    {#if entry.kana_only}
+                                                        <span
+                                                            class="freq-tag freq-uk"
+                                                            title="Usually written using kana alone"
+                                                        >UK</span>
+                                                    {/if}
                                                 </div>
                                                 <div class="entry-pos">{formatPosTags(entry.pos)}</div>
                                             </div>
