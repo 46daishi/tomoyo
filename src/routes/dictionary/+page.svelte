@@ -76,11 +76,15 @@
     let showCustomReviewModal = $state(false);
     let showImportModal = $state(false);
 
+    // Words track the theme primary, sentences the theme accent, so the
+    // distinction follows every theme (dark and light) instead of fixed
+    // dark-tuned hues. Values feed CSS custom props only, where var()
+    // resolves at use. Streak/last-review keep their own accent hues.
     const STAT_COLORS = {
-        wordCount: '#36b7bd',
-        sentenceCount: '#89b4fa',
-        wordTime: '#36b7bd',
-        sentenceTime: '#89b4fa',
+        wordCount: 'var(--theme-primary)',
+        sentenceCount: 'var(--theme-accent)',
+        wordTime: 'var(--theme-primary)',
+        sentenceTime: 'var(--theme-accent)',
         lastReview: '#cba6f7',
         currentStreak: '#fab387',
         longestStreak: '#f38ba8',
@@ -2412,8 +2416,8 @@
         margin-right: 0.2rem;
     }
 
-    .legend-dot.word, .dist-bar-fill.word-fill { background: #36b7bd; }
-    .legend-dot.sentence, .dist-bar-fill.sentence-fill { background: #89b4fa; }
+    .legend-dot.word, .dist-bar-fill.word-fill { background: var(--theme-primary, #36b7bd); }
+    .legend-dot.sentence, .dist-bar-fill.sentence-fill { background: var(--theme-accent, #89b4fa); }
 
     .dist-bar-track {
         display: flex;
