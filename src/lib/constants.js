@@ -24,3 +24,28 @@ export const STATUS_LEVELS = [
     { label: 'Learned', color: '#a6e3a1' },
     { label: 'Known', color: '#40a02b' },
 ];
+
+// Word-level colours are user-customizable (settings → general → word
+// level colours, stored as settings.word_level_colors, index-aligned).
+// These helpers resolve them with per-level fallback, so partial, stale,
+// or missing custom data degrades gracefully to the built-ins.
+/**
+ * @param {any} settings settings object (or null/undefined)
+ * @param {number} level 0-4 word level
+ * @returns {string} hex colour
+ */
+export function statusLevelColor(settings, level) {
+    const custom = settings?.word_level_colors;
+    if (Array.isArray(custom) && typeof custom[level] === 'string' && custom[level]) {
+        return custom[level];
+    }
+    return STATUS_LEVELS[level]?.color ?? '#f38ba8';
+}
+
+/**
+ * @param {any} settings settings object (or null/undefined)
+ * @returns {Array<{ label: string, color: string }>} levels with resolved colours
+ */
+export function resolveStatusLevels(settings) {
+    return STATUS_LEVELS.map((level, i) => ({ ...level, color: statusLevelColor(settings, i) }));
+}

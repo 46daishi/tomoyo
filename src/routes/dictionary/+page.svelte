@@ -14,7 +14,7 @@
     import { loadSettings } from '$lib/settings';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { getNames, updateName, deleteName } from '$lib/names.js';
-    import { STATUS_LEVELS } from '$lib/constants';
+    import { STATUS_LEVELS, statusLevelColor, resolveStatusLevels } from '$lib/constants';
     import { getReviewStats, getReviewActivityByDay } from '$lib/reviewStats.js';
     import { goto, afterNavigate } from '$app/navigation';
     import CustomReviewModal from '$lib/components/CustomReviewModal.svelte';
@@ -817,7 +817,7 @@
                             type="button"
                             class="status-bar"
                             data-status-toggle
-                            style={`--status-color: ${STATUS_LEVELS[word.status ?? 0].color}`}
+                            style={`--status-color: ${statusLevelColor(settings, word.status ?? 0)}`}
                             title={`Status: ${STATUS_LEVELS[word.status ?? 0].label} — click to change`}
                             aria-haspopup="menu"
                             aria-expanded={statusMenuWordId === word.id}
@@ -827,7 +827,7 @@
                             <StatusMenu
                                 x={statusMenuPos.x}
                                 y={statusMenuPos.y}
-                                levels={STATUS_LEVELS}
+                                levels={resolveStatusLevels(settings)}
                                 current={word.status ?? 0}
                                 onSelect={(status) => selectWordStatus(word, status)}
                                 onClose={closeStatusMenu}
@@ -1338,7 +1338,7 @@
                     />
                 </div>
             </div>
-            <CustomReviewModal bind:show={showCustomReviewModal} {mediaFilter} onEmptyPool={showToast} />
+            <CustomReviewModal bind:show={showCustomReviewModal} {mediaFilter} {settings} onEmptyPool={showToast} />
             <Toast message={toastMessage} />
         </div>
         {/if}

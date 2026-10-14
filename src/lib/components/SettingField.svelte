@@ -4,12 +4,43 @@
     import HotkeyInput from '$lib/components/HotkeyInput.svelte';
     import MultiSelectInput from './MultiSelectInput.svelte';
     import AppImage from '$lib/components/AppImage.svelte';
+    import { statusLevelColor } from '$lib/constants.js';
 
     let { option, settings = $bindable(), onChange, onAction } = $props();
 
     function displayValue(val) {
         if (option.percent) return `${Math.round(val * 100)}%`;
         return `${val}${option.unit ?? ''}`;
+    }
+
+    /**
+     * Options for the multi-select row. When the schema flags
+     * levelColors, dot colours resolve from the customizable word
+     * level colours instead of the static built-ins.
+     * @returns {Array<{ value: number, label: string, color?: string }>}
+     */
+    function multiSelectOptions() {
+        const opts = option.options ?? [];
+        if (!option.levelColors) return opts;
+        return opts.map((/** @type {{ value: number, label: string, color?: string }} */ o) => ({
+            ...o,
+            color: statusLevelColor(settings, o.value),
+        }));
+    }
+
+    /**
+     * @param {number} index
+     * @param {string} value
+     */
+    function updateColor(index, value) {
+        const options = option.options ?? [];
+        const stored = Array.isArray(settings[option.key]) ? settings[option.key] : [];
+        const next = options.map(
+            (/** @type {{ color?: string }} */ opt, /** @type {number} */ j) =>
+                stored[j] ?? opt.color ?? '#888888'
+        );
+        next[index] = value;
+        onChange(option.key, next);
     }
 </script>
 
@@ -94,10 +125,23 @@
             </button>
         {:else if option.type === 'multi_select'}
             <MultiSelectInput
-                options={option.options}
+                options={multiSelectOptions()}
                 values={settings[option.key] ?? []}
                 onChange={(next) => onChange(option.key, next)}
             />
+        {:else if option.type === 'colors'}
+            <div class="color-row" role="group" aria-label={option.label}>
+                {#each option.options ?? [] as opt, i}
+                    <label class="color-cell" title={opt.label ?? `Level ${i}`}>
+                        <input
+                            type="color"
+                            value={settings?.[option.key]?.[i] ?? opt.color ?? '#888888'}
+                            oninput={(e) => updateColor(i, e.currentTarget.value)}
+                        />
+                        <span class="color-num">{i}</span>
+                    </label>
+                {/each}
+            </div>
         {/if}
     {/if}
 </div>
@@ -171,6 +215,55 @@
     .settings-number-input {
         width: 5rem;
         text-align: center;
+    }
+
+    /* ── Round colour pickers ── */
+    .color-row {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        flex-shrink: 0;
+    }
+
+    .color-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        cursor: pointer;
+    }
+
+    .color-cell input[type="color"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 50%;
+        border: 2px solid var(--theme-border, #404040);
+        background: none;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    .color-cell input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+
+    .color-cell input[type="color"]::-webkit-color-swatch {
+        border: none;
+        border-radius: 50%;
+    }
+
+    .color-cell input[type="color"]::-moz-color-swatch {
+        border: none;
+        border-radius: 50%;
+    }
+
+    .color-num {
+        font-size: 0.75rem;
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
     }
 
     input[type="range"] {

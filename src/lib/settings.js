@@ -71,7 +71,14 @@ export const HIGHLIGHT_MODE_OPTIONS = [
 //   text        -> placeholder
 //   checkbox    -> (nothing extra)
 //   theme       -> (nothing extra — renders <ThemeGrid />)
+//   colors      -> options: [{ value, label, color? }] — a row of round
+//                  colour pickers, one per option; the stored value is an
+//                  array of hex strings aligned with options (missing
+//                  entries fall back to option.color)
 //   hotkey      -> (nothing extra)
+//   multi_select -> options; levelColors (bool): resolve each option's
+//                  color from the customizable word level colours
+//                  (option.value is the level index)
 //   actions     -> buttons: [{ label, onClick }]
 //   placeholder -> text
 
@@ -81,6 +88,12 @@ export const SETTINGS_SCHEMA = [
         label: 'General',
         options: [
           { key: 'theme', label: 'Theme', type: 'theme' },
+          {
+              key: 'word_level_colors',
+              label: 'Word level colours',
+              type: 'colors',
+              options: STATUS_LEVELS.map((level, i) => ({ value: i, label: level.label, color: level.color })),
+          },
           { key: 'username', label: 'Username', type: 'text', placeholder: 'Your name' },
           { key: 'profile_picture', label: 'Profile picture', type: 'image' },
           { key: 'input_mode', label: 'Input source', type: 'select', options: INPUT_MODE_OPTIONS },
@@ -206,6 +219,7 @@ export const SETTINGS_SCHEMA = [
               key: 'review_statuses',
               label: 'Word levels to include in reviews',
               type: 'multi_select',
+              levelColors: true,
               options: STATUS_LEVELS.map((level, i) => ({ value: i, label: level.label, color: level.color })),
           }
         ],

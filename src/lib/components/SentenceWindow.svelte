@@ -13,7 +13,7 @@
     import NameModal from './NameModal.svelte';
     import { getNames, findNameAt, scanNameSpans, nameToEntry } from '$lib/names';
 
-    import { STATUS_LEVELS } from '$lib/constants';
+    import { statusLevelColor, resolveStatusLevels } from '$lib/constants';
 
     let { settings, miniMode, session, mediaId, mediaTag, onMined, wordStatusVersion = 0, onStatusChanged, onNameSaved } = $props();
 
@@ -781,7 +781,7 @@
                     class:no-match={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end && hoveredSpan.entries.length === 0 && settings?.word_highlight_enabled}
                     onmouseenter={(event) => handleCharHover(i, event)}
                     onclick={(event) => handleCharClick(i, event)}
-                    style={getKnownSpanAt(i) ? `--status-color: ${getKnownSpanAt(i).status != null ? (STATUS_LEVELS[getKnownSpanAt(i).status]?.color ?? '') : '#f38ba8'}` : ''}
+                    style={getKnownSpanAt(i) ? `--status-color: ${getKnownSpanAt(i).status != null ? statusLevelColor(settings, getKnownSpanAt(i).status) : '#f38ba8'}` : ''}
                 >{char}</span>
             {/each}
         </p>
@@ -846,7 +846,7 @@
         <StatusMenu
             x={statusMenu.x}
             y={statusMenu.y}
-            levels={STATUS_LEVELS}
+            levels={resolveStatusLevels(settings)}
             current={statusMenu.current}
             onSelect={handleStatusSelect}
             onClose={closeStatusMenu}

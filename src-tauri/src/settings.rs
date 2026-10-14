@@ -52,6 +52,10 @@ pub struct AppSettings {
     pub sentence_review_text: String, // "interactive" | "plain"
     pub only_review_translated: bool,
     pub review_statuses: Vec<u8>, // 0-4
+    /// Per word-level custom colours, index-aligned with the five levels
+    /// (New/Recognized/Familiar/Learned/Known). Empty/missing entries fall
+    /// back to the built-in level colours on the frontend.
+    pub word_level_colors: Vec<String>,
 
     // ── Dictionary ──
     pub default_dictionary_sort: String, // "date" | "status" | "lookup"
@@ -104,6 +108,14 @@ impl Default for AppSettings {
             sentence_review_text: "interactive".into(),
             only_review_translated: false,
             review_statuses: vec![0, 1, 2, 3],
+            // Mirrors STATUS_LEVELS colours in src/lib/constants.js.
+            word_level_colors: vec![
+                "#6c7086".into(),
+                "#89b4fa".into(),
+                "#cba6f7".into(),
+                "#a6e3a1".into(),
+                "#40a02b".into(),
+            ],
 
             default_dictionary_sort: "date".into(),
             word_sentence_count: 5,

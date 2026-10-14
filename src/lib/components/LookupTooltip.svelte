@@ -3,7 +3,7 @@
     import ActionButton from '$lib/components/ActionButton.svelte';
     import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
-    import { STATUS_LEVELS } from '$lib/constants';
+    import { statusLevelColor, resolveStatusLevels } from '$lib/constants';
     import { getKnownWordsMap, updateWordStatus, getWordImages } from '$lib/dictionary.js';
     import { distributeFurigana } from '$lib/furigana.js';
     import { frequencyTier, frequencyRank } from '$lib/frequency.js';
@@ -162,14 +162,14 @@
                                                     <span
                                                         class="entry-spelling"
                                                         class:known-word={entryStatus != null}
-                                                        style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
+                                                        style={entryStatus != null ? `--status-color: ${statusLevelColor(settings, entryStatus)}` : ''}
                                                         onclick={(e) => handleEntryReadingClick(entry, e)}
                                                     >{#each furigana as seg}{#if seg.reading}<ruby><rb>{seg.text}</rb><rt class="entry-reading-kana">{seg.reading}</rt></ruby>{:else}{seg.text}{/if}{/each}</span>
                                                 {:else}
                                                     <span
                                                         class="entry-spelling"
                                                         class:known-word={entryStatus != null}
-                                                        style={entryStatus != null ? `--status-color: ${STATUS_LEVELS[entryStatus]?.color ?? ''}` : ''}
+                                                        style={entryStatus != null ? `--status-color: ${statusLevelColor(settings, entryStatus)}` : ''}
                                                         onclick={(e) => handleEntryReadingClick(entry, e)}
                                                     >{entry.spellings[0] ?? entry.readings[0]}</span>
                                                 {/if}
@@ -249,7 +249,7 @@
         <StatusMenu
             x={statusMenu.x}
             y={statusMenu.y}
-            levels={STATUS_LEVELS}
+            levels={resolveStatusLevels(settings)}
             current={statusMenu.current}
             onSelect={handleStatusSelect}
             onClose={closeStatusMenu}

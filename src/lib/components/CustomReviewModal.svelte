@@ -1,6 +1,6 @@
 <script>
     import { goto } from '$app/navigation';
-    import { STATUS_LEVELS } from '$lib/constants.js';
+    import { resolveStatusLevels } from '$lib/constants.js';
     import MultiSelectInput from '$lib/components/MultiSelectInput.svelte';
     import { getReviewPool, getSentenceReviewPool } from '$lib/dictionary';
 
@@ -14,7 +14,7 @@
         show = false;
     }
 
-    let { show = $bindable(false), mediaFilter = null, onEmptyPool } = $props();
+    let { show = $bindable(false), mediaFilter = null, onEmptyPool, settings = null } = $props();
     
     async function startCustomReview() {
         const statuses = reviewKind === 'word' ? selectedStatuses : null;
@@ -96,7 +96,7 @@
             {#if reviewKind === 'word'}
                 <div class="setting-row">
                     <MultiSelectInput
-                        options={STATUS_LEVELS.map((level, i) => ({ value: i, label: level.label, color: level.color }))}
+                        options={resolveStatusLevels(settings).map((level, i) => ({ value: i, label: level.label, color: level.color }))}
                         values={selectedStatuses}
                         onChange={(next) => (selectedStatuses = next)}
                     />

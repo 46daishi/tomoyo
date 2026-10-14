@@ -13,7 +13,7 @@
     import LineChart from '$lib/components/LineChart.svelte';
     import DonutChart from '$lib/components/DonutChart.svelte';
     import { ICONS } from '$lib/icons';
-    import { STATUS_LEVELS, STATUS_COLORS } from '$lib/constants.js';
+    import { STATUS_LEVELS, STATUS_COLORS, statusLevelColor } from '$lib/constants.js';
     import { formatMinutes, formatTick } from '$lib/utils/chartFormatters.js';
     import { getMediaStats } from '$lib/sessions.js';
     import { getVocabularyCoverage } from '$lib/coverage.js';
@@ -324,7 +324,7 @@
     let donutData = $derived(
         STATUS_LEVELS.map((lvl, status) => {
             const entry = wordStatusCounts.find((e) => e.status === status);
-            return { label: lvl.label, value: entry?.count ?? 0, color: lvl.color };
+            return { label: lvl.label, value: entry?.count ?? 0, color: statusLevelColor(settings, status) };
         })
     );
 

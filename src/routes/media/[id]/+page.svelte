@@ -21,7 +21,7 @@
     import MediaStats from '$lib/components/MediaStats.svelte';
     import StatusMenu from '$lib/components/StatusMenu.svelte';
 
-    import { STATUS_LEVELS } from '$lib/constants';
+    import { STATUS_LEVELS, statusLevelColor, resolveStatusLevels } from '$lib/constants';
     import { parseDefinitions, updateWordStatus } from '$lib/dictionary.js';
     import AppImage from '$lib/components/AppImage.svelte';
     import { getNames, deleteName } from '$lib/names.js';
@@ -231,7 +231,7 @@
                                         type="button"
                                         class="mined-word-status"
                                         data-status-toggle
-                                        style={`--status-color: ${STATUS_LEVELS[word.status ?? 0].color}`}
+                                        style={`--status-color: ${statusLevelColor(settings, word.status ?? 0)}`}
                                         title={`Status: ${STATUS_LEVELS[word.status ?? 0].label} — click to change`}
                                         aria-haspopup="menu"
                                         aria-expanded={statusMenuWordId === word.id}
@@ -241,7 +241,7 @@
                                         <StatusMenu
                                             x={statusMenuPos.x}
                                             y={statusMenuPos.y}
-                                            levels={STATUS_LEVELS}
+                                            levels={resolveStatusLevels(settings)}
                                             current={word.status ?? 0}
                                             onSelect={(status) => selectWordStatus(word, status)}
                                             onClose={closeStatusMenu}

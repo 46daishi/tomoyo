@@ -5,7 +5,7 @@
     import ActionButton from '$lib/components/ActionButton.svelte';
     import AppImage from '$lib/components/AppImage.svelte';
     import { ICONS } from '$lib/icons';
-    import { STATUS_LEVELS } from '$lib/constants.js';
+    import { STATUS_LEVELS, statusLevelColor, resolveStatusLevels } from '$lib/constants.js';
     import { loadSettings } from '$lib/settings.js';
     import { getReviewPool, updateWordStatus, parseDefinitions, getSentencesForWord } from '$lib/dictionary.js';
     import { getReviewWeighting, startReviewSession, endReviewSession, logReviewedItem } from '$lib/reviewStats.js';
@@ -200,7 +200,7 @@
         <div class="review-card">
             <div class="review-word"><span class="review-word-text">{#if showRuby}{#each rFurigana as seg}{#if seg.reading}<ruby><rb>{seg.text}</rb><rt class="entry-reading-kana" class:concealed={!isRevealed}>{seg.reading}</rt></ruby>{:else}{seg.text}{/if}{/each}{:else}{currentWord.spelling}{/if}</span></div>
 
-            <div class="current-status-badge" style={`--status-color: ${STATUS_LEVELS[currentWord.status]?.color}`}>
+            <div class="current-status-badge" style={`--status-color: ${statusLevelColor(settings, currentWord.status)}`}>
                 {STATUS_LEVELS[currentWord.status]?.label}
             </div>
 
@@ -248,7 +248,7 @@
             </button>
         {:else}
             <div class="status-btn-row">
-                {#each STATUS_LEVELS as level, i}
+                {#each resolveStatusLevels(settings) as level, i}
                     <button 
                         type="button" 
                         class="status-btn" 

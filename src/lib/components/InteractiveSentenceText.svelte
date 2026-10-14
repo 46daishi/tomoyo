@@ -4,7 +4,7 @@
     import { logLookupEvent } from '$lib/lookupEvents.js';
     import { mineWord, getKnownWordsMap, updateWordStatus } from '$lib/dictionary.js';
     import { findHighlightedWordSpans } from '$lib/lookup.js';
-    import { STATUS_LEVELS } from '$lib/constants.js';
+    import { statusLevelColor, resolveStatusLevels } from '$lib/constants.js';
     import LookupTooltip from '$lib/components/LookupTooltip.svelte';
     import StatusMenu from '$lib/components/StatusMenu.svelte';
     import { ICONS } from '$lib/icons';
@@ -224,7 +224,7 @@
             class:hovered={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end}
             class:no-match={hoveredSpan && i >= hoveredSpan.start && i < hoveredSpan.end && hoveredSpan.entries.length === 0}
             class:known-word={getKnownSpanAt(i) !== null}
-            style={getKnownSpanAt(i) ? `--status-color: ${getKnownSpanAt(i).status != null ? (STATUS_LEVELS[getKnownSpanAt(i).status]?.color ?? '') : '#f38ba8'}` : ''}
+            style={getKnownSpanAt(i) ? `--status-color: ${getKnownSpanAt(i).status != null ? statusLevelColor(settings, getKnownSpanAt(i).status) : '#f38ba8'}` : ''}
             onmouseenter={(e) => handleCharHover(i, e)}
             onclick={(e) => handleCharClick(i, e)}
         >{char}</span>
@@ -250,7 +250,7 @@
         <StatusMenu
             x={statusMenu.x}
             y={statusMenu.y}
-            levels={STATUS_LEVELS}
+            levels={resolveStatusLevels(settings)}
             current={statusMenu.current}
             onSelect={handleStatusSelect}
             onClose={closeStatusMenu}
