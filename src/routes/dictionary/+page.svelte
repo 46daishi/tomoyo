@@ -5,6 +5,7 @@
     import { getFrequentUnknownWords, getMediaTagsForWordIds, getMediaIdsForWordIds, dismissUnknownWords } from '$lib/lookupEvents.js';
     import { lookupAtPosition } from '$lib/lookup.js';
     import { formatPosTags } from '$lib/posLabels.js';
+    import { distributeFurigana } from '$lib/furigana.js';
     import { getDb } from '$lib/db';
     import ActionButton from '$lib/components/ActionButton.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
@@ -806,6 +807,7 @@
         {:else}
             <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
                 {#each pagedWords as word (word.id)}
+                    {@const furigana = distributeFurigana(word.spelling ?? '', word.reading ?? '')}
                     <div class="word-card" class:list-view={viewMode === 'list'}>
                         <button
                             type="button"
@@ -840,9 +842,13 @@
                                 imagePath={word.image_path ?? null}
                                 onSaved={(path) => (word.image_path = path)}
                             />
-                            <span class="word-spelling">{word.spelling}</span>
-                            {#if word.reading && word.reading !== word.spelling}
-                                <span class="word-reading">{word.reading}</span>
+                            {#if viewMode === 'list' || !furigana.some((s) => s.reading)}
+                                <span class="word-spelling">{word.spelling}</span>
+                                {#if word.reading && word.reading !== word.spelling}
+                                    <span class="word-reading">{word.reading}</span>
+                                {/if}
+                            {:else}
+                                <span class="word-spelling">{#each furigana as seg}{#if seg.reading}<ruby><rb>{seg.text}</rb><rt class="entry-reading-kana">{seg.reading}</rt></ruby>{:else}{seg.text}{/if}{/each}</span>
                             {/if}
                             <button
                                 type="button"
@@ -1029,16 +1035,22 @@
         {:else}
             <div class="word-list" class:word-grid={viewMode === 'grid'} class:word-list-view={viewMode === 'list'}>
                 {#each filteredFrequentWords as item (item.entry.id)}
-                    {@const forms = spellingChoices(item.entry, item.surfaceText)}
+                            {@const forms = spellingChoices(item.entry, item.surfaceText)}
+                    {@const fSpelling = item.entry.spellings?.[0] ?? item.surfaceText}
+                    {@const fFurigana = distributeFurigana(fSpelling, item.entry.readings?.[0] ?? '')}
                     <div class="word-card frequent-card" class:list-view={viewMode === 'list'}>
                         <div class="lookup-badge frequent-badge">
                             <span class="lookup-badge-count">{item.count}</span>
                             <span class="lookup-badge-icon">{@html ICONS.magnify}</span>
                         </div>
                         <div class="word-main">
-                            <span class="word-spelling">{item.entry.spellings?.[0] ?? item.surfaceText}</span>
-                            {#if item.entry.readings?.[0] && item.entry.readings?.[0] !== (item.entry.spellings?.[0] ?? item.surfaceText)}
-                                <span class="word-reading">{item.entry.readings[0]}</span>
+                            {#if viewMode === 'list' || !fFurigana.some((s) => s.reading)}
+                                <span class="word-spelling">{fSpelling}</span>
+                                {#if item.entry.readings?.[0] && item.entry.readings?.[0] !== fSpelling}
+                                    <span class="word-reading">{item.entry.readings[0]}</span>
+                                {/if}
+                            {:else}
+                                <span class="word-spelling">{#each fFurigana as seg}{#if seg.reading}<ruby><rb>{seg.text}</rb><rt class="entry-reading-kana">{seg.reading}</rt></ruby>{:else}{seg.text}{/if}{/each}</span>
                             {/if}
                         </div>
                         <div class="entry-pos">{formatPosTags(item.entry.pos)}</div>
@@ -1757,6 +1769,13 @@
         font-weight: 700;
         font-family: "Noto Sans JP", Inter, sans-serif;
         color: var(--theme-text, #f6f6f6);
+    }
+
+    /* Ruby reserves line-box space above the base text; pull ruby
+       spellings up slightly so the furigana sits closer to the card
+       edge. Plain spellings (list view, kana-only) are untouched. */
+    .word-spelling:has(ruby) {
+        margin-top: -0.5rem;
     }
 
     .name-spelling-input {

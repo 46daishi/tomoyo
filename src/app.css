@@ -535,7 +535,7 @@ body {
 }
 
 .entry-reading-kana {
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     font-weight: 500;
     color: var(--theme-accent, #b3b3b3);
     line-height: 1;
