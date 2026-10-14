@@ -6,6 +6,7 @@
     import { setMediaTitle } from '$lib/stores/presence.svelte.js';
     import { loadSettings } from '$lib/settings.js';
     import { goto } from '$app/navigation';
+    import { distributeFurigana } from '$lib/furigana.js';
     import { extractDominantColor } from '$lib/utils/color.js';
 
     import { initMiniMode } from '$lib/miniMode.js';
@@ -226,6 +227,7 @@
                     {:else}
                         <div class="session-words-grid">
                             {#each sessionWords as word (word.id)}
+                                {@const swFurigana = distributeFurigana(word.spelling ?? '', word.reading ?? '')}
                                 <div class="mined-word-card">
                                     <button
                                         type="button"
@@ -247,9 +249,13 @@
                                             onClose={closeStatusMenu}
                                         />
                                     {/if}
-                                    <span class="mined-word-spelling">{word.spelling}</span>
-                                    {#if word.reading && word.reading !== word.spelling}
-                                        <span class="mined-word-reading">{word.reading}</span>
+                                    {#if swFurigana.some((s) => s.reading)}
+                                        <span class="mined-word-spelling">{#each swFurigana as seg}{#if seg.reading}<ruby><rb>{seg.text}</rb><rt class="entry-reading-kana">{seg.reading}</rt></ruby>{:else}{seg.text}{/if}{/each}</span>
+                                    {:else}
+                                        <span class="mined-word-spelling">{word.spelling}</span>
+                                        {#if word.reading && word.reading !== word.spelling}
+                                            <span class="mined-word-reading">{word.reading}</span>
+                                        {/if}
                                     {/if}
                                     {#if word.definitions.length > 0}
                                         <span class="mined-word-definition">{word.definitions[0]}</span>
@@ -561,6 +567,14 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    /* The shared rt tucks -3px into the base text, which overlaps at
+       this small size — lift it clear of the spelling and scale it to
+       the card. */
+    .mined-word-spelling rt {
+        margin-bottom: 2px;
+        font-size: 0.75rem;
     }
 
     .mined-word-reading {
