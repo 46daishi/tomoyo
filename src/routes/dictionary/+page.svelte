@@ -842,6 +842,7 @@
                         
                         <div class="word-main">
                             <WordImageButton
+                                fixedPreview
                                 wordId={word.id}
                                 imagePath={word.image_path ?? null}
                                 onSaved={(path) => (word.image_path = path)}

@@ -101,6 +101,9 @@
         const path = imagePath;
         loadImageSrc(path).then((url) => {
             if (!url || imagePath !== path) return;
+            // Clear again here: a second overlapping sync may have resolved
+            // first — last writer wins, so exactly one image ever lands.
+            portal.replaceChildren();
             const img = document.createElement('img');
             img.src = url;
             img.alt = '';
@@ -127,7 +130,9 @@
 
     onMount(() => {
         if (!fixedPreview) return;
-        syncPortalImage();
+        // Image sync rides on the $effect below (which also runs at
+        // mount); calling it here too double-syncs and can land two
+        // images in the portal.
         positionPortal();
         previewPoller = setInterval(positionPortal, 250);
     });
