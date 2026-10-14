@@ -9,6 +9,7 @@
     import { loadSettings } from '$lib/settings.js';
     import { getReviewPool, updateWordStatus, parseDefinitions, getSentencesForWord } from '$lib/dictionary.js';
     import { getReviewWeighting, startReviewSession, endReviewSession, logReviewedItem } from '$lib/reviewStats.js';
+    import { distributeFurigana } from '$lib/furigana.js';
     import { setReviewProgress } from '$lib/stores/presence.svelte';
     
     const mediaId = page.url.searchParams.get('media') ? Number(page.url.searchParams.get('media')) : null;
@@ -194,15 +195,17 @@
             </button>
         </div>
     {:else if currentWord}
+        {@const rFurigana = distributeFurigana(currentWord.spelling ?? '', currentWord.reading ?? '')}
+        {@const showRuby = rFurigana.some((s) => s.reading)}
         <div class="review-card">
+            <div class="review-word"><span class="review-word-text">{#if showRuby}{#each rFurigana as seg}{#if seg.reading}<ruby><rb>{seg.text}</rb><rt class="entry-reading-kana" class:concealed={!isRevealed}>{seg.reading}</rt></ruby>{:else}{seg.text}{/if}{/each}{:else}{currentWord.spelling}{/if}</span></div>
+
             <div class="current-status-badge" style={`--status-color: ${STATUS_LEVELS[currentWord.status]?.color}`}>
                 {STATUS_LEVELS[currentWord.status]?.label}
             </div>
 
-            <div class="review-word">{currentWord.spelling}</div>
-
             {#if isRevealed}
-                {#if currentWord.reading && currentWord.reading !== currentWord.spelling}
+                {#if !showRuby && currentWord.reading && currentWord.reading !== currentWord.spelling}
                     <div class="review-reading">{currentWord.reading}</div>
                 {/if}
                 <div class="review-definitions">{parseDefinitions(currentWord.definitions).join('; ')}</div>
@@ -355,10 +358,29 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
         padding: 0rem 0.4rem;
-        margin-bottom:0.2rem;
+        margin-top: -0.4rem;
         border-radius: 5px;
         color: black;
         background: color-mix(in srgb, var(--status-color, #6c7086) 85%, transparent);
+    }
+
+    /* Review ruby runs much larger than tooltip/dictionary furigana —
+       scoped here so the shared global size is untouched. */
+    .review-word .entry-reading-kana {
+        font-size: 1.3rem;
+    }
+
+    /* Pre-reveal ruby is invisible but reserves its exact space, so
+       revealing the answer never moves the word or the pill. */
+    .review-word .concealed {
+        visibility: hidden;
+    }
+
+    /* Zero out the reading's line box: the annotation then paints as
+       pure overflow and contributes no descent, so ruby and kana words
+       share byte-identical metrics below the baseline. */
+    .review-word rt {
+        line-height: 0;
     }
 
     .review-word {
@@ -366,6 +388,17 @@
         font-size: 3rem;
         font-weight: 700;
         color: var(--theme-text, #f6f6f6);
+        /* Fixed box, content bottom-aligned through a single inner span:
+           ruby and kana share the same font strut, so base glyphs land at
+           identical positions, ruby overflows upward visibly, and the pill
+           below always lands at the same distance — kana, ruby, revealed
+           or not. A wrapping long word overflows upward too, never into
+           the pill. */
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        height: 3rem;
+        line-height: 1;
     }
 
     .review-image-row {
@@ -394,6 +427,7 @@
         font-size: 1.2rem;
         color: var(--theme-text, #f6f6f6);
         max-width: 420px;
+        margin-top: 0.6rem;
     }
 
     .review-sentence-wrap {
