@@ -21,6 +21,9 @@
     let completionStats = $state(null);
     let startTime = 0;
     let advancing = $state(false);
+    // Sentences already logged this session (Back + Next over the same
+    // sentence must not double-count it in review weighting).
+    const loggedItemKeys = new Set();
 
     let currentSentence = $derived(queue[index] ?? null);
 
@@ -64,7 +67,10 @@
         if (!currentSentence || advancing || done) return;
         advancing = true;
         try {
-            await logReviewedItem({ sessionId, reviewType: 'sentence', itemKey: currentSentence.sentence_text, mediaId });
+            if (!loggedItemKeys.has(currentSentence.sentence_text)) {
+                await logReviewedItem({ sessionId, reviewType: 'sentence', itemKey: currentSentence.sentence_text, mediaId });
+                loggedItemKeys.add(currentSentence.sentence_text);
+            }
 
             translationOpen = false;
             setReviewProgress(queue.length > 0
@@ -78,6 +84,15 @@
         } finally {
             advancing = false;
         }
+    }
+
+    function goBack() {
+        if (index <= 0 || !currentSentence || advancing || done) return;
+        index -= 1;
+        translationOpen = false;
+        setReviewProgress(queue.length > 0
+          ? `${index + 1}/${queue.length} reviewed`
+          : null);
     }
 
     async function finishReview() {
@@ -100,6 +115,9 @@
         if (done || !currentSentence) return;
         if (e.key === 'ArrowRight') {
             advance();
+        }
+        if (e.key === 'ArrowLeft' && index > 0) {
+            goBack();
         }
     }
     
@@ -161,7 +179,10 @@
         </div>
 
         <div class="bottom-nav">
-            <div class="review-counter">Progress: {index+1}/{queue.length}</div>
+            <button class="next-btn" onclick={goBack} disabled={index === 0}>
+                <span class="key-hint">{ICONS.left}</span> Back
+            </button>
+            <div class="review-counter">{index+1}/{queue.length}</div>
             <button class="next-btn" onclick={advance}>
                 Next <span class="key-hint">{ICONS.right}</span>
             </button>
@@ -220,7 +241,7 @@
     }
 
     .review-counter {
-        font-size: 0.95rem;
+        font-size: 1rem;
         font-weight: 700;
         color: var(--theme-textSecondary, #b3b3b3);
         font-variant-numeric: tabular-nums;
@@ -244,6 +265,15 @@
 
     .next-btn:hover {
         border-color: var(--theme-primary, #36b7bd);
+    }
+
+    .next-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+    }
+
+    .next-btn:disabled:hover {
+        border-color: transparent;
     }
 
     .key-hint {

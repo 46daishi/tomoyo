@@ -40,6 +40,7 @@ export const ICONS = {
   hourglass: "\uf254",
   calendar: "\uf073",
   right: "\uea9c",
+  left: "\uea9b",
   clock: "\uf017",
   star_half: "\ueb5a",
   book_open: "\uf405",

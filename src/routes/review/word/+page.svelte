@@ -23,6 +23,9 @@
     let completionStats = $state(null);
     let startTime = 0;
     let advancing = $state(false);
+    // Cards already logged this session (Back + Next over the same card
+    // must not double-count it in review weighting).
+    const loggedItemKeys = new Set();
 
     let currentWord = $derived(queue[index] ?? null);
     let currentSentence = $state(null);
@@ -100,12 +103,24 @@
         }
     }
 
+    function goBack() {
+        if (index <= 0 || !currentWord || advancing) return;
+        index -= 1;
+        revealed = false;
+        setReviewProgress(queue.length > 0
+            ? `${index+1}/${queue.length} reviewed`
+            : null);
+    }
+
     async function selectStatus(status) {
         if (!currentWord || advancing) return;
         advancing = true;
         try {
             await updateWordStatus({ wordId: currentWord.id, status });
-            await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
+            if (!loggedItemKeys.has(currentWord.id)) {
+                await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
+                loggedItemKeys.add(currentWord.id);
+            }
             advance();
         } finally {
             advancing = false;
@@ -116,7 +131,10 @@
         if (!currentWord || !isRevealed || advancing) return;
         advancing = true;
         try {
-            await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
+            if (!loggedItemKeys.has(currentWord.id)) {
+                await logReviewedItem({ sessionId, reviewType: 'word', itemKey: currentWord.id, mediaId });
+                loggedItemKeys.add(currentWord.id);
+            }
             advance();
         } finally {
             advancing = false;
@@ -153,6 +171,9 @@
         }
         if (e.key === 'ArrowRight' && isRevealed) {
             skipNext();
+        }
+        if (e.key === 'ArrowLeft' && index > 0) {
+            goBack();
         }
     }
 
@@ -263,12 +284,13 @@
         {/if}
 
         <div class="bottom-nav">
-            <div class="review-counter">Progress: {index+1}/{queue.length}</div>
-            {#if isRevealed}
-                <button class="next-btn" onclick={skipNext}>
-                    Next <span class="key-hint">{ICONS.right}</span>
-                </button>
-            {/if}
+            <button class="next-btn" onclick={goBack} disabled={index === 0}>
+                <span class="key-hint">{ICONS.left}</span> Back
+            </button>
+            <div class="review-counter">{index+1}/{queue.length}</div>
+            <button class="next-btn" onclick={skipNext} disabled={!isRevealed}>
+                Next <span class="key-hint">{ICONS.right}</span>
+            </button>
         </div>
     {:else}
         <p class="no-words-notice">No words available to review right now.</p>
@@ -308,7 +330,7 @@
     }
 
     .review-counter {
-        font-size: 0.95rem;
+        font-size: 1rem;
         font-weight: 700;
         color: var(--theme-textSecondary, #b3b3b3);
         font-variant-numeric: tabular-nums;
@@ -332,6 +354,15 @@
 
     .next-btn:hover {
         border-color: var(--theme-primary, #36b7bd);
+    }
+
+    .next-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+    }
+
+    .next-btn:disabled:hover {
+        border-color: transparent;
     }
 
     .key-hint {
