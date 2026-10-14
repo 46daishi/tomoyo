@@ -243,6 +243,16 @@ pub(crate) fn lookup_from_position(
                         {
                             break;
                         }
+                        // いつも通り yields to verb continuations the same
+                        // way: 通り過ぎる/通りかかる are verb compounds,
+                        // not the adverb.
+                        if *tail == "もとうり"
+                            && tokens
+                                .iter()
+                                .any(|tok| tok.start == end && tok.pos == "動詞")
+                        {
+                            break;
+                        }
                         let mut nend = end.min(len);
                         if nend > position {
                             ends.push(nend);
@@ -650,8 +660,8 @@ pub(crate) fn lookup_from_position(
                 _ => None,
             };
             let is_koto_naru = |end: usize| koto_naru_end == Some(end);
-            // Noun + を/に + verb dictionary compounds (身につける,
-            // 皮をむく): the particle trips the separator guard below and
+            // Noun + を/に/が + verb dictionary compounds (身につける,
+            // 皮をむく, 気が向く): the particle trips the separator guard below and
             // the inflected compound is never literal-known, so the verb's
             // end is exempted from both verb guards when noun + particle +
             // verb-base is itself a dictionary entry — the span then
@@ -665,10 +675,10 @@ pub(crate) fn lookup_from_position(
             let pp_compound_end: Option<usize> = match token_at_pos {
                 Some(t) if t.pos == "名詞" && position == t.start => {
                     let p = tokens.iter().find(|tok| tok.start == t.end);
-                    let v = p
-                        .filter(|p| {
-                            p.pos == "助詞" && matches!(p.surface.as_str(), "を" | "に")
-                        })
+                     let v = p
+                         .filter(|p| {
+                             p.pos == "助詞" && matches!(p.surface.as_str(), "を" | "に" | "が")
+                         })
                         .and_then(|p| tokens.iter().find(|tok| tok.start == p.end))
                         .filter(|v| v.pos == "動詞" && v.base_form != "*");
                     match (p, v) {

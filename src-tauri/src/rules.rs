@@ -217,6 +217,22 @@ pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     // a verb continuing right after (取ってくる/おく/しまう) belongs to
     // a verb compound instead, so the merge yields there.
     ("に", "とって", true),
+    // いつも通り ("as usual"): UniDic tags 通り as a verb stem (通る)
+    // before punctuation, so the noun-compound path misses it (it only
+    // fires for noun-tagged 通り). The head is anchored at the phrase
+    // start (completions only fire from the cursor token): the tail
+    // accumulates readings (も|通り reads もとうり) and the literal
+    // いつも通り entry resolves the merged span, longest-first falls
+    // back elsewhere. Guarded below: a verb continuing right after
+    // (通り過ぎる/通りかかる) belongs to a verb compound instead, so
+    // the merge yields there.
+    ("いつ", "もとうり", false),
+    // あっという間 ("in the blink of an eye"): tokens split as
+    // あっ|と|いう|間. Anchored at あっ for the same reason; the tail
+    // accumulates readings (と|いう|間 reads というま) and the literal
+    // entries resolve the merged span, longest-first falls back
+    // elsewhere (と言う間もなく stays split).
+    ("あっ", "というま", false),
 ];
 
 /// Single-char particles a clipped emphasis can attach to (sokuon-span

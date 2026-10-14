@@ -1094,13 +1094,51 @@ pub(crate) fn lookup_candidate(
         let chain_has_even_if = form.rule_chain.as_deref().map_or(false, |c| {
             c.split('→').any(|seg| seg.contains("even if"))
         });
+        // The stem is just a string suffix, so noun+particle stretches
+        // fabricate verbs through the rule (今はなくても -> 居回る from
+        // stem いまは). Require the stretch between the cursor and the
+        // span end to be verb-inflectional only: verbs, auxiliaries,
+        // i-adjectives (including ない-negation like なく), te-form
+        // markers and the ても tail itself. Any phrase particle (は/が/
+        // を/...) or content word in between means the ても belongs to a
+        // different clause, and the normal verb-token backing gate
+        // applies. Tails of な-adjective+だ copulas and the like never
+        // produce verb-class results, so they are unaffected.
+        //
+        // The godan "even if not" rules (and friends) carry dec_tag
+        // "any", which is not a verb class — so without more, their
+        // verb results dodge verb backing AND POS validation entirely
+        // (the hole above). Treat "any"-tagged even-if chains as
+        // backing-needing: genuine stems (急がなくても, 出来なくても)
+        // always have the verb (or its mistagged noun) adjacent, while
+        // fabricated ones (いまは) fail contiguity. Non-even-if "any"
+        // rules (prohibitive んじゃない etc.) are untouched.
+        let even_if_needs_backing = chain_has_even_if && form.tag == "any";
+        let needs_verb_backing = is_verb_class(&form.tag) || even_if_needs_backing;
+        let even_if_contiguous = !chain_has_even_if || {
+            let span_end = position + span_len;
+            tokens
+                .iter()
+                .filter(|t| t.start > position && t.start < span_end)
+                .all(|t| {
+                    matches!(
+                        t.pos.as_str(),
+                        "動詞" | "助動詞" | "形容詞" | "記号" | "接頭辞" | "接尾辞"
+                    ) || (t.pos == "助詞"
+                        && matches!(
+                            t.surface.as_str(),
+                            "て" | "で" | "ても" | "でも" | "っても" | "も" | "たり"
+                                | "だり" | "ば" | "ながら"
+                        ))
+                })
+        };
         if starts_at_position
             && !single_token_span
-            && is_verb_class(&form.tag)
+            && needs_verb_backing
             && !span_has_verb_token
             && !(cursor_single_kanji && ends_mid_token && surface_te_form)
             && !chain_has_slurred
-            && !chain_has_even_if
+            && !(chain_has_even_if && even_if_contiguous)
         {
             continue;
         }
@@ -1670,9 +1708,21 @@ pub(crate) fn lookup_candidate(
             archaic_forms.extend(decon.deconjugate_including_archaic(key));
         }
         for form in &archaic_forms {
+            // Same verb-backing requirement as the modern pool, extended
+            // to "any"-tagged even-if chains the same way: dec_tag "any"
+            // is not a verb class, so noun+particle fabrications (今はなく
+            // ても -> 居回る) otherwise dodge backing here after being
+            // closed out of the modern pool. Genuine stems always carry
+            // their verb (or mistagged noun) adjacent; fabricated ones
+            // span phrase particles, which this span lacks a verb for.
+            let classical_even_if = form.rule_chain.as_deref().map_or(false, |c| {
+                c.split('→').any(|seg| seg.contains("even if"))
+            });
+            let classical_needs_backing =
+                is_verb_class(&form.tag) || (classical_even_if && form.tag == "any");
             if starts_at_position
                 && !single_token_span
-                && is_verb_class(&form.tag)
+                && classical_needs_backing
                 && !span_has_verb_token
             {
                 continue;

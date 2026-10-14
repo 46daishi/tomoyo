@@ -645,3 +645,11 @@ bugs6-24	bugs	鴨が泳いでいる。	scan			has_span	鴨
 bugs6-25	bugs	同市出身だ。	scan			has_span	同市	
 bugs6-26	bugs	さくらが咲いた。	scan			has_span	さくら	noun tails never split
 bugs6-27	bugs	食べるのかな?	scan			has_span	食べるのか	verb+particle-tail wholes stay whole by design
+bugs7-01	bugs	気が向いたらかな	scan			scan_surfaces	気が向いたら|かな	気が向く conditional stays one span
+bugs7-02	bugs	気が向いたらかな	lookup	気		top_spelling	気が向く	resolves to 気が向く
+bugs7-03	bugs	今はなくても生きていける	scan			scan_surfaces	今|は|なくても|生きていける	なくても stays its own expression
+bugs7-04	bugs	今はなくても生きていける	lookup	今		surface	今	falls back to the noun, no 居回る
+bugs7-05	bugs	僕と穹はいつも通り、学校に向かう道で、天女目を見つけた。	scan			scan_surfaces	僕|と|は|いつも通り|学校|に|向かう|道|で|天女|目|を|見つけた	verb-tagged 通り still merges
+bugs7-06	bugs	いつも通り過ぎていった	scan			scan_surfaces	いつも|通り過ぎていった	verb continuation yields
+bugs7-07	bugs	あっという間な気分だった	scan			scan_surfaces	あっという間|な|気分だった	adverbial expression merges
+bugs7-08	bugs	気が付いたらどうしよう	scan			scan_surfaces	気が付いたら|どうしよう	が-compound breadth
