@@ -50,6 +50,10 @@ pub struct AppSettings {
     pub mini_mode_enter_height: u32,
     pub mini_mode_exit_height: u32,
     pub mini_mode_transparency: f32,
+    /// Mini-mode window colour override (empty = theme surface behaviour).
+    pub mini_mode_color: String,
+    /// Mini-mode window text colour override (empty = theme text).
+    pub mini_mode_text_color: String,
 
     // ── Review  ──
     pub default_review_mode: String, // "normal" | "flashcard"
@@ -110,6 +114,8 @@ impl Default for AppSettings {
             mini_mode_enter_height: 300,
             mini_mode_exit_height: 350,
             mini_mode_transparency: 0.5,
+            mini_mode_color: String::new(),
+            mini_mode_text_color: String::new(),
 
             default_review_mode: "normal".into(),
             word_review_count: 20,

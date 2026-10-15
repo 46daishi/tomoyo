@@ -25,6 +25,14 @@
     let invertedStyle = $derived(
         settings?.sentence_window_inverted ? invertedThemeVars($currentTheme) : ''
     );
+    // Mini-mode text override lives on the window itself (not :root, so
+    // the rest of the app is untouched); empty when unset or not in mini
+    // mode, which preserves theme behaviour.
+    let miniTextStyle = $derived(
+        miniMode && settings?.mini_mode_text_color
+            ? `--theme-text: ${settings.mini_mode_text_color};`
+            : ''
+    );
     // Tracks whether inversion actually applied (theme pair exists): the
     // window background drops its black-ward mix in that case, so an
     // inverted dark-mode window renders the full light surface.
@@ -776,7 +784,7 @@
     onkeyup={handleGlobalKeyup}
 />
 
-<div class="sentence-window" bind:this={sentenceWindowEl} onwheel={handleSentenceWheel} style={invertedStyle} class:inverted={invertedActive}>
+<div class="sentence-window" bind:this={sentenceWindowEl} onwheel={handleSentenceWheel} style={`${invertedStyle} ${miniTextStyle}`} class:inverted={invertedActive}>
     {#if displayedChars.length > 0}
         <p
             class="sentence-text"
@@ -961,7 +969,7 @@
         padding: 1.5rem;
         background: color-mix(
             in srgb,
-            color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 20%) var(--mini-color-weight, 70%),
+            var(--mini-color, color-mix(in srgb, var(--theme-surface, #1e1e2e) 80%, black 20%)) var(--mini-color-weight, 70%),
             transparent
         );
     }

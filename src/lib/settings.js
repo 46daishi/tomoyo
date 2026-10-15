@@ -75,6 +75,8 @@ export const HIGHLIGHT_MODE_OPTIONS = [
 //                  colour pickers, one per option; the stored value is an
 //                  array of hex strings aligned with options (missing
 //                  entries fall back to option.color)
+//   color       -> single round colour picker; stored value is a hex
+//                  string (empty means unset)
 //   hotkey      -> (nothing extra)
 //   multi_select -> options; levelColors (bool): resolve each option's
 //                  color from the customizable word level colours
@@ -194,6 +196,20 @@ export const SETTINGS_SCHEMA = [
           percent: true,
           subRow: true,
           showIf: (s) => s.mini_mode_enabled,
+      },
+      {
+          key: 'mini_mode_color',
+          label: 'Window colour',
+          type: 'color',
+          subRow: true,
+          showIf: (/** @type {Record<string, any>} */ s) => s.mini_mode_enabled,
+      },
+      {
+          key: 'mini_mode_text_color',
+          label: 'Text colour',
+          type: 'color',
+          subRow: true,
+          showIf: (/** @type {Record<string, any>} */ s) => s.mini_mode_enabled,
       },
       ],
   },

@@ -142,6 +142,14 @@
                     </label>
                 {/each}
             </div>
+        {:else if option.type === 'color'}
+            <label class="color-cell" title={option.label}>
+                <input
+                    type="color"
+                    value={settings?.[option.key] || '#1e1e2e'}
+                    oninput={(e) => onChange(option.key, e.currentTarget.value)}
+                />
+            </label>
         {/if}
     {/if}
 </div>

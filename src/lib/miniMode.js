@@ -12,6 +12,17 @@ export function initMiniMode(settings, onMiniModeChange) {
         document.documentElement.style.setProperty('--mini-color-weight', `${colorWeight}%`);
     }
 
+    /**
+     * @param {string} [color] hex colour override, empty/undefined restores theme behaviour
+     */
+    function applyMiniModeColor(color) {
+        if (color) {
+            document.documentElement.style.setProperty('--mini-color', color);
+        } else {
+            document.documentElement.style.removeProperty('--mini-color');
+        }
+    }
+
     function checkWindowSize() {
         if (settings?.mini_mode_enabled === false) {
             if (miniMode) {
@@ -43,6 +54,7 @@ export function initMiniMode(settings, onMiniModeChange) {
     }
 
     applyMiniModeTransparency(settings.mini_mode_transparency);
+    applyMiniModeColor(settings?.mini_mode_color);
     checkWindowSize();
     window.addEventListener('resize', handleResize);
 
