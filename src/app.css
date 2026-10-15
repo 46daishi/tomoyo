@@ -712,12 +712,6 @@ html[data-theme-mode="light"] .selection-popup {
     background: var(--theme-surface);
 }
 
-/* Known-word status underlines: pastel 2px lines go faint on white. */
-html[data-theme-mode="light"] .char-token.known-word,
-html[data-theme-mode="light"] .entry-spelling.known-word {
-    border-bottom-color: color-mix(in srgb, var(--status-color) 60%, black);
-}
-
 /* Frequency pills: fixed greens/ambers go weak on white. */
 html[data-theme-mode="light"] .freq-tier-common {
     color: #2e7d32;
