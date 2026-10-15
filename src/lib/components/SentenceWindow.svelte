@@ -768,7 +768,7 @@
             onmouseleave={handleSentenceLeave}
             onmousedown={() => (suppressClick = false)}
             onmouseup={handleSentenceMouseUp}
-            style={`--font-size: ${settings?.font_size ?? 30}px; --font-family: '${settings?.font_family ?? 'Noto Sans JP'}'`}
+            style={`--font-size: ${settings?.font_size ?? 30}px; --font-family: '${settings?.font_family ?? 'Noto Sans JP'}'; --status-underline-width: ${settings?.status_underline_width ?? 2}px`}
         >
             {#each displayedChars as char, i}
                 <span
@@ -966,7 +966,7 @@
     }
 
     .char-token.known-word {
-        border-bottom: 2px solid var(--status-color, transparent);
+        border-bottom: var(--status-underline-width, 2px) solid var(--status-color, transparent);
         padding-bottom: 1px;
     }
 

@@ -211,7 +211,7 @@
 
 <svelte:window onclick={() => (tooltipVisible = false)} onkeydown={handleGlobalKeydown} />
 
-<div class="interactive-sentence" bind:this={containerEl} onmouseleave={(e) => {
+<div class="interactive-sentence" bind:this={containerEl} style={`--status-underline-width: ${settings?.status_underline_width ?? 2}px`} onmouseleave={(e) => {
         if (settings?.lookup_mode === 'hover' && !isRelatedTargetInSentenceArea(e.relatedTarget)) {
             closeHoverTooltip();
         } else {
@@ -286,7 +286,7 @@
     }
 
     .char-token.known-word {
-        border-bottom: 2px solid var(--status-color, transparent);
+        border-bottom: var(--status-underline-width, 2px) solid var(--status-color, transparent);
         padding-bottom: 1px;
     }
 </style>

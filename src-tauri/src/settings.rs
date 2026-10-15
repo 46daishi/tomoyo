@@ -34,6 +34,8 @@ pub struct AppSettings {
     pub highlight_mode: String, // "none" | "known" | "unknown"
     pub treat_new_as_unknown: bool,
     pub underline_names: bool,
+    /// Word status underline width in px (sentence chars + tooltip readings).
+    pub status_underline_width: u32,
 
     // ── Input & History ──
     pub input_mode: String, // "clipboard" | "websocket"
@@ -94,6 +96,7 @@ impl Default for AppSettings {
             highlight_mode: "none".into(),
             treat_new_as_unknown: false,
             underline_names: true,
+            status_underline_width: 2,
 
             input_mode: "clipboard".into(),
             websocket_address: "ws://127.0.0.1:6677".into(),

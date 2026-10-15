@@ -125,7 +125,7 @@
 <div
     class="lookup-tooltip"
     class:static-position={tooltipX === null}
-    style={positionStyle}
+    style={`${positionStyle} --status-underline-width: ${settings?.status_underline_width ?? 2}px;`}
     transition:fly={{ y: 6, duration: 120 }}
     onclick={(event) => event.stopPropagation()}
     onwheel={(event) => event.stopPropagation()}
@@ -310,7 +310,7 @@
     }
 
     .entry-spelling.known-word {
-        border-bottom: 2px solid var(--status-color, transparent);
+        border-bottom: var(--status-underline-width, 2px) solid var(--status-color, transparent);
         /* Flush against the text: any padding here reads as a gap, and the
            meta row below already carries the spacing. */
         padding-bottom: 0;
