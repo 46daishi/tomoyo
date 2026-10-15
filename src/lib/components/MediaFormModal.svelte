@@ -14,6 +14,7 @@
     let color = $state('#89b4fa');
     let coverPath = $state(/** @type {string | null} */ (null));
     let vndbId = $state('');
+    let excludeJiten = $state(false);
     let activeTab = $state('manual');
     let saving = $state(false);
     let error = $state('');
@@ -32,6 +33,7 @@
                 color = media.color;
                 coverPath = media.cover_path;
                 vndbId = media.vndb_id ?? '';
+                excludeJiten = (media.jiten_excluded ?? 0) !== 0;
             } else {
                 title = '';
                 tag = '';
@@ -39,6 +41,7 @@
                 color = '#89b4fa';
                 coverPath = null;
                 vndbId = '';
+                excludeJiten = false;
             }
         }
     });
@@ -111,8 +114,8 @@
                 }
 
                 await db.execute(
-                    'UPDATE media SET title = $1, tag = $2, status = $3, color = $4, cover_path = $5, vndb_id = $6, updated_at = unixepoch() WHERE id = $7',
-                    [title.trim(), tag || null, status, color, finalCover, finalId, media.id]
+                'UPDATE media SET title = $1, tag = $2, status = $3, color = $4, cover_path = $5, vndb_id = $6, jiten_excluded = $7, updated_at = unixepoch() WHERE id = $8',
+                [title.trim(), tag || null, status, color, finalCover, finalId, excludeJiten ? 1 : 0, media.id]
                 );
                 show = false;
                 onSaved();
@@ -160,8 +163,8 @@
             }
 
             await db.execute(
-                'INSERT INTO media (title, tag, status, color, cover_path, vndb_id) VALUES ($1, $2, $3, $4, $5, $6)',
-                [finalTitle.trim(), tag || null, status, color, finalCover, finalId]
+                'INSERT INTO media (title, tag, status, color, cover_path, vndb_id, jiten_excluded) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [finalTitle.trim(), tag || null, status, color, finalCover, finalId, excludeJiten ? 1 : 0]
             );
             show = false;
             onSaved();
@@ -238,6 +241,11 @@
                                 <SelectInput options={STATUS_OPTIONS} value={status} on:change={(/** @type {Event} */ e) => (status = /** @type {HTMLSelectElement} */ (e.target).value)} />
                             </div>
                         </div>
+
+                        <label class="exclude-row">
+                            <input type="checkbox" bind:checked={excludeJiten} />
+                            <span>Exclude from Jiten</span>
+                        </label>
                     </div>
                 </div>
             {/if}
@@ -371,6 +379,19 @@
         justify-content: flex-start;
         gap: 0.6rem;
         align-items: center;
+    }
+
+    .exclude-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--theme-text, #f6f6f6);
+        cursor: pointer;
+    }
+
+    .exclude-row input[type="checkbox"] {
+        accent-color: var(--theme-primary, #36b7bd);
     }
 
     .status-field {

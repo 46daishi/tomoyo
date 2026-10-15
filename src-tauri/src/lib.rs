@@ -126,6 +126,12 @@ pub fn run() {
             sql: include_str!("../migrations/0016_jiten_cache.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 17,
+            description: "jiten_excluded",
+            sql: include_str!("../migrations/0017_jiten_excluded.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

@@ -162,6 +162,7 @@
         const attempted = new Set();
         for (const m of mediaList) {
             if (coverBackfillCancelled) return;
+            if (m.jiten_excluded) continue;
             if (attempted.has(m.id)) continue;
             attempted.add(m.id);
             if (coverStats[m.id]?.difficulty != null) continue;
@@ -237,7 +238,7 @@
                         />
                     </div>
                     {#if barStats}
-                        {@const showBarDifficulty = settings?.jiten_enabled && barStats.difficulty != null}
+                        {@const showBarDifficulty = settings?.jiten_enabled && !media.jiten_excluded && barStats.difficulty != null}
                         <div class="cover-meta" aria-hidden="true">
                             <div class="cover-meta-row">
                                 <span class="cover-meta-left"><span class="cover-meta-icon">{@html ICONS.book}</span><span class="cover-meta-value">{formatLastActive(barStats.last_active)}</span></span>

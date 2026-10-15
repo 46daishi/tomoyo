@@ -88,7 +88,7 @@
             return;
         }
         const db = await getDb();
-        const rows = await db.select('SELECT id, title, color, cover_path, status, tag, vndb_id, created_at FROM media WHERE id = $1', [mediaFilter]);
+        const rows = await db.select('SELECT id, title, color, cover_path, status, tag, vndb_id, jiten_excluded, created_at FROM media WHERE id = $1', [mediaFilter]);
         if (latestInfo.get() === my) mediaInfo = rows[0] ?? null;
     }
 
@@ -119,7 +119,7 @@
         const finish = (/** @type {typeof jitenInfo} */ v) => {
             if (jitenRequestId === my) jitenInfo = v;
         };
-        if (!settings?.jiten_enabled || !mediaInfo) {
+        if (!settings?.jiten_enabled || !mediaInfo || mediaInfo.jiten_excluded) {
             finish(null);
             return;
         }
