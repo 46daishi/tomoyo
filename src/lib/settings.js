@@ -204,6 +204,7 @@ export const SETTINGS_SCHEMA = [
         { key: 'unknown_words_count', label: "Number of words to show", type: 'number', subRow: true, showIf: (/** @type {Record<string, any>} */ s) => s.track_unknown_words },
         { key: 'unknown_words_min_lookups', label: "Minimum lookups to appear", type: 'number', subRow: true, showIf: (/** @type {Record<string, any>} */ s) => s.track_unknown_words },        { key: 'word_sentence_count', label: "Number of sentences to display under a word", type: 'number' },
         { key: 'estimate_coverage', label: "Estimate media vocabulary coverage", type: 'checkbox' },
+        { key: 'jiten_enabled', label: 'Show Jiten difficulty stats', type: 'checkbox' },
       ],
     },
     {

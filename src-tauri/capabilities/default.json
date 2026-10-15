@@ -21,7 +21,7 @@
     "core:event:allow-listen",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://*.vndb.org" }]
+      "allow": [{ "url": "https://*.vndb.org" }, { "url": "https://api.jiten.moe" }]
     },
     {
       "identifier": "fs:scope",

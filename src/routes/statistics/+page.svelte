@@ -18,6 +18,7 @@
     import { getMediaStats } from '$lib/sessions.js';
     import { getVocabularyCoverage } from '$lib/coverage.js';
     import { getVn, formatVnLength, formatVnRating, vndbUrl } from '$lib/vndb.js';
+    import { loadJitenStats, difficultyLabel, difficultyBand } from '$lib/jiten.js';
     import { openUrl } from '@tauri-apps/plugin-opener';
     import {
         getReadingStats, getReadingStreak, getActivityYears, getMojiActivityByYear,
@@ -33,6 +34,8 @@
     let mediaInfo = $state(/** @type {Record<string, any> | null} */ (null));
     let vnInfo = $state(/** @type {Record<string, any> | null} */ (null));
     let vnInfoRequestId = 0;
+    let jitenInfo = $state(/** @type {{ deckId: number, characterCount: number|null, difficulty: number|null, uniqueWords: number|null } | null} */ (null));
+    let jitenRequestId = 0;
 
     // Native state initialized as provided
     let stats = $state({
@@ -109,6 +112,32 @@
     async function openVndb(id) {
         const url = vndbUrl(id);
         if (url) await openUrl(url);
+    }
+
+    async function loadJitenInfo() {
+        const my = ++jitenRequestId;
+        const finish = (/** @type {typeof jitenInfo} */ v) => {
+            if (jitenRequestId === my) jitenInfo = v;
+        };
+        if (!settings?.jiten_enabled || !mediaInfo) {
+            finish(null);
+            return;
+        }
+        try {
+            const stats = await loadJitenStats(mediaInfo.id, {
+                vndbId: mediaInfo.vndb_id ?? null,
+                title: mediaInfo.title ?? '',
+            });
+            finish(stats);
+        } catch (err) {
+            console.error('Jiten fetch failed:', err);
+            finish(null);
+        }
+    }
+
+    /** @param {number} deckId */
+    async function openJiten(deckId) {
+        await openUrl(`https://jiten.moe/decks/media/${deckId}/detail`);
     }
 
     async function loadStats() {
@@ -224,6 +253,12 @@
     $effect(() => {
         mediaInfo?.vndb_id;
         loadVnInfo();
+    });
+
+    $effect(() => {
+        mediaInfo;
+        settings?.jiten_enabled;
+        loadJitenInfo();
     });
 
     onMount(async () => {
@@ -457,9 +492,17 @@
                         {/if}
                     </div>
                     <div class="cover-title">{mediaInfo.title}</div>
-                    {#if info.vndb_id}
+                    {#if info.vndb_id || jitenInfo}
                         <div class="vndb-row">
-                            <button class="vndb-link" onclick={() => openVndb(info.vndb_id)}>v{info.vndb_id.replace(/^v/i, '')}</button>
+                            {#if info.vndb_id}
+                                <button class="vndb-link" onclick={() => openVndb(info.vndb_id)}>v{info.vndb_id.replace(/^v/i, '')}</button>
+                            {/if}
+                            {#if info.vndb_id && jitenInfo}
+                                <span class="link-sep" aria-hidden="true">·</span>
+                            {/if}
+                            {#if jitenInfo}
+                                <button class="vndb-link" onclick={() => jitenInfo && openJiten(jitenInfo.deckId)} title="Open on jiten.moe">jiten:{jitenInfo.deckId}</button>
+                            {/if}
                         </div>
                     {/if}
                     <ul class="media-meta">
@@ -503,6 +546,24 @@
                                 <span class="meta-icon" style="color: {info.color || '#fab387'}">{@html ICONS.star}</span>
                                 <span class="meta-label">VNDB rating</span>
                                 <span class="meta-value">{vnInfo ? formatVnRating(vnInfo) : '—'}</span>
+                            </li>
+                        {/if}
+                        {#if settings?.jiten_enabled && jitenInfo}
+                            {@const jitenBand = difficultyBand(jitenInfo.difficulty)}
+                            <li>
+                                <span class="meta-icon" style="color: {info.color || '#fab387'}">{@html ICONS.book_open}</span>
+                                <span class="meta-label">Length</span>
+                                <span class="meta-value">{jitenInfo.characterCount != null ? `${jitenInfo.characterCount.toLocaleString()} 文字` : '—'}</span>
+                            </li>
+                            <li>
+                                <span class="meta-icon" style="color: {info.color || '#fab387'}">{@html ICONS.translate}</span>
+                                <span class="meta-label">Unique words</span>
+                                <span class="meta-value">{jitenInfo.uniqueWords != null ? `${jitenInfo.uniqueWords.toLocaleString()}` : '—'}</span>
+                            </li>
+                            <li>
+                                <span class="meta-icon" style="color: {info.color || '#fab387'}">{@html ICONS.star}</span>
+                                <span class="meta-label">Difficulty</span>
+                                <span class="meta-value {jitenBand != null ? `diff-band-${jitenBand}` : ''}" title={jitenInfo.difficulty != null ? `${jitenInfo.difficulty.toFixed(1)}/5 on jiten.moe` : ''}>{difficultyLabel(jitenInfo.difficulty) ?? '—'}</span>
                             </li>
                         {/if}
                     </ul>
@@ -1046,10 +1107,36 @@
         gap: 0.35rem;
     }
 
+    /* Values carrying a hover tooltip (difficulty score): dotted
+       underline + help cursor so the extra detail gets discovered. */
+    .meta-value[title] {
+        text-decoration: underline dotted;
+        text-underline-offset: 3px;
+        text-decoration-color: var(--theme-primary, #36b7bd);
+        cursor: help;
+    }
+
+    /* Difficulty band text, mirroring Jiten's own per-band hues
+       (dark surfaces; light overrides live in app.css). */
+    .diff-band-0 { color: #4ade80; }
+    .diff-band-1 { color: #bbf7d0; }
+    .diff-band-2 { color: #67e8f9; }
+    .diff-band-3 { color: #fcd34d; }
+    .diff-band-4 { color: #fca5a5; }
+    .diff-band-5 { color: #ef4444; }
+
     .vndb-row {
         display: flex;
         justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
         padding: 0 0.5rem;
+    }
+
+    .link-sep {
+        color: var(--theme-textSecondary, #b3b3b3);
+        font-size: 0.8rem;
+        line-height: 1;
     }
 
     .vndb-link {

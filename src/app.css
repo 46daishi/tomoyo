@@ -837,3 +837,11 @@ html[data-theme-mode="light"] .status-bar,
 html[data-theme-mode="light"] .mined-word-status {
     background: color-mix(in srgb, var(--status-color, #6c7086) 72%, black);
 }
+
+/* Difficulty bands on light surfaces: darker cuts of the same hues. */
+html[data-theme-mode="light"] .diff-band-0 { color: #15803d; }
+html[data-theme-mode="light"] .diff-band-1 { color: #16a34a; }
+html[data-theme-mode="light"] .diff-band-2 { color: #0891b2; }
+html[data-theme-mode="light"] .diff-band-3 { color: #b45309; }
+html[data-theme-mode="light"] .diff-band-4 { color: #dc2626; }
+html[data-theme-mode="light"] .diff-band-5 { color: #991b1b; }

@@ -11,6 +11,8 @@ pub struct AppSettings {
     pub font_size: u32,
     pub discord_rpc_enabled: bool,
     pub estimate_coverage: bool,
+    /// Show Jiten.moe difficulty stats (length, unique words, difficulty).
+    pub jiten_enabled: bool,
 
     // ── Profile ──
     pub username: String,
@@ -72,6 +74,7 @@ impl Default for AppSettings {
             font_size: 32,
             discord_rpc_enabled: false,
             estimate_coverage: true,
+            jiten_enabled: true,
 
             username: "Reader".into(),
             profile_picture: String::new(),
