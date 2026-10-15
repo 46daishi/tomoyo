@@ -160,6 +160,7 @@ export const SETTINGS_SCHEMA = [
           },
           { key: 'underline_names', label: 'Underline custom names', type: 'checkbox' },
           { key: 'status_underline_width', label: 'Word status underline width', type: 'slider', min: 1, max: 4, step: 1, unit: 'px' },
+          { key: 'sentence_window_inverted', label: 'Invert sentence window colours', type: 'checkbox' },
       { key: 'history_enabled', label: 'Enable history', type: 'checkbox' },
       {
           key: 'history_span',

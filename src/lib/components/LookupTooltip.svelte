@@ -10,7 +10,7 @@
     import { formatPosTags } from '$lib/posLabels.js';
     import WordImageButton from '$lib/components/WordImageButton.svelte';
 
-    let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {}, onStatusChanged } = $props();
+    let { tooltipSpan, settings, tooltipX = null, tooltipY = null, tooltipMaxHeight = null, onMouseLeave, onMine, mineStatuses = {}, onStatusChanged, themeStyle = '' } = $props();
     
     let positionStyle = $derived(
         (tooltipX !== null && tooltipY !== null ? `left: ${tooltipX}px; top: ${tooltipY}px;` : '') +
@@ -125,7 +125,7 @@
 <div
     class="lookup-tooltip"
     class:static-position={tooltipX === null}
-    style={`${positionStyle} --status-underline-width: ${settings?.status_underline_width ?? 2}px;`}
+    style={`${positionStyle} --status-underline-width: ${settings?.status_underline_width ?? 2}px; ${themeStyle}`}
     transition:fly={{ y: 6, duration: 120 }}
     onclick={(event) => event.stopPropagation()}
     onwheel={(event) => event.stopPropagation()}

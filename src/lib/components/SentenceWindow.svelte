@@ -14,8 +14,24 @@
     import { getNames, findNameAt, scanNameSpans, nameToEntry } from '$lib/names';
 
     import { statusLevelColor, resolveStatusLevels } from '$lib/constants';
+    import { currentTheme, invertedThemeVars, themeVars } from '$lib/stores/themes.js';
 
     let { settings, miniMode, session, mediaId, mediaTag, onMined, wordStatusVersion = 0, onStatusChanged, onNameSaved } = $props();
+
+    // Opposite-family chrome for the whole window when the inversion
+    // setting is on; empty string otherwise (inherits :root). The
+    // lookup tooltip is explicitly excluded: it re-declares the current
+    // theme's variables so it always matches the rest of the app.
+    let invertedStyle = $derived(
+        settings?.sentence_window_inverted ? invertedThemeVars($currentTheme) : ''
+    );
+    // Tracks whether inversion actually applied (theme pair exists): the
+    // window background drops its black-ward mix in that case, so an
+    // inverted dark-mode window renders the full light surface.
+    let invertedActive = $derived(invertedStyle !== '');
+    let tooltipThemeStyle = $derived(
+        settings?.sentence_window_inverted ? themeVars($currentTheme) : ''
+    );
 
     let currentText = $state('');
     let historyEntries = $state([]);
@@ -760,7 +776,7 @@
     onkeyup={handleGlobalKeyup}
 />
 
-<div class="sentence-window" bind:this={sentenceWindowEl} onwheel={handleSentenceWheel}>
+<div class="sentence-window" bind:this={sentenceWindowEl} onwheel={handleSentenceWheel} style={invertedStyle} class:inverted={invertedActive}>
     {#if displayedChars.length > 0}
         <p
             class="sentence-text"
@@ -794,6 +810,7 @@
                 {tooltipY}
                 {tooltipMaxHeight}
                 {mineStatuses}
+                themeStyle={tooltipThemeStyle}
                 onMine={(entry, spelling) => handleMineWord(tooltipSpan, entry, spelling)}
                 {onStatusChanged}
                 onMouseLeave={(e) => {
@@ -874,6 +891,12 @@
         padding: 2rem 2.5rem;
         box-sizing: border-box;
         container-type: inline-size; /* enables cqw units below, scoped to this element's own width */
+    }
+
+    /* Inverted window renders the full surface instead of the black-ward
+       mix, so dark-mode inversion reads properly light. */
+    .sentence-window.inverted {
+        background: var(--theme-surface, #ffffff);
     }
     
 

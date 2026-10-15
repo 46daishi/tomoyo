@@ -36,6 +36,8 @@ pub struct AppSettings {
     pub underline_names: bool,
     /// Word status underline width in px (sentence chars + tooltip readings).
     pub status_underline_width: u32,
+    /// Paint the sentence window in the opposite theme family.
+    pub sentence_window_inverted: bool,
 
     // ── Input & History ──
     pub input_mode: String, // "clipboard" | "websocket"
@@ -97,6 +99,7 @@ impl Default for AppSettings {
             treat_new_as_unknown: false,
             underline_names: true,
             status_underline_width: 2,
+            sentence_window_inverted: false,
 
             input_mode: "clipboard".into(),
             websocket_address: "ws://127.0.0.1:6677".into(),

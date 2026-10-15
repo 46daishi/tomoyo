@@ -563,3 +563,47 @@ export function initializeTheme() {
   const themeKey = localStorage.getItem("tomoyo-theme") ?? "tomoyo";
   applyTheme(themeKey);
 }
+
+/**
+ * Paired-theme counterpart of a theme key: light themes strip `-light`,
+ * dark themes gain it. Noir (near-black) variants pair with the plain
+ * light theme (`tomoyo-noir` -> `tomoyo-light`). Null when the
+ * counterpart doesn't exist.
+ * @param {string|null|undefined} themeKey
+ * @returns {string|null}
+ */
+export function oppositeThemeKey(themeKey) {
+  if (!themeKey || typeof themeKey !== "string") return null;
+  let base = themeKey;
+  if (base.endsWith("-noir")) base = base.slice(0, -"-noir".length);
+  const flipped = base.endsWith("-light")
+    ? base.slice(0, -"-light".length)
+    : `${base}-light`;
+  return themes[flipped] ? flipped : null;
+}
+
+/**
+ * Inline CSS variables painting a subtree in the given theme family.
+ * Empty string when the key is unknown (caller renders normally).
+ * @param {string|null|undefined} themeKey
+ * @returns {string}
+ */
+export function themeVars(themeKey) {
+  const theme = themeKey ? themes[themeKey] : null;
+  if (!theme) return "";
+  return Object.entries(theme.colors)
+    .map(([k, v]) => `--theme-${k}: ${v};`)
+    .join(" ");
+}
+
+/**
+ * Inline CSS variables painting a subtree in the opposite theme family
+ * (sentence-window inversion): same main colours, flipped chrome.
+ * Empty string when no counterpart exists (caller renders normally).
+ * Root-level light/dark contrast overrides still follow the global mode.
+ * @param {string|null|undefined} themeKey
+ * @returns {string}
+ */
+export function invertedThemeVars(themeKey) {
+  return themeVars(oppositeThemeKey(themeKey));
+}
