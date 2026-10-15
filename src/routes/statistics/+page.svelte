@@ -468,6 +468,36 @@
                 </ul>
             </div>
 
+            <div class="panel">
+                <div class="panel-head" style="--icon-color: #a6e3a1">
+                    <span class="panel-icon">{@html ICONS.bolt}</span>
+                    <h2>Reading pace</h2>
+                </div>
+                <ul class="pace-list">
+                    <li>
+                        <span class="pace-icon" style="--icon-color: #a6e3a1">{@html ICONS.book_open}</span>
+                        <span class="pace-body">
+                            <span class="pace-name">Reading speed</span>
+                            <span class="pace-value">{stats.mojiPerHour.toFixed(0)} 文字 <small>/hr</small></span>
+                        </span>
+                    </li>
+                    <li>
+                        <span class="pace-icon" style="--icon-color: #89b4fa">{@html ICONS.translate}</span>
+                        <span class="pace-body">
+                            <span class="pace-name">Sentences</span>
+                            <span class="pace-value">{stats.sentencesPerHour.toFixed(1)} <small>/hr</small></span>
+                        </span>
+                    </li>
+                    <li>
+                        <span class="pace-icon" style="--icon-color: #cba6f7">{@html ICONS.book}</span>
+                        <span class="pace-body">
+                            <span class="pace-name">Avg sentence length</span>
+                            <span class="pace-value">{stats.avgSentenceLength.toFixed(1)} 文字 <small>/sentence</small></span>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
             {#if mediaInfo}
                 {@const info = mediaInfo}
                 <div class="panel cover-panel">
@@ -569,36 +599,6 @@
                     </ul>
                 </div>
             {/if}
-
-            <div class="panel">
-                <div class="panel-head" style="--icon-color: #a6e3a1">
-                    <span class="panel-icon">{@html ICONS.bolt}</span>
-                    <h2>Reading pace</h2>
-                </div>
-                <ul class="pace-list">
-                    <li>
-                        <span class="pace-icon" style="--icon-color: #a6e3a1">{@html ICONS.book_open}</span>
-                        <span class="pace-body">
-                            <span class="pace-name">Reading speed</span>
-                            <span class="pace-value">{stats.mojiPerHour.toFixed(0)} 文字 <small>/hr</small></span>
-                        </span>
-                    </li>
-                    <li>
-                        <span class="pace-icon" style="--icon-color: #89b4fa">{@html ICONS.translate}</span>
-                        <span class="pace-body">
-                            <span class="pace-name">Sentences</span>
-                            <span class="pace-value">{stats.sentencesPerHour.toFixed(1)} <small>/hr</small></span>
-                        </span>
-                    </li>
-                    <li>
-                        <span class="pace-icon" style="--icon-color: #cba6f7">{@html ICONS.book}</span>
-                        <span class="pace-body">
-                            <span class="pace-name">Avg sentence length</span>
-                            <span class="pace-value">{stats.avgSentenceLength.toFixed(1)} 文字 <small>/sentence</small></span>
-                        </span>
-                    </li>
-                </ul>
-            </div>
 
             <div class="panel">
                 <div class="panel-head" style="--icon-color: #89b4fa">

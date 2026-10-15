@@ -20,21 +20,30 @@ export async function getVocabularyCoverage(mediaId) {
     if (sentences.length === 0) return { gathering: true, percentage: null };
 
     const knownWordsMap = await getKnownWordsMap();
-    let totalWeight = 0;
-    let totalOccurrences = 0;
-
+    // Distinct words (types), not occurrences: token-weighted averages
+    // saturate near 90% once common words are all Known, no matter how
+    // difficult the remaining vocabulary is. Per-type scoring lets each
+    // rare word move the needle. Unknowns key by surface (no id); known
+    // words by dict id, so repeat occurrences never double-count.
+    // First occurrence wins — weights are deterministic per key.
+    const typeWeights = new Map();
     for (const { sentence_text } of sentences) {
         for (const span of await scanSentenceSpans(sentence_text)) {
             const knownId = (span.entryIds ?? []).find((id) => knownWordsMap.has(id));
+            const key = knownId !== undefined ? `id:${knownId}` : `surface:${span.surface}`;
+            if (typeWeights.has(key)) continue;
             const status = knownId !== undefined ? knownWordsMap.get(knownId) : undefined;
-            totalWeight += status !== undefined ? STATUS_WEIGHT[status] : 0;
-            totalOccurrences += 1;
+            typeWeights.set(key, status !== undefined ? STATUS_WEIGHT[status] : 0);
         }
     }
 
+    let totalWeight = 0;
+    for (const w of typeWeights.values()) totalWeight += w;
+    const distinctCount = typeWeights.size;
+
     return {
         gathering: false,
-        percentage: totalOccurrences > 0 ? Math.round((totalWeight / totalOccurrences) * 100) : null,
+        percentage: distinctCount > 0 ? Math.round((totalWeight / distinctCount) * 100) : null,
         sentenceCount: sentences.length,
     };
 }
