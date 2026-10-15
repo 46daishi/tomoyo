@@ -1116,14 +1116,8 @@
         cursor: help;
     }
 
-    /* Difficulty band text, mirroring Jiten's own per-band hues
-       (dark surfaces; light overrides live in app.css). */
-    .diff-band-0 { color: #4ade80; }
-    .diff-band-1 { color: #bbf7d0; }
-    .diff-band-2 { color: #67e8f9; }
-    .diff-band-3 { color: #fcd34d; }
-    .diff-band-4 { color: #fca5a5; }
-    .diff-band-5 { color: #ef4444; }
+    /* Difficulty band text lives in app.css (shared with cover hover
+       bars); light overrides live there too. */
 
     .vndb-row {
         display: flex;

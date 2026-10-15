@@ -64,6 +64,32 @@ export async function getMediaStats(mediaId) {
     return { ...session, words_mined: words.words_mined ?? 0 };
 }
 
+/**
+ * Reading time + characters for every media with sessions, in one query
+ * (cover hover bars). Keyed by media id.
+ * @returns {Promise<Record<number, { moji_read: number, reading_seconds: number, last_active: number|null }>>}
+ */
+export async function getAllMediaStats() {
+    const db = await getDb();
+    /** @type {Array<{ mediaId: number, moji_read: number, reading_seconds: number, last_active: number|null }>} */
+    const rows = await db.select(
+        `SELECT media_id AS mediaId,
+                COALESCE(SUM(moji_read), 0) AS moji_read,
+                COALESCE(SUM(
+                    CASE WHEN ended_at IS NOT NULL THEN ended_at - started_at ELSE 0 END
+                ), 0) AS reading_seconds,
+                MAX(COALESCE(ended_at, started_at)) AS last_active
+         FROM sessions
+         GROUP BY media_id`
+    );
+    return Object.fromEntries(
+        (rows ?? []).map((r) => [
+            r.mediaId,
+            { moji_read: r.moji_read ?? 0, reading_seconds: r.reading_seconds ?? 0, last_active: r.last_active ?? null },
+        ])
+    );
+}
+
 export async function logSentenceRead({ sessionId, mediaId, sentenceText }) {
     const db = await getDb();
     await db.execute(

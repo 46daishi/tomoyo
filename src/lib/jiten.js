@@ -3,6 +3,32 @@ import { getDb } from '$lib/db';
 
 const API = 'https://api.jiten.moe/api/media-deck';
 
+// Null until probed: whether the media table already carries the Jiten
+// cache columns (migration 0016, applied at app startup). Entries on a
+// pre-migration database simply have no Jiten connection — reads stay
+// silent instead of warning on every load.
+/** @type {boolean|null} */
+let jitenSchemaOk = null;
+
+/**
+ * @returns {Promise<boolean>}
+ */
+async function hasJitenColumns() {
+    if (jitenSchemaOk != null) return jitenSchemaOk;
+    try {
+        const db = await getDb();
+        /** @type {Array<{ name: string }>} */
+        const cols = await db.select('PRAGMA table_info(media)');
+        const names = new Set((cols ?? []).map((c) => c.name));
+        jitenSchemaOk = ['jiten_deck_id', 'jiten_char_count', 'jiten_difficulty', 'jiten_unique_words', 'jiten_fetched_at'].every(
+            (c) => names.has(c)
+        );
+    } catch {
+        jitenSchemaOk = false;
+    }
+    return jitenSchemaOk;
+}
+
 /**
  * @param {string} url
  * @returns {Promise<any|null>} parsed JSON, or null on any failure (offline,
@@ -117,6 +143,7 @@ export async function resolveDeckForMedia({ vndbId, title }) {
  * @returns {Promise<{ deckId: number, characterCount: number|null, difficulty: number|null, uniqueWords: number|null }|null>}
  */
 export async function getCachedJitenStats(mediaId) {
+    if (!(await hasJitenColumns())) return null;
     const db = await getDb();
     const rows = await db.select(
         'SELECT jiten_deck_id AS deckId, jiten_char_count AS characterCount, jiten_difficulty AS difficulty, jiten_unique_words AS uniqueWords FROM media WHERE id = $1',
@@ -137,10 +164,30 @@ export async function getCachedJitenStats(mediaId) {
  * @param {{ deckId: number, characterCount: number|null, difficulty: number|null, uniqueWords: number|null }} stats
  */
 export async function saveJitenStats(mediaId, stats) {
+    if (!(await hasJitenColumns())) return;
     const db = await getDb();
     await db.execute(
         'UPDATE media SET jiten_deck_id = $1, jiten_char_count = $2, jiten_difficulty = $3, jiten_unique_words = $4, jiten_fetched_at = unixepoch() WHERE id = $5',
         [stats.deckId, stats.characterCount, stats.difficulty, stats.uniqueWords, mediaId]
+    );
+}
+
+/**
+ * All cached deck stats in one query (cover hover bars), keyed by media id.
+ * Cache only — the home grid never triggers network fetches.
+ * @returns {Promise<Record<number, { deckId: number, characterCount: number|null, difficulty: number|null }>>}
+ */
+export async function getAllCachedJitenStats() {
+    if (!(await hasJitenColumns())) return {};
+    const db = await getDb();
+    /** @type {Array<{ id: number, deckId: number, characterCount: number|null, difficulty: number|null }>} */
+    const rows = await db.select(
+        'SELECT id, jiten_deck_id AS deckId, jiten_char_count AS characterCount, jiten_difficulty AS difficulty FROM media WHERE jiten_deck_id IS NOT NULL'
+    );
+    return Object.fromEntries(
+        (rows ?? [])
+            .filter((r) => Number.isInteger(r.deckId))
+            .map((r) => [r.id, { deckId: r.deckId, characterCount: r.characterCount ?? null, difficulty: r.difficulty ?? null }])
     );
 }
 

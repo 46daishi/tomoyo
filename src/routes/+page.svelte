@@ -5,9 +5,11 @@
     import MediaFormModal from '$lib/components/MediaFormModal.svelte';
     import AboutModal from '$lib/components/AboutModal.svelte';
     import { ICONS } from "$lib/icons.js";
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import { goto } from '$app/navigation';
     import { getDb } from '$lib/db';
+    import { getAllMediaStats } from '$lib/sessions.js';
+    import { getAllCachedJitenStats, loadJitenStats, difficultyLabel, difficultyBand } from '$lib/jiten.js';
     import AppImage from '$lib/components/AppImage.svelte';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_COLORS, FILTER_OPTIONS, STATUS_OPTIONS } from '$lib/constants.js';
@@ -16,6 +18,10 @@
 
     let mediaList = $state([]);
     let statusFilter = $state('all');
+    // Per-media stats for the cover hover bars (sessions aggregates +
+    // cached Jiten difficulty), keyed by media id. Loaded once, never
+    // per hover; Jiten stays cache-only here (no network from the grid).
+    let coverStats = $state(/** @type {Record<number, any>} */ ({}));
     let showModal = $state(false);
     let editingMedia = $state(null);
     let settings = $state(/** @type {Record<string, any> | null} */ (null));
@@ -26,6 +32,59 @@
     async function loadMedia() {
         const db = await getDb();
         mediaList = await db.select('SELECT * FROM media ORDER BY updated_at DESC');
+    }
+
+    async function loadCoverStats() {
+        // Sessions and Jiten resolve independently: either source failing
+        // (e.g. cache columns missing before a restart picks up the
+        // migration) must never hide the other.
+        const [sessions, jiten] = await Promise.all([
+            getAllMediaStats().catch((/** @type {unknown} */ err) => {
+                console.warn('Cover session stats unavailable:', err);
+                return /** @type {Record<number, { moji_read: number, reading_seconds: number, last_active: number|null }>} */ ({});
+            }),
+            getAllCachedJitenStats().catch((/** @type {unknown} */ err) => {
+                console.warn('Cover Jiten stats unavailable:', err);
+                return /** @type {Record<number, { deckId: number, characterCount: number|null, difficulty: number|null }>} */ ({});
+            }),
+        ]);
+        const merged = /** @type {Record<number, any>} */ ({});
+            for (const m of mediaList) {
+                const s = sessions[m.id];
+                const j = jiten[m.id];
+                // Always present (even all-zero) so the time/characters
+                // bars render for fresh media too; only difficulty stays
+                // conditional on cached Jiten data.
+                merged[m.id] = {
+                    moji_read: s?.moji_read ?? 0,
+                    reading_seconds: s?.reading_seconds ?? 0,
+                    last_active: s?.last_active ?? null,
+                    difficulty: j?.difficulty ?? null,
+                };
+        }
+        coverStats = merged;
+    }
+
+    /** @param {number} totalSeconds */
+    function formatBarsDuration(totalSeconds) {
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        if (h > 0) return `${h}h ${m}m`;
+        return `${m}m`;
+    }
+
+    /** @param {number|null|undefined} unixSeconds */
+    function formatLastActive(unixSeconds) {
+        if (!unixSeconds) return '—';
+        const diff = Date.now() / 1000 - unixSeconds;
+        if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
+        return new Date(unixSeconds * 1000).toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
     }
 
     let filtered = $derived.by(() => {
@@ -84,9 +143,49 @@
     async function onMountHome() {
         settings = await loadSettings();
         await loadMedia();
+        await loadCoverStats();
+        // Resolve uncached media in the background (sequential, one at a
+        // time): the grid never waits for the network, and each resolved
+        // deck is cached, so repeat visits cost nothing.
+        backfillJitenCache();
     }
 
     onMount(onMountHome);
+
+    let coverBackfillCancelled = false;
+    onDestroy(() => {
+        coverBackfillCancelled = true;
+    });
+
+    async function backfillJitenCache() {
+        if (!settings?.jiten_enabled) return;
+        const attempted = new Set();
+        for (const m of mediaList) {
+            if (coverBackfillCancelled) return;
+            if (attempted.has(m.id)) continue;
+            attempted.add(m.id);
+            if (coverStats[m.id]?.difficulty != null) continue;
+            try {
+                const stats = await loadJitenStats(m.id, {
+                    vndbId: m.vndb_id ?? null,
+                    title: m.title ?? '',
+                });
+                if (coverBackfillCancelled) return;
+                if (!stats) continue;
+                coverStats = {
+                    ...coverStats,
+                    [m.id]: {
+                        moji_read: coverStats[m.id]?.moji_read ?? 0,
+                        reading_seconds: coverStats[m.id]?.reading_seconds ?? 0,
+                        last_active: coverStats[m.id]?.last_active ?? null,
+                        difficulty: stats.difficulty,
+                    },
+                };
+            } catch (err) {
+                console.warn(`Jiten backfill failed for media ${m.id}:`, err);
+            }
+        }
+    }
 </script>
 
 <main class="page home">
@@ -106,6 +205,7 @@
 
     <div class="grid">
         {#each filtered as media (media.id)}
+            {@const barStats = coverStats[media.id] ?? null}
             <div
                 class="card"
                 style="--accent: {media.color}"
@@ -136,6 +236,29 @@
                             onAction={() => handleDelete(media)}
                         />
                     </div>
+                    {#if barStats}
+                        {@const showBarDifficulty = settings?.jiten_enabled && barStats.difficulty != null}
+                        <div class="cover-meta" aria-hidden="true">
+                            <div class="cover-meta-row">
+                                <span class="cover-meta-left"><span class="cover-meta-icon">{@html ICONS.book}</span><span class="cover-meta-value">{formatLastActive(barStats.last_active)}</span></span>
+                            </div>
+                            <div class="cover-meta-row">
+                                <span class="cover-meta-left"><span class="cover-meta-icon">{@html ICONS.clock}</span><span class="cover-meta-value">{formatBarsDuration(barStats.reading_seconds)}</span></span>
+                            </div>
+                            <div class="cover-meta-row">
+                                <span class="cover-meta-left"><span class="cover-meta-icon">{@html ICONS.translate}</span><span class="cover-meta-value">{barStats.moji_read.toLocaleString()} 文字</span></span>
+                            </div>
+                            {#if showBarDifficulty}
+                                {@const barBand = difficultyBand(barStats.difficulty)}
+                                <div class="cover-meta-row">
+                                    <span class="cover-meta-left"><span class="cover-meta-icon">{@html ICONS.star}</span><span
+                                        class="cover-meta-value {barBand != null ? `diff-band-${barBand}` : ''}"
+                                        title={`${barStats.difficulty.toFixed(1)}/5 on jiten.moe`}
+                                    >{difficultyLabel(barStats.difficulty)}</span></span>
+                                </div>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
 
                 <div class="title">{media.title}</div>
@@ -254,6 +377,9 @@
         background: var(--surface1, #313244);
         border: 2px solid transparent;
         transition: border-color 0.15s ease, transform 0.15s ease;
+        /* Container for cover-relative units below: inline-size is
+           parent-driven here, so this changes no layout. */
+        container-type: inline-size;
     }
 
     .cover :global(img),
@@ -290,15 +416,96 @@
         top: 8px;
         right: 8px;
         display: flex;
-        gap: 0.4rem;
+        gap: 0.4em;
         opacity: 0;
         transition: opacity 0.4s ease;
         z-index: 2;
+        /* Overlay buttons scale with the cover: mini buttons size in em,
+           so driving the row font in cover-width units keeps them
+           proportional (bounded so tiny covers stay tappable and huge
+           covers don't grow clown buttons). */
+        font-size: 1rem;
+        font-size: clamp(0.85rem, 10cqw, 1.15rem);
     }
 
     .card:hover .cover-actions,
     .card:focus-visible .cover-actions {
         opacity: 1;
+    }
+
+    /* Hover stat bars pinned to the cover bottom: alternating black
+       translucency, icon + field left, value right. Display-only
+       (pointer-events none) so card clicks pass through; only the
+       difficulty value re-enables pointer for its hover tooltip. */
+    .cover-meta {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+        pointer-events: none;
+    }
+
+    .card:hover .cover-meta,
+    .card:focus-visible .cover-meta {
+        opacity: 1;
+    }
+
+    .cover-meta-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.28rem 0.6rem;
+        color: #f5f5f5;
+        font-size: 0.72rem;
+        line-height: 1.3;
+    }
+
+    .cover-meta-row:nth-child(odd) {
+        background: rgba(0, 0, 0, 0.65);
+    }
+
+    .cover-meta-row:nth-child(even) {
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .cover-meta-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .cover-meta-icon {
+        display: inline-flex;
+        flex-shrink: 0;
+        font-family: "Symbols Nerd Font";
+        font-size: 0.75rem;
+        opacity: 0.85;
+    }
+
+    .cover-meta-icon :global(svg) {
+        width: 0.75rem;
+        height: 0.75rem;
+    }
+
+    .cover-meta-value {
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .cover-meta-value[title] {
+        pointer-events: auto;
+        cursor: help;
+        text-decoration: underline dotted;
+        text-underline-offset: 3px;
     }
 
     .cover :global(img) {
