@@ -791,7 +791,8 @@ html[data-theme-mode="light"] .mb-cover-placeholder {
 html[data-theme-mode="light"] .action-button.primary,
 html[data-theme-mode="light"] .modal-btn.primary,
 html[data-theme-mode="light"] .settings-tab.active,
-html[data-theme-mode="light"] .review-kind-toggle button.active {
+html[data-theme-mode="light"] .review-kind-toggle button.active,
+html[data-theme-mode="light"] .category-pill.active {
     color: var(--theme-text);
 }
 

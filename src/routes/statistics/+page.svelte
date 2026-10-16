@@ -88,12 +88,14 @@
             return;
         }
         const db = await getDb();
-        const rows = await db.select('SELECT id, title, color, cover_path, status, tag, vndb_id, jiten_excluded, created_at FROM media WHERE id = $1', [mediaFilter]);
+        const rows = await db.select('SELECT id, title, color, cover_path, status, tag, vndb_id, media_type, jiten_excluded, created_at FROM media WHERE id = $1', [mediaFilter]);
         if (latestInfo.get() === my) mediaInfo = rows[0] ?? null;
     }
 
     async function loadVnInfo() {
-        const id = mediaInfo?.vndb_id;
+        // VNDB only applies to visual novels (stale ids on re-typed
+        // entries are ignored, never deleted).
+        const id = (mediaInfo?.media_type ?? 'visual_novel') === 'visual_novel' ? mediaInfo?.vndb_id : null;
         const my = ++vnInfoRequestId;
         if (!id) {
             vnInfo = null;
@@ -125,7 +127,7 @@
         }
         try {
             const stats = await loadJitenStats(mediaInfo.id, {
-                vndbId: mediaInfo.vndb_id ?? null,
+                vndbId: (mediaInfo.media_type ?? 'visual_novel') === 'visual_novel' ? (mediaInfo.vndb_id ?? null) : null,
                 title: mediaInfo.title ?? '',
             });
             finish(stats);
@@ -523,11 +525,12 @@
                     </div>
                     <div class="cover-title">{mediaInfo.title}</div>
                     {#if info.vndb_id || jitenInfo}
+                        {@const showVndbId = (info.media_type ?? 'visual_novel') === 'visual_novel' && info.vndb_id}
                         <div class="vndb-row">
-                            {#if info.vndb_id}
+                            {#if showVndbId}
                                 <button class="vndb-link" onclick={() => openVndb(info.vndb_id)}>v{info.vndb_id.replace(/^v/i, '')}</button>
                             {/if}
-                            {#if info.vndb_id && jitenInfo}
+                            {#if showVndbId && jitenInfo}
                                 <span class="link-sep" aria-hidden="true">·</span>
                             {/if}
                             {#if jitenInfo}
@@ -566,7 +569,7 @@
                             <span class="meta-label">Tag</span>
                             <span class="meta-value" style="color: {mediaInfo.color || '#fab387'}">{mediaInfo.tag || '—'}</span>
                         </li>
-                        {#if info.vndb_id}
+                        {#if info.vndb_id && (info.media_type ?? 'visual_novel') === 'visual_novel'}
                             <li>
                                 <span class="meta-icon" style="color: {info.color || '#fab387'}">{@html ICONS.clock}</span>
                                 <span class="meta-label">Avg length</span>

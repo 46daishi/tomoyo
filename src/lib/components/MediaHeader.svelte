@@ -35,7 +35,7 @@
                 <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
                 {media.status}
             </span>
-            {#if media.vndb_id}
+            {#if media.vndb_id && (media.media_type ?? 'visual_novel') === 'visual_novel'}
                 <button class="vndb-link" onclick={() => openVndb(media.vndb_id)} title="Open on VNDB">v{media.vndb_id.replace(/^v/i, '')}</button>
             {/if}
         </div>

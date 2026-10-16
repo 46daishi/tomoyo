@@ -2,7 +2,7 @@
     import { getDb, pickCoverImage } from '$lib/db';
     import AppImage from '$lib/components/AppImage.svelte';
     import SelectInput from '$lib/components/SelectInput.svelte';
-    import { STATUS_OPTIONS } from '$lib/constants.js';
+    import { STATUS_OPTIONS, MEDIA_TYPE_OPTIONS } from '$lib/constants.js';
     import { searchVn, getVn, downloadCover, findExactVn, parseVndbId, preferredTitle } from '$lib/vndb.js';
     import { getCachedSettings } from '$lib/settings.js';
 
@@ -12,6 +12,7 @@
     let tag = $state('');
     let status = $state('active');
     let color = $state('#89b4fa');
+    let mediaType = $state('visual_novel');
     let coverPath = $state(/** @type {string | null} */ (null));
     let vndbId = $state('');
     let excludeJiten = $state(false);
@@ -31,6 +32,7 @@
                 tag = media.tag ?? '';
                 status = media.status;
                 color = media.color;
+                mediaType = media.media_type ?? 'visual_novel';
                 coverPath = media.cover_path;
                 vndbId = media.vndb_id ?? '';
                 excludeJiten = (media.jiten_excluded ?? 0) !== 0;
@@ -39,6 +41,7 @@
                 tag = '';
                 status = 'active';
                 color = '#89b4fa';
+                mediaType = 'visual_novel';
                 coverPath = null;
                 vndbId = '';
                 excludeJiten = false;
@@ -114,8 +117,8 @@
                 }
 
                 await db.execute(
-                'UPDATE media SET title = $1, tag = $2, status = $3, color = $4, cover_path = $5, vndb_id = $6, jiten_excluded = $7, updated_at = unixepoch() WHERE id = $8',
-                [title.trim(), tag || null, status, color, finalCover, finalId, excludeJiten ? 1 : 0, media.id]
+                'UPDATE media SET title = $1, tag = $2, status = $3, color = $4, cover_path = $5, vndb_id = $6, jiten_excluded = $7, media_type = $8, updated_at = unixepoch() WHERE id = $9',
+                [title.trim(), tag || null, status, color, finalCover, finalId, excludeJiten ? 1 : 0, mediaType, media.id]
                 );
                 show = false;
                 onSaved();
@@ -159,12 +162,13 @@
                     error = 'Enter a title';
                     return;
                 }
-                finalId = await detectVndbId(finalTitle);
+                // VNDB auto-detect only makes sense for visual novels.
+                finalId = mediaType === 'visual_novel' ? await detectVndbId(finalTitle) : null;
             }
 
             await db.execute(
-                'INSERT INTO media (title, tag, status, color, cover_path, vndb_id, jiten_excluded) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [finalTitle.trim(), tag || null, status, color, finalCover, finalId, excludeJiten ? 1 : 0]
+                'INSERT INTO media (title, tag, status, color, cover_path, vndb_id, jiten_excluded, media_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                [finalTitle.trim(), tag || null, status, color, finalCover, finalId, excludeJiten ? 1 : 0, activeTab === 'vndb' ? 'visual_novel' : mediaType]
             );
             show = false;
             onSaved();
@@ -185,11 +189,13 @@
             {#if !media}
                 <div class="modal-tabs">
                     <button class="tab-btn" class:active={activeTab === 'manual'} onclick={() => (activeTab = 'manual')}>Manual</button>
-                    <button class="tab-btn" class:active={activeTab === 'vndb'} onclick={() => (activeTab = 'vndb')}>VNDB</button>
+                    {#if mediaType === 'visual_novel'}
+                        <button class="tab-btn" class:active={activeTab === 'vndb'} onclick={() => (activeTab = 'vndb')}>VNDB</button>
+                    {/if}
                 </div>
             {/if}
 
-            {#if !media && activeTab === 'vndb'}
+            {#if !media && activeTab === 'vndb' && mediaType === 'visual_novel'}
                 <div class="modal-body">
                     <div class="form-fields">
                         <input class="modal-input" placeholder="VNDB ID or name" bind:value={vndbId} />
@@ -222,6 +228,7 @@
                     </button>
 
                     <div class="form-fields">
+                        <SelectInput options={MEDIA_TYPE_OPTIONS} value={mediaType} on:change={(/** @type {Event} */ e) => (mediaType = /** @type {HTMLSelectElement} */ (e.target).value)} />
                         <input class="modal-input" placeholder="Title" bind:value={title} />
 
                         <div class="tag-color-row">
@@ -232,7 +239,7 @@
                             <input class="color-input" type="color" bind:value={color} title="Tag / card color" />
                         </div>
 
-                        {#if media}
+                        {#if media && mediaType === 'visual_novel'}
                             <input class="modal-input" placeholder="VNDB ID (e.g. 17 or v17)" bind:value={vndbId} />
                         {/if}
 

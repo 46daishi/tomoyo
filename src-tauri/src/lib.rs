@@ -132,6 +132,12 @@ pub fn run() {
             sql: include_str!("../migrations/0017_jiten_excluded.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 18,
+            description: "media_type",
+            sql: include_str!("../migrations/0018_media_type.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

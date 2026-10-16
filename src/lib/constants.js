@@ -17,6 +17,14 @@ export const FILTER_OPTIONS = [
 
 export const STATUS_OPTIONS = FILTER_OPTIONS.filter((o) => o.value !== 'all');
 
+export const MEDIA_TYPE_OPTIONS = [
+    { value: 'visual_novel', label: 'Visual Novel' },
+    { value: 'game', label: 'Game' },
+    { value: 'light_novel', label: 'Light Novel' },
+    { value: 'book', label: 'Book' },
+    { value: 'other', label: 'Other' },
+];
+
 export const STATUS_LEVELS = [
     { label: 'New', color: '#6c7086' },
     { label: 'Recognized', color: '#89b4fa' },

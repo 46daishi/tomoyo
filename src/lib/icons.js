@@ -52,8 +52,13 @@ export const ICONS = {
   twitter: "\uf099",
   bolt: "\uf0e7",
   grid: "\udb81\udd70",
+  gamepad: "\uf11b",
+  ellipsis: "\uf141",
+  lines: "\uf039",
   list: "\uf03a",
   card: "\udb85\udff1",
   hiragana: "\udb84\udf34",
   history: "\uf1da",
+  text: "\udb82\udda8",
+  heart: "\u2665",
 };

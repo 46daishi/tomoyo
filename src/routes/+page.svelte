@@ -1,5 +1,6 @@
 <script>
     import ActionButton from "$lib/components/ActionButton.svelte";
+    import CategoryBar from "$lib/components/CategoryBar.svelte";
     import SelectInput from "$lib/components/SelectInput.svelte";
     import SideNav from "$lib/components/SideNav.svelte";
     import MediaFormModal from '$lib/components/MediaFormModal.svelte';
@@ -28,6 +29,19 @@
     let showAbout = $state(false);
 
     const STATUS_ORDER = Object.fromEntries(STATUS_OPTIONS.map((o, i) => [o.value, i]));
+
+    const CATEGORIES = [
+        { value: 'all', label: 'All', icon: ICONS.grid },
+        { value: 'visual_novel', label: 'Visual Novel', abr: "VN", icon: ICONS.heart },
+        { value: 'game', label: 'Game', icon: ICONS.gamepad },
+        { value: 'light_novel', label: 'Light Novel', abr: "LN", icon: ICONS.book_open },
+        { value: 'book', label: 'Book', icon: ICONS.book },
+        { value: 'other', label: 'Other', icon: ICONS.text },
+    ];
+
+    const CATEGORY_BY_VALUE = Object.fromEntries(CATEGORIES.map((c) => [c.value, c]));
+
+    let categoryFilter = $state('all');
 
     async function loadMedia() {
         const db = await getDb();
@@ -88,9 +102,11 @@
     }
 
     let filtered = $derived.by(() => {
-        const list = statusFilter === 'all'
-            ? [...mediaList]
-            : mediaList.filter((m) => m.status === statusFilter);
+        const list = mediaList.filter(
+            (m) =>
+                (statusFilter === 'all' || m.status === statusFilter) &&
+                (categoryFilter === 'all' || (m.media_type ?? 'visual_novel') === categoryFilter)
+        );
 
         return list.sort((a, b) => {
             const rankDiff = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0);
@@ -168,7 +184,7 @@
             if (coverStats[m.id]?.difficulty != null) continue;
             try {
                 const stats = await loadJitenStats(m.id, {
-                    vndbId: m.vndb_id ?? null,
+                    vndbId: (m.media_type ?? 'visual_novel') === 'visual_novel' ? (m.vndb_id ?? null) : null,
                     title: m.title ?? '',
                 });
                 if (coverBackfillCancelled) return;
@@ -204,9 +220,14 @@
         />
     </div>
 
+    <div class="category-row">
+        <CategoryBar items={CATEGORIES} active={categoryFilter} onSelect={(v) => (categoryFilter = v)} />
+    </div>
+
     <div class="grid">
         {#each filtered as media (media.id)}
             {@const barStats = coverStats[media.id] ?? null}
+            {@const badgeType = CATEGORY_BY_VALUE[media.media_type ?? 'visual_novel'] ?? CATEGORY_BY_VALUE.other}
             <div
                 class="card"
                 style="--accent: {media.color}"
@@ -222,6 +243,11 @@
                         <div class="cover-placeholder"></div>
                     {/if}
                     <div class="cover-shade" aria-hidden="true"></div>
+                    {#if categoryFilter === 'all'}
+                        <div class="cover-type-badge" aria-hidden="true">
+                            <span class="cover-type-icon">{@html badgeType.icon}</span>
+                        </div>
+                    {/if}
 
                     <div class="cover-actions" onclick={(e) => e.stopPropagation()}>
                         <ActionButton
@@ -240,6 +266,12 @@
                     {#if barStats}
                         {@const showBarDifficulty = settings?.jiten_enabled && !media.jiten_excluded && barStats.difficulty != null}
                         <div class="cover-meta" aria-hidden="true">
+                            {#if categoryFilter === 'all'}
+                                {@const barType = CATEGORY_BY_VALUE[media.media_type ?? 'visual_novel'] ?? CATEGORY_BY_VALUE.other}
+                                <div class="cover-meta-row">
+                                    <span class="cover-meta-left"><span class="cover-meta-icon">{@html barType.icon}</span><span class="cover-meta-value">{barType.label}</span></span>
+                                </div>
+                            {/if}
                             <div class="cover-meta-row">
                                 <span class="cover-meta-left"><span class="cover-meta-icon">{@html ICONS.book}</span><span class="cover-meta-value">{formatLastActive(barStats.last_active)}</span></span>
                             </div>
@@ -343,6 +375,13 @@
         gap: 10px;
     }
 
+    .category-row {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        max-width: 1100px;
+    }
+
     .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -432,6 +471,38 @@
     .card:hover .cover-actions,
     .card:focus-visible .cover-actions {
         opacity: 1;
+    }
+
+    /* Persistent type badge (All tab only): transparent black square in
+       the cover's bottom-left corner. Fades out on hover, when the stat
+       bars (including the type row) take over the same space. */
+    .cover-type-badge {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        background: rgba(0, 0, 0, 0.55);
+        border-top-right-radius: 6px;
+        color: #f5f5f5;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+    }
+
+    .card:hover .cover-type-badge,
+    .card:focus-visible .cover-type-badge {
+        opacity: 0;
+    }
+
+    .cover-type-icon {
+        display: inline-flex;
+        font-family: "Symbols Nerd Font";
+        font-size: 0.9rem;
+        line-height: 1;
     }
 
     /* Hover stat bars pinned to the cover bottom: alternating black
