@@ -14,6 +14,7 @@
     import AppImage from '$lib/components/AppImage.svelte';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { STATUS_COLORS, FILTER_OPTIONS, STATUS_OPTIONS } from '$lib/constants.js';
+    import { MEDIA_TYPES } from '$lib/mediaTypes.js';
     import { clearDictionaryData } from "$lib/dictionary";
     import { loadSettings } from '$lib/settings.js';
 
@@ -30,13 +31,11 @@
 
     const STATUS_ORDER = Object.fromEntries(STATUS_OPTIONS.map((o, i) => [o.value, i]));
 
+    // Home category pills: "All" plus the shared media-type registry
+    // (mediaTypes.js), so labels/icons never drift from the modal.
     const CATEGORIES = [
         { value: 'all', label: 'All', icon: ICONS.grid },
-        { value: 'visual_novel', label: 'Visual Novel', abr: "VN", icon: ICONS.heart },
-        { value: 'game', label: 'Game', icon: ICONS.gamepad },
-        { value: 'light_novel', label: 'Light Novel', abr: "LN", icon: ICONS.book_open },
-        { value: 'book', label: 'Book', icon: ICONS.book },
-        { value: 'other', label: 'Other', icon: ICONS.text },
+        ...MEDIA_TYPES,
     ];
 
     const CATEGORY_BY_VALUE = Object.fromEntries(CATEGORIES.map((c) => [c.value, c]));
@@ -206,22 +205,24 @@
 </script>
 
 <main class="page home">
-    <div class="toolbar">
-        <SelectInput
-            options={FILTER_OPTIONS}
-            value={statusFilter}
-            on:change={(e) => (statusFilter = e.target.value)}
-        />
-        <ActionButton
-            icon={ICONS.plus}
-            variant="primary"
-            size="tiny"
-            onAction={openAddModal}
-        />
-    </div>
+    <div class="controls-row">
+        <div class="category-row">
+            <CategoryBar items={CATEGORIES} active={categoryFilter} onSelect={(v) => (categoryFilter = v)} />
+        </div>
 
-    <div class="category-row">
-        <CategoryBar items={CATEGORIES} active={categoryFilter} onSelect={(v) => (categoryFilter = v)} />
+        <div class="toolbar">
+            <SelectInput
+                options={FILTER_OPTIONS}
+                value={statusFilter}
+                on:change={(e) => (statusFilter = e.target.value)}
+            />
+            <ActionButton
+                icon={ICONS.plus}
+                variant="primary"
+                size="tiny"
+                onAction={openAddModal}
+            />
+        </div>
     </div>
 
     <div class="grid">
@@ -370,16 +371,27 @@
         overflow-y: auto;
     }
 
+    /* Category bar + status filter/plus share one centered row: the whole
+       group stays together, the bar shrinks and scrolls when space runs out. */
+    .controls-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 1100px;
+    }
+
     .toolbar {
         display: flex;
+        flex-shrink: 0;
         gap: 10px;
     }
 
     .category-row {
         display: flex;
         justify-content: center;
-        width: 100%;
-        max-width: 1100px;
+        min-width: 0;
     }
 
     .grid {

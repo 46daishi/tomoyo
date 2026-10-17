@@ -1,3 +1,5 @@
+import { MEDIA_TYPES } from './mediaTypes.js';
+
 export const STATUS_COLORS = {
     active: '#a6e3a1',
     planned: '#89b4fa',
@@ -5,6 +7,16 @@ export const STATUS_COLORS = {
     dropped: '#f38ba8',
     completed: '#cba6f7'
 };
+
+/**
+ * Resolve a status colour by value, with a safe fallback so callers can
+ * index the map with a plain string without tripping type checks.
+ * @param {string} value
+ * @returns {string}
+ */
+export function statusColor(value) {
+    return /** @type {Record<string, string>} */ (STATUS_COLORS)[value] ?? '#89b4fa';
+}
 
 export const FILTER_OPTIONS = [
         { value: 'all', label: 'All' },
@@ -17,13 +29,9 @@ export const FILTER_OPTIONS = [
 
 export const STATUS_OPTIONS = FILTER_OPTIONS.filter((o) => o.value !== 'all');
 
-export const MEDIA_TYPE_OPTIONS = [
-    { value: 'visual_novel', label: 'Visual Novel' },
-    { value: 'game', label: 'Game' },
-    { value: 'light_novel', label: 'Light Novel' },
-    { value: 'book', label: 'Book' },
-    { value: 'other', label: 'Other' },
-];
+// Derived from the media-type registry so labels stay in sync (see
+// mediaTypes.js, the single source of truth).
+export const MEDIA_TYPE_OPTIONS = MEDIA_TYPES.map(({ value, label }) => ({ value, label }));
 
 export const STATUS_LEVELS = [
     { label: 'New', color: '#6c7086' },

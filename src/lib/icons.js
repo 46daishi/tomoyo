@@ -61,4 +61,5 @@ export const ICONS = {
   history: "\uf1da",
   text: "\udb82\udda8",
   heart: "\u2665",
+  close: "\uf00d",
 };

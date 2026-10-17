@@ -754,7 +754,7 @@ html[data-theme-mode="light"] .panel,
 html[data-theme-mode="light"] .session-words-section,
 html[data-theme-mode="light"] .mined-word-card,
 html[data-theme-mode="light"] .session-card,
-html[data-theme-mode="light"] .modal-tabs,
+html[data-theme-mode="light"] .type-grid,
 html[data-theme-mode="light"] .pager,
 html[data-theme-mode="light"] .pager-btn {
     background: var(--theme-surface);
@@ -792,6 +792,7 @@ html[data-theme-mode="light"] .action-button.primary,
 html[data-theme-mode="light"] .modal-btn.primary,
 html[data-theme-mode="light"] .settings-tab.active,
 html[data-theme-mode="light"] .review-kind-toggle button.active,
+html[data-theme-mode="light"] .type-tile.active,
 html[data-theme-mode="light"] .category-pill.active {
     color: var(--theme-text);
 }
