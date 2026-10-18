@@ -153,6 +153,7 @@
             class:editing
             class:empty={!draft.trim()}
             contenteditable="plaintext-only"
+            spellcheck="false"
             role="textbox"
             aria-multiline="true"
             aria-label="Synopsis"
