@@ -51,6 +51,20 @@ export async function getVn(id) {
 }
 
 /**
+ * Fetch a VN's synopsis (`description`) on its own — kept out of VN_FIELDS
+ * so searches and stat lookups don't pull the (large) text.
+ * @param {string} id
+ * @returns {Promise<string | null>}
+ */
+export async function getVnDescription(id) {
+    const data = await postVn({
+        filters: ['id', '=', id],
+        fields: 'id, description',
+    });
+    return (data.results ?? [])[0]?.description ?? null;
+}
+
+/**
  * Download a VNDB cover image into the app's covers directory.
  * @param {string} imageUrl
  * @returns {Promise<string | null>} stored path (to save in media.cover_path), or null

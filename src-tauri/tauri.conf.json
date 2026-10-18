@@ -13,8 +13,9 @@
       "windows": [
           {
               "label": "main",
-              "title": "tomoyo",
-              "transparent": true
+          "title": "tomoyo",
+          "transparent": true,
+          "minWidth": 480
           }
       ],
       "security": {

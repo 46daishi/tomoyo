@@ -189,6 +189,14 @@
     <main class="page home" style={`--page-glow: ${glowColor}; --page-glow-soft: color-mix(in srgb, ${glowColor} 30%, transparent)`}>
         {#if media}
             <MediaHeader {media}>
+                {#snippet titleActions()}
+                    <ActionButton
+                        icon={ICONS.edit}
+                        variant="primary"
+                        size="mini"
+                        onAction={() => (showEditModal = true)}
+                    />
+                {/snippet}
                 <MediaStats {mediaId} {media} refreshKey={session.running} {settings}/>
             </MediaHeader>
         {/if}
@@ -352,12 +360,6 @@
     variant="secondary"
     size="small"
     onAction={() => goto('/settings')}
-  />
-  <ActionButton 
-    icon={ICONS.edit} 
-    variant="secondary" 
-    size="small" 
-    onAction={() => (showEditModal = true)} 
   />
   <ActionButton
     icon={session.running ? ICONS.pause : ICONS.play}

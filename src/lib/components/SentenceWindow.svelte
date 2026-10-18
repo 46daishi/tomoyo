@@ -889,6 +889,11 @@
         width: 100%;
         max-width: 900px;
         min-height: 200px;
+        /* The media page is a flex column capped at 100vh; without this the
+           window shrinks below its text and the sentence spills out of the
+           box when the app window is resized down. Keep natural height and
+           let the page scroll instead. */
+        flex-shrink: 0;
         margin-top: 2rem;
         background: color-mix(in srgb, var(--theme-surface, #2d2d2d) 70%, #000);
         border: 1px solid var(--theme-border, #404040);

@@ -138,6 +138,12 @@ pub fn run() {
             sql: include_str!("../migrations/0018_media_type.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 19,
+            description: "synopsis",
+            sql: include_str!("../migrations/0019_synopsis.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

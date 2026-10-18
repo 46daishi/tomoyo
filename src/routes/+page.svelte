@@ -296,8 +296,8 @@
                 </div>
 
                 <div class="title">{media.title}</div>
-                <div class="status">
-                    <span class="status-dot" style="--dot-color: {STATUS_COLORS[media.status]}"></span>
+                <div class="status" style="--dot-color: {STATUS_COLORS[media.status]}">
+                    <span class="status-dot"></span>
                     {media.status}
                 </div>
             </div>
@@ -621,7 +621,8 @@
         gap: 0.3rem;
         margin-left: 0.2rem;
         font-size: 0.75rem;
-        color: var(--subtext0, #a6adc8);
+        font-weight: 600;
+        color: var(--dot-color, var(--subtext0, #a6adc8));
         text-transform: capitalize;
     }
 

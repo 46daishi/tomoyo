@@ -750,6 +750,7 @@ html[data-theme-mode="light"] .sentence-window,
 html[data-theme-mode="light"] .modal,
 html[data-theme-mode="light"] .word-card,
 html[data-theme-mode="light"] .stat-tile,
+html[data-theme-mode="light"] .stat-card,
 html[data-theme-mode="light"] .panel,
 html[data-theme-mode="light"] .session-words-section,
 html[data-theme-mode="light"] .mined-word-card,
@@ -821,11 +822,14 @@ html[data-theme-mode="light"] .freq-uk {
     border-color: color-mix(in srgb, #9e9e9e 65%, transparent);
 }
 
-/* Plain status dots/bars keyed off pastel STATUS_COLORS/STATUS_LEVELS
-   hues via --dot-color/--status-color: darken the resolved hue so the
-   signal survives white surfaces. Scoped to textless dots and bars —
-   numbered status dots keep black text on pastel, which already reads
-   on both themes. */
+/* Plain status dots/bars and their labels keyed off pastel
+   STATUS_COLORS/STATUS_LEVELS hues via --dot-color/--status-color:
+   darken the resolved hue so the signal survives white surfaces, with
+   the label keeping the same colour as the dot. Numbered status dots
+   keep black text on pastel, which already reads on both themes. */
+html[data-theme-mode="light"] .status {
+    color: color-mix(in srgb, var(--dot-color, var(--theme-textSecondary)) 68%, black);
+}
 html[data-theme-mode="light"] .status .status-dot {
     background: color-mix(in srgb, var(--dot-color, var(--theme-textSecondary)) 68%, black);
 }
@@ -843,10 +847,20 @@ html[data-theme-mode="light"] .mined-word-status {
 .diff-band-4 { color: #fca5a5; }
 .diff-band-5 { color: #ef4444; }
 
-/* Difficulty bands on light surfaces: darker cuts of the same hues. */
+/* Difficulty bands on light surfaces: darker cuts of the same hues.
+   The home cover hover bars are exempt (block below): they sit on cover
+   art, which light mode does not lighten, so they keep the dark hues. */
 html[data-theme-mode="light"] .diff-band-0 { color: #15803d; }
 html[data-theme-mode="light"] .diff-band-1 { color: #16a34a; }
 html[data-theme-mode="light"] .diff-band-2 { color: #0891b2; }
 html[data-theme-mode="light"] .diff-band-3 { color: #b45309; }
 html[data-theme-mode="light"] .diff-band-4 { color: #dc2626; }
 html[data-theme-mode="light"] .diff-band-5 { color: #991b1b; }
+
+/* Cover hover bars: dark-surface hues in every theme. */
+html[data-theme-mode="light"] .cover-meta .diff-band-0 { color: #4ade80; }
+html[data-theme-mode="light"] .cover-meta .diff-band-1 { color: #bbf7d0; }
+html[data-theme-mode="light"] .cover-meta .diff-band-2 { color: #67e8f9; }
+html[data-theme-mode="light"] .cover-meta .diff-band-3 { color: #fcd34d; }
+html[data-theme-mode="light"] .cover-meta .diff-band-4 { color: #fca5a5; }
+html[data-theme-mode="light"] .cover-meta .diff-band-5 { color: #ef4444; }
