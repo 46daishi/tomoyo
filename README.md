@@ -5,12 +5,12 @@
 
 **tomoyo is an immersion app made in Tauri + SvelteKit. Its goal is to aid you in learning Japanese by mainly just reading native content instead of relying on spaced repetition.**
 
-![Version](https://img.shields.io/badge/version-1.3.0-446db9?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.4.0-446db9?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-446db9?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 </div>
 
-<img src="https://i.imgur.com/Mcj4Ghh.png" width="30%"> <img src="https://i.imgur.com/mhkdES7.png" width="32%"> <img src="https://i.imgur.com/0pGgPhN.png" width="37%"> 
+<img src="https://i.imgur.com/V7SIq4D.png" width="32%"> <img src="https://i.imgur.com/kS96s53.png" width="32%"> <img src="https://i.imgur.com/0pGgPhN.png" width="35%"> 
 <img src="https://i.imgur.com/Req3iZI.png" width="33%"> <img src="https://i.imgur.com/SuWlx9k.png" width="33%"> <img src="https://i.imgur.com/aVfjuU0.png" width="33%">
 <img src="https://i.imgur.com/TTeStcG.png" width="55%"> <img src="https://i.imgur.com/c8iYdM5.png" width="33%">
 
@@ -33,11 +33,13 @@ As you mine words they'll start being underlined with their level; click on the 
 - Track vocabulary coverage for a particular media
 - Flashcard review system (non-SRS) for both words and sentences. Review based on word status or media entry
 - Mine words together with sentences they appeared in. Words can be mined multiple times to save more sentences containing it
-- Fully offline
+- Works offline
 - Sub-dictionaries for each media entry
 - Track commonly looked up words that weren't mined and total look-ups
 - Highlight known words based on their level
 - Mini mode - resize app to limit it to the text window with adjustable transparency
+- Integration with VNDB and Jiten for fetching information for media entries
+- Categorise your media between a VN, Game, LN, and Book
 - Discord Rich Presence
 - History - scroll to view previous sentences
 - Several themes to choose from
@@ -76,6 +78,6 @@ A: Either create a GH issue or post about it in the **#tomoyo** channel on my [D
 - [JL](https://github.com/rampaa/JL): direct inspiration for the lookup mechanism
 - [LingQ](https://www.lingq.com/en/): inspiration for learning philosophy and the word level system
 - [JMdict](https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project): dictionary used in the look-ups
-- [Jiten](https://jiten.moe/frequency-dictionaries): visual novel word frequency data
+- [Jiten](https://github.com/Sirush/Jiten): visual novel word frequency data and API for fetching certain media stats
 - [VNDB](https://vndb.org/): used as a data source for importing and VN stats
 - [絆 Kizuna](https://kizuna-texthooker-ui.app/): inspiration for tracking Japanese immersion
