@@ -160,7 +160,7 @@
                 <div class="stat-field">
                     <span class="stat-icon-inline">{@html ICONS.clock ?? ''}</span>
                     <span class="stat-field-value">{formatDuration(stats.reading_seconds)}</span>
-                    <span class="stat-field-label">time spent</span>
+                    <span class="stat-field-label">on record</span>
                 </div>
                 <div class="stat-field">
                     <span class="stat-icon-inline">{@html ICONS.history ?? ''}</span>
@@ -185,7 +185,7 @@
                 <div class="stat-field">
                     <span class="stat-icon-inline">{@html ICONS.book ?? ''}</span>
                     <span class="stat-field-value">{stats.moji_read.toLocaleString()} 文字</span>
-                    <span class="stat-field-label">characters read</span>
+                    <span class="stat-field-label">read</span>
                 </div>
                 <div class="stat-field">
                     <span class="stat-icon-inline">{@html ICONS.plus ?? ''}</span>
@@ -196,7 +196,7 @@
                     <div class="stat-field">
                         <span class="stat-icon-inline">{@html ICONS.half_circle ?? ''}</span>
                         <span class="stat-field-value">{vocab.gathering ? 'Gathering…' : vocab.percentage != null ? `${vocab.percentage}%` : 'N/A'}</span>
-                        <span class="stat-field-label">coverage</span>
+                        <span class="stat-field-label">avg vocab coverage</span>
                     </div>
                 {/if}
             </div>
