@@ -8,7 +8,9 @@ use crate::deconjugate::{
 };
 use crate::index::DictionaryIndex;
 use crate::normalize::{self, normalize_variants};
-use crate::rank::{is_bound_only, match_kind, priority_score, reading_matches_context};
+use crate::rank::{
+    is_bound_only, match_kind, only_obsolete_readings, priority_score, reading_matches_context,
+};
 use crate::rules::{
     CONJECTURE_TAILS, CONTRACTION_AUX_VERBS, COPULA_TAILS, NANDA_ADVERBIAL_TAILS, NANDA_TAILS,
     SHIYAGARU_FORMS, TAIL_AUX_LABELS, TE_AUX_VERBS,
@@ -106,8 +108,32 @@ pub(crate) fn lookup_candidate(
     // "reaches" its kanji base (惹かれております -> 惹く), which would let
     // coincidental orphans (惹く, 知らす) hijack the morphological slot that
     // belongs to rule-based ranking.
+    // Kanji-bearing tokens after the cursor must survive into the resolved
+    // text: deconjugating the concatenated reading can spend them as kana
+    // grammar (遅れて息 -> おくれていき -> 遅れる, いた三 -> いたさん ->
+    // 致す, 俺に何 -> おれになん -> 折れる). The cursor token itself is the
+    // word being asked about, so its kanji may differ from the base text.
+    let trailing_kanji: Vec<char> = tokens
+        .iter()
+        .filter(|t| t.start > position && t.end <= position + span_len)
+        .flat_map(|t| t.surface.chars())
+        .filter(|c| {
+            let cp = *c as u32;
+            (0x4E00..=0x9FFF).contains(&cp) || (0x3400..=0x4DBF).contains(&cp)
+        })
+        .collect();
+    let kanji_faithful = |text: &str| {
+        trailing_kanji.is_empty() || {
+            let norm = normalize::normalize_text(text);
+            trailing_kanji.iter().all(|k| norm.contains(*k))
+        }
+    };
     let reading_forms: Vec<DeconjugatedForm> = match &span_reading {
-        Some(reading) => decon.deconjugate(reading),
+        Some(reading) => decon
+            .deconjugate(reading)
+            .into_iter()
+            .filter(|f| kanji_faithful(&f.text))
+            .collect(),
         None => Vec::new(),
     };
     let deconj_forms: Vec<DeconjugatedForm> = {
@@ -153,7 +179,62 @@ pub(crate) fn lookup_candidate(
             if !literal_hit {
                 for s in &stripped_inputs {
                     for key in normalize::normalize_variants(s) {
-                        all.extend(decon.deconjugate(&key));
+                        all.extend(
+                            decon
+                                .deconjugate(&key)
+                                .into_iter()
+                                .filter(|f| kanji_faithful(&f.text)),
+                        );
+                    }
+                }
+            }
+        }
+        // The vulgar auxiliary やがる has no rule in the table, and the
+        // tokenizer splits it off (買ってき|やがる): strip it from the
+        // surface and reading so the verb's own conjugation still resolves
+        // (買ってきやがる -> 買ってき -> 買う). Gated on an actual やがる
+        // token after this span's verb so a chance suffix on a real word
+        // stays put.
+        {
+            let has_vulg = tokens.iter().any(|t| {
+                t.start >= position
+                    && t.end <= position + span_len
+                    && matches!(t.base_form.as_str(), "やがる" | "がる")
+                    && tokens.iter().any(|p| {
+                        p.pos == "動詞" && p.end <= t.start && p.start >= position
+                    })
+            });
+            const VULG_TAILS: &[&str] = &[
+                "やがった",
+                "やがって",
+                "やがります",
+                "やがり",
+                "やがる",
+                "やがれ",
+                "やがろ",
+            ];
+            if has_vulg {
+                let strip = |text: &str| {
+                    VULG_TAILS
+                        .iter()
+                        .filter(|s| text.ends_with(**s))
+                        .max_by_key(|s| s.chars().count())
+                        .map(|tail| text[..text.len() - tail.len()].to_string())
+                        .filter(|stem| !stem.is_empty())
+                };
+                let mut inputs: Vec<String> = Vec::new();
+                if let Some(reading) = &span_reading {
+                    inputs.extend(strip(reading));
+                }
+                inputs.extend(strip(candidate));
+                for stem in inputs {
+                    for key in normalize::normalize_variants(&stem) {
+                        all.extend(
+                            decon
+                                .deconjugate(&key)
+                                .into_iter()
+                                .filter(|f| kanji_faithful(&f.text)),
+                        );
                     }
                 }
             }
@@ -551,10 +632,11 @@ pub(crate) fn lookup_candidate(
                             .iter()
                             .flat_map(|k| index.by_text.get(k).into_iter().flatten())
                             .any(|e| {
-                                e.pos.iter().any(|p| {
-                                    p.split(|c: char| !c.is_alphabetic())
-                                        .any(|w| w.starts_with("noun"))
-                                })
+                                (e.kana_only || e.spellings.is_empty())
+                                    && e.pos.iter().any(|p| {
+                                        p.split(|c: char| !c.is_alphabetic())
+                                            .any(|w| w.starts_with("noun"))
+                                    })
                             })
                 })
                 .and_then(|t| tokens.iter().find(|n| n.start == t.end))
@@ -1699,13 +1781,23 @@ pub(crate) fn lookup_candidate(
     if candidates.is_empty() && !trailing_sokuon {
         let mut archaic_forms: Vec<DeconjugatedForm> = Vec::new();
         if let Some(reading) = &span_reading {
-            archaic_forms.extend(decon.deconjugate_including_archaic(reading));
+            archaic_forms.extend(
+                decon
+                    .deconjugate_including_archaic(reading)
+                    .into_iter()
+                    .filter(|f| kanji_faithful(&f.text)),
+            );
         }
         for key in &variants {
             if Some(key) == span_reading.as_ref() {
                 continue;
             }
-            archaic_forms.extend(decon.deconjugate_including_archaic(key));
+            archaic_forms.extend(
+                decon
+                    .deconjugate_including_archaic(key)
+                    .into_iter()
+                    .filter(|f| kanji_faithful(&f.text)),
+            );
         }
         for form in &archaic_forms {
             // Same verb-backing requirement as the modern pool, extended
@@ -1880,6 +1972,20 @@ pub(crate) fn lookup_candidate(
         let b_kanji_share = primary_share(&b.0);
         let a_prefix = entry_prefix(&a.0);
         let b_prefix = entry_prefix(&b.0);
+        // The tokenizer's reading of the whole span identifies the intended
+        // homograph even when the cursor's own reading is a single morpheme
+        // (何人 + か: なんにん, not なにびと).
+        let span_reading_eq = |e: &Arc<DictEntry>| {
+            span_reading.as_ref().map_or(false, |r| {
+                let rv = normalize::normalize_variants(r);
+                e.readings
+                    .iter()
+                    .flat_map(|x| normalize::normalize_variants(x))
+                    .any(|x| rv.iter().any(|y| *y == x))
+            })
+        };
+        let a_span_reading = span_reading_eq(&a.0);
+        let b_span_reading = span_reading_eq(&b.0);
         let a_base_match = match morph_base {
             Some(base) => a.0.spellings.iter().any(|s| normalize::normalize_text(s) == base),
             None => false,
@@ -1923,6 +2029,13 @@ pub(crate) fn lookup_candidate(
             MatchKind::Morphological
                 if c.0.priority.is_empty() && !morph_is_faithful(&c.0) =>
             {
+                MatchKind::Deconjugated
+            }
+            // An "ok" (out-dated kana usage) reading is a dead form: a kana
+            // surface reachable only through one must lose to live readings
+            // (なんだ -> 何だ, not 涙, whose なんだ reading is ok-tagged and
+            // would otherwise carry the entry's kanji-form priority).
+            MatchKind::Reading if only_obsolete_readings(&c.0, candidate) => {
                 MatchKind::Deconjugated
             }
             k => k,
@@ -2031,6 +2144,7 @@ pub(crate) fn lookup_candidate(
                 .then(b_prefix.cmp(&a_prefix)) // longest-prefix entry first
                 .then(morph_exact(b).cmp(&morph_exact(a))) // tokenizer's exact form first
                 .then(is_bound_only(&a.0).cmp(&is_bound_only(&b.0))) // free words beat bound morphemes (はり over suffix-ばり) — bound readings never bury free words, orphan or not
+                .then(b_span_reading.cmp(&a_span_reading)) // span reading: true first, but never over free-vs-bound
                 .then(a_orphan.cmp(&b_orphan)) // common word first
                 .then(b_base_match.cmp(&a_base_match)) // morph-base spelling next
                 .then(a.1.cmp(&b.1)) // fewest deconj steps first
@@ -2053,8 +2167,12 @@ pub(crate) fn lookup_candidate(
             let archaic = |e: &Arc<DictEntry>| {
                 e.misc.iter().any(|m| m == "arch") && e.priority.is_empty()
             };
-            let a_kana = a.0.kana_only && !archaic(&a.0);
-            let b_kana = b.0.kana_only && !archaic(&b.0);
+            // Entries with no spellings are kana words outright; the
+            // usually-kana flag only records uk on kanji-bearing ones.
+            let a_kana =
+                (a.0.kana_only || a.0.spellings.is_empty()) && !archaic(&a.0);
+            let b_kana =
+                (b.0.kana_only || b.0.spellings.is_empty()) && !archaic(&b.0);
             // Pure-kana surface: no kanji evidence, most common word wins.
             // Bound morphemes first: a top-tier suffix entry matching
             // exactly (ちゃん, くん, さん) IS that morpheme — a kanji word

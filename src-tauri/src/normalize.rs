@@ -274,10 +274,31 @@ pub fn chouonpu_variants(text: &str) -> Vec<String> {
     let chars: Vec<char> = text.chars().collect();
     let mut mechanical: Vec<char> = Vec::with_capacity(chars.len());
     let mut convention: Vec<char> = Vec::with_capacity(chars.len());
+    let mut dropped: Vec<char> = Vec::with_capacity(chars.len());
     let mut any_convention_diff = false;
+    let mut any_drop_diff = false;
 
-    for &c in &chars {
+    for (i, &c) in chars.iter().enumerate() {
         if c == 'ー' {
+            // Colloquial lengthening before a mora obstruent (ちゃーん)
+            // often stands for no vowel at all: ちゃん is the word. Drop
+            // the mark as an alternative rather than resolving it.
+            if matches!(chars.get(i + 1), Some('ん') | Some('っ')) {
+                any_drop_diff = true;
+            } else {
+                dropped.extend(dropped.last().copied().and_then(kana_row).map_or(
+                    vec!['ー'],
+                    |row| {
+                        vec![match row {
+                            Row::A => 'あ',
+                            Row::I => 'い',
+                            Row::U => 'う',
+                            Row::E => 'え',
+                            Row::O => 'お',
+                        }]
+                    },
+                ));
+            }
             let prev = mechanical.last().copied();
             let row = prev.and_then(kana_row);
             let (mech_vowel, conv_vowel) = match row {
@@ -296,16 +317,25 @@ pub fn chouonpu_variants(text: &str) -> Vec<String> {
         } else {
             mechanical.push(c);
             convention.push(c);
+            dropped.push(c);
         }
     }
 
     let mech_str: String = mechanical.into_iter().collect();
+    let mut out = vec![mech_str];
     if any_convention_diff {
         let conv_str: String = convention.into_iter().collect();
-        vec![mech_str, conv_str]
-    } else {
-        vec![mech_str]
+        if !out.contains(&conv_str) {
+            out.push(conv_str);
+        }
     }
+    if any_drop_diff {
+        let drop_str: String = dropped.into_iter().collect();
+        if !out.contains(&drop_str) {
+            out.push(drop_str);
+        }
+    }
+    out
 }
 
 /// Convenience: full normalization pipeline producing every candidate
@@ -318,6 +348,21 @@ pub fn normalize_variants(input: &str) -> Vec<String> {
         if !variants.contains(&v) {
             variants.push(v);
         }
+    }
+    // Small ぁ spellings are interchangeable with あ (よくもまぁ = よくもまあ,
+    // おばぁ = おばあ). Only ぁ: the other small vowels (ぃ/ぅ/ぇ/ぉ) are
+    // mostly emphatic lengthenings whose folded forms collide with the
+    // mechanical chouonpu expansion of unrelated entries (けどぉ -> けどお
+    // would match ＫＥＤＯ/ケドー), and っ/ゃ/ゅ/ょ change the word outright.
+    let folded: String = base
+        .chars()
+        .map(|c| match c {
+            'ぁ' => 'あ',
+            other => other,
+        })
+        .collect();
+    if folded != base && !variants.contains(&folded) {
+        variants.push(folded);
     }
     variants
 }

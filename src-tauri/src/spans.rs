@@ -761,6 +761,7 @@ pub(crate) fn lookup_from_position(
                                 || matches!(p.surface.as_str(), "ましょ" | "でしょ" | "だろ")
                         });
                     if c == 'う'
+                        && tok.pos != "動詞"
                         && tok.start + 1 > position
                         && tok.start + 1 < tok.end.min(len)
                         && prev_volitional
@@ -1145,6 +1146,7 @@ pub(crate) fn lookup_from_position(
                     && !(in_must_chain && tok_is_must_aux)
                     && !is_koto_naru(tok.end)
                     && !is_pp_compound(tok.end)
+                    && !compound_shares_deconj_kanji(tok.end)
                     && !tok_is_split_cause
                 {
                     break;
@@ -1408,7 +1410,6 @@ pub(crate) fn lookup_from_position(
     ends.sort_unstable();
     ends.dedup();
     ends.retain(|e| *e <= position + MAX_CHARS_COMBINED);
-
     let mut found = 0usize;
     for &end in ends.iter().rev() {
         // Trim trailing punctuation so a candidate never ends in 記号/UNK
@@ -2103,8 +2104,15 @@ pub(crate) fn lookup_from_position(
                                         .map(|e| priority_score(e))
                                         .max()
                                         .unwrap_or(0);
-                                    let winner_score =
-                                        priority_score(&entries[0]);
+                                    // Any common resolution keeps the span
+                                    // whole: 立てて lists the rare adverb
+                                    // first, but 立てる (deconjugated) is the
+                                    // word the stem split would bury.
+                                    let winner_score = entries
+                                        .iter()
+                                        .map(|e| priority_score(e))
+                                        .max()
+                                        .unwrap_or(0);
                                     let same_entry = se
                                         .iter()
                                         .any(|e| e.id == entries[0].id);
@@ -2143,14 +2151,17 @@ pub(crate) fn lookup_from_position(
                                                     .unwrap_or(""),
                                             )
                                         });
-                                    // Copula-attached grammatical expressions stay
-                                    // whole (そうだ hearsay, わけだ, はずだ):
-                                    // the winner names the construction itself,
-                                    // not a coincidental homophone.
-                                    let winner_is_expression = copula_tail
-                                        && entries[0].pos.iter().any(|p| {
-                                            p.contains("expression")
-                                        });
+                                    // Grammatical expressions stay whole
+                                    // (そうだ hearsay, わけだ, はずだ; and
+                                    // particle-tailed ones like 何だと "what
+                                    // did you just say?"): the winner names
+                                    // the construction itself, not a
+                                    // coincidental homophone — whether the
+                                    // tail is a copula or a particle.
+                                    let winner_is_expression = entries[0]
+                                        .pos
+                                        .iter()
+                                        .any(|p| p.contains("expression"));
                                     if !same_entry
                                         && !same_lemma_keep
                                         && !winner_is_expression
@@ -2336,6 +2347,12 @@ pub(crate) fn lookup_from_position(
                                 continue;
                             }
                             if !tail.ends_with(&['て', 'で'][..]) {
+                                continue;
+                            }
+                            // The tail must start a token: reading across a
+                            // token boundary is how ぐらい became ぐら+いで
+                            // and いっぱい became いっぱ+いで.
+                            if !tokens.iter().any(|t| t.start == b) {
                                 continue;
                             }
                             let hit = |s: &str| {

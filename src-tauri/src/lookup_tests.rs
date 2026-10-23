@@ -521,8 +521,46 @@
         let top = &span.entries[0];
         assert!(top.spellings.is_empty(),
             "modern かな particle should lead, got {:?}", top.spellings);
-        assert!(span.entries.last().map_or(false, |e| e.spellings.first().map_or(false, |s| s == "哉")),
-            "archaic 哉 should sort last");
+        // 哉 still sorts behind both modern entries; the dead-last spot it
+        // used to hold now belongs to 金, whose ok-tagged (out-dated kana
+        // usage) かな reading puts it behind even an archaic word.
+        let zai = span.entries.iter().position(|e| {
+            e.spellings.first().map_or(false, |s| s == "哉")
+        });
+        assert!(zai.is_some_and(|p| p >= 2),
+            "archaic 哉 should sort behind the modern entries, got {zai:?}");
+    }
+
+    #[test]
+    fn obsolete_kana_reading_yields_to_live_form() {
+        // なんだ: 涙 lists なんだ as an ok (out-dated kana usage) reading and
+        // would otherwise carry its kanji-form priority (ichi1/nf04) to the
+        // top of the pure-kana pool. The live readings — 何だ's primary
+        // reading and the なのだ auxiliary — must lead; 涙 stays reachable
+        // below, never first.
+        let h = Harness::new();
+        let text = "なんだと";
+        let tokens = h.tokens(text);
+        let (entries, _) = crate::lookup::lookup_candidate(
+            "なんだ", &h.index, &h.decon, None, None, &tokens, 0,
+        )
+        .expect("なんだ resolves");
+        assert_eq!(
+            entries[0].readings.first().map(|r| r.as_str()),
+            Some("なのだ"),
+            "live なんだ readings lead, got {:?}",
+            entries[0].spellings
+        );
+        let nanda = entries
+            .iter()
+            .position(|e| e.spellings.first().map_or(false, |s| s == "何だ"))
+            .expect("何だ stays reachable");
+        let tears = entries
+            .iter()
+            .position(|e| e.spellings.first().map_or(false, |s| s == "涙"))
+            .expect("涙 stays reachable");
+        assert_eq!(nanda, 1, "何だ sits behind the live auxiliary");
+        assert_eq!(tears, 2, "obsolete-reading 涙 sorts last of the three");
     }
 
     #[test]

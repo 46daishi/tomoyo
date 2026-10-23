@@ -53,6 +53,12 @@ pub(crate) const CONTRACTION_SURFACES: &[&str] = &[
 pub(crate) const COMPLETIONS: &[(&str, &str, bool)] = &[
     // (head, tail, function_head_only)
     ("な", "んで", true),
+    // 何だと (なんだと, "what did you just say?"): な|ん|だ|と shreds
+    // with the な function-locked, so the expression never forms — the
+    // な+ん rule in spans stops at なん. The exact tail keeps it safe:
+    // sentence-final なんだ (相手なんだ) has no と, and なんだか/なんだろ
+    // don't match the tail either.
+    ("な", "んだと", true),
     ("だっ", "た", true),
     ("だっ", "たら", true),
     // Conjecture だろう (どうなんだろう?): だろ and う are split

@@ -80,6 +80,37 @@ pub(crate) fn match_kind(entry: &DictEntry, key: &str) -> MatchKind {
     }
 }
 
+/// True when every reading of this entry that matches `key` carries the
+/// "ok" (out-dated kana usage) tag — i.e. the kana in question is a dead
+/// form for this entry. Callers demote such matches to deconjugation rank
+/// so a live rival wins: なんだ is ok-tagged on 涙 (its reading #4/4) but is
+/// the primary reading of 何だ, and without the demotion the coincidental
+/// reading rides 涙's entry-level priority (ichi1/nf04) to the top. No entry
+/// in the bundled dictionary has an ok tag on its first reading, so this
+/// only ever demotes secondary readings, never an entry's canonical form.
+pub(crate) fn only_obsolete_readings(entry: &DictEntry, key: &str) -> bool {
+    let key_variants = normalize::normalize_variants(key);
+    let mut matched = false;
+    for (i, reading) in entry.readings.iter().enumerate() {
+        let reading_variants = normalize::normalize_variants(reading);
+        if !key_variants
+            .iter()
+            .any(|k| reading_variants.iter().any(|v| v == k))
+        {
+            continue;
+        }
+        matched = true;
+        let obsolete = entry
+            .re_inf
+            .get(i)
+            .is_some_and(|tags| tags.iter().any(|t| t == "ok"));
+        if !obsolete {
+            return false;
+        }
+    }
+    matched
+}
+
 /// Does any of this entry's readings match the reading the tokenizer assigned
 /// to the surface in context (e.g. 前 read まえ in 前にある vs ぜん in 午前)?
 pub(crate) fn reading_matches_context(entry: &DictEntry, context_reading: &str) -> bool {

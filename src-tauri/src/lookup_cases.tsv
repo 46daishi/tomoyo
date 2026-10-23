@@ -653,3 +653,29 @@ bugs7-05	bugs	僕と穹はいつも通り、学校に向かう道で、天女目
 bugs7-06	bugs	いつも通り過ぎていった	scan			scan_surfaces	いつも|通り過ぎていった	verb continuation yields
 bugs7-07	bugs	あっという間な気分だった	scan			scan_surfaces	あっという間|な|気分だった	adverbial expression merges
 bugs7-08	bugs	気が付いたらどうしよう	scan			scan_surfaces	気が付いたら|どうしよう	が-compound breadth
+bugs7-09	bugs	なんだと	lookup	なんだ		not_top_reading	なみだ	obsolete ok reading never tops the expression span
+bugs7-10	bugs	なんだと	lookup	なんだ		surface	なんだと	whole expression 何だと matches as one span
+bugs7-11	bugs	なんだと	lookup	なんだ		top_spelling	何だと	fixed expression beats the obscure-literal split
+bugs8-01	bugs	よーし! 俺も張り切っちゃうぞっ! 穹ちゃーん、俺に何か質問はないかなぁ?	lookup	俺に		surface	俺	reading-based deconj must not spend the 何 kanji (俺に何 -> 折れる)
+bugs8-02	bugs	よーし! 俺も張り切っちゃうぞっ! 穹ちゃーん、俺に何か質問はないかなぁ?	lookup	俺に		not_surface	俺に何	trailing kanji blocks the reading deconjugation
+bugs8-03	bugs	よーし! 俺も張り切っちゃうぞっ! 穹ちゃーん、俺に何か質問はないかなぁ?	lookup	ちゃーん		surface	ちゃーん	emphatic ー drop still resolves ちゃん as the whole span
+bugs8-04	bugs	よーし! 俺も張り切っちゃうぞっ! 穹ちゃーん、俺に何か質問はないかなぁ?	lookup	ちゃーん		has_entry	ちゃん	ー-drop variant reaches ちゃん
+bugs8-05	bugs	傍らで見ているだけだから、手が出せない穹は凄くやりにくそうだ。	lookup	やり		top_spelling	遣る	noun 槍 must not suppress the verb morphology
+bugs8-06	bugs	急に境内がざわつき、社務所から何人かの人が出てきて、誰かを迎えるように並んで参道の方を向く。	lookup	何人		top_reading_contains	なんにん	span reading picks なんにん over なにびと
+bugs8-07	bugs	後は、天かすやキャベツもいっぱいでホントに一個分にまとめたようなたこ焼きだった。	lookup	いっぱい		surface	いっぱい	te-splitter must not chop at mid-token いで
+bugs8-08	bugs	えっ、ケバブって何?	lookup	ケバブ		surface	ケバブ	te-splitter token boundary keeps the loanword whole
+bugs8-09	bugs	奈緒ちゃんは僕から目をそらしうつむく。	lookup	そらし		surface	そらし	volitional う must not extend into the next verb
+bugs8-10	bugs	奈緒ちゃんは僕から目をそらしうつむく。	lookup	そらし		not_surface	そらしう	no mid-token volitional merge
+bugs8-11	bugs	僕の口中に、氷をちょんと乗せてもらうと、急に恥ずかしくなってきた。	lookup	ちょん		top_reading	ちょん	obscure 煎 must not outrank the common ちょん
+bugs8-12	bugs	なんだよ......お前ら、もうちょっと気を利かせろよ?	lookup	気を		top_spelling	気を利かせる	expression whole-span wins over a chopped verb guard
+bugs8-13	bugs	よくもまぁ、ここまでコーディネートされて穹が黙っていたものだ。	lookup	よくも		surface	よくもまぁ	adverb span survives the small-vowel fold
+bugs8-14	bugs	よくもまぁ、ここまでコーディネートされて穹が黙っていたものだ。	lookup	よくも		top_spelling	善くもまあ	folded compound resolves to the expression
+bugs8-15	bugs	そーそー!  夏休みは有限なんだ、今のうちからガッツリ計画立てて無駄のない休みを満喫してだな......	lookup	立てて		surface	立てて	common stem score keeps the full 立てて span
+bugs8-16	bugs	俺のオカンは、いっつもそこで買ってきやがるんだよなぁ。	lookup	買って		surface	買ってきやがる	vulgar やがる tail stays in the span
+bugs8-17	bugs	俺のオカンは、いっつもそこで買ってきやがるんだよなぁ。	lookup	買って		top_spelling	買う	stripped やがる still deconjugates to 買う
+bugs8-18	bugs	僕の後ろにいた三人も、奈緒ちゃんのスプラッシュ攻撃の餌食となった。	lookup	いた三		surface	いた	kanji 三 must not be spent as the 致す reading
+bugs8-19	bugs	僕の後ろにいた三人も、奈緒ちゃんのスプラッシュ攻撃の餌食となった。	lookup	いた三		no_entry	致す|いたす	致す must not appear for いた+三
+bugs8-20	bugs	これぐらいでへこたれてどうするの?  まだまだ序の口よ?	lookup	ぐらい		surface	ぐらい	te-splitter token boundary keeps ぐらい whole
+bugs8-21	bugs	これぐらいでへこたれてどうするの?  まだまだ序の口よ?	lookup	ぐらい		top_spelling	位	ぐらい resolves to 位
+bugs8-22	bugs	遅れて息も絶え絶えな亮平が、へばるように小島に上陸した。	lookup	遅れて		surface	遅れて	kanji 息 blocks the teiku reading
+bugs8-23	bugs	遅れて息も絶え絶えな亮平が、へばるように小島に上陸した。	lookup	遅れて		not_surface	遅れて息	no reading-only overreach across the kanji
