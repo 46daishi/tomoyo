@@ -1,23 +1,64 @@
 import { getDb } from '$lib/db';
 
+/**
+ * @param {number} mediaId
+ * @returns {Promise<number>}
+ */
 export async function startSession(mediaId) {
     const db = await getDb();
     const result = await db.execute(
         'INSERT INTO sessions (media_id, started_at, last_updated_at) VALUES ($1, unixepoch(), unixepoch())',
         [mediaId]
     );
+    if (result.lastInsertId == null) {
+        throw new Error('Failed to create reading session');
+    }
     return result.lastInsertId;
 }
 
-export async function endSession(sessionId) {
+/**
+ * Ends a session. When `activeSeconds` is given the stored `ended_at` is
+ * `started_at + activeSeconds`, so paused stretches are excluded from the
+ * reading duration; otherwise the wall clock end time is used.
+ * @param {number} sessionId
+ * @param {number | null} [activeSeconds]
+ */
+export async function endSession(sessionId, activeSeconds = null) {
+    if (!sessionId) return;
+    const db = await getDb();
+    if (activeSeconds != null && Number.isFinite(activeSeconds)) {
+        await db.execute(
+            `UPDATE sessions
+             SET ended_at = started_at + $1, last_updated_at = unixepoch()
+             WHERE id = $2`,
+            [Math.max(0, Math.round(activeSeconds)), sessionId]
+        );
+    } else {
+        await db.execute(
+            'UPDATE sessions SET ended_at = unixepoch(), last_updated_at = unixepoch() WHERE id = $1',
+            [sessionId]
+        );
+    }
+}
+
+/**
+ * Refreshes `last_updated_at` for a still-active session. Called on pause and
+ * periodically while running so crash recovery does not undercount.
+ * @param {number} sessionId
+ */
+export async function touchSession(sessionId) {
     if (!sessionId) return;
     const db = await getDb();
     await db.execute(
-        'UPDATE sessions SET ended_at = unixepoch(), last_updated_at = unixepoch() WHERE id = $1',
+        'UPDATE sessions SET last_updated_at = unixepoch() WHERE id = $1',
         [sessionId]
     );
 }
 
+/**
+ * @param {number} sessionId
+ * @param {number} mojiCount
+ */
 export async function recordSentenceRead(sessionId, mojiCount) {
     if (!sessionId) return;
     const db = await getDb();
@@ -34,6 +75,7 @@ export async function recoverDanglingSessions() {
     );
 }
 
+/** @param {number} mediaId */
 export async function getMediaStats(mediaId) {
     const db = await getDb();
 
@@ -90,6 +132,9 @@ export async function getAllMediaStats() {
     );
 }
 
+/**
+ * @param {{ sessionId: number, mediaId: number, sentenceText: string }} event
+ */
 export async function logSentenceRead({ sessionId, mediaId, sentenceText }) {
     const db = await getDb();
     await db.execute(

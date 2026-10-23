@@ -10,6 +10,7 @@
     import { presenceState } from "$lib/stores/presence.svelte.js";
     import { recoverDanglingSessions } from '$lib/sessions.js';
     import { recoverDanglingReviewSessions } from "$lib/reviewStats";
+    import Session from "$lib/components/Session.svelte";
     import {
         PRESENCE_DEFAULTS,
         PRESENCE_DETAILS,
@@ -144,3 +145,5 @@
 </script>
 
 {@render children()}
+
+<Session />

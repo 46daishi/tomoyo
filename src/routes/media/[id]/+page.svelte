@@ -10,7 +10,7 @@
     import { extractDominantColor } from '$lib/utils/color.js';
 
     import { initMiniMode } from '$lib/miniMode.js';
-    import { createSessionStore } from '$lib/stores/session.svelte.js';
+    import { session } from '$lib/stores/session.svelte.js';
 
     import { ICONS } from '$lib/icons';
 
@@ -37,9 +37,6 @@
 
     let mediaRequestId = 0;
 
-    // Initialize session store
-    const session = createSessionStore(mediaId);
-
     async function loadMedia(id) {
         const my = ++mediaRequestId;
         const db = await getDb();
@@ -56,13 +53,19 @@
         loadMedia(mediaId);
     });
 
+    $effect(() => {
+        // Only pass media that matches the current route param; `media` can
+        // still hold the previous title while a switch is in flight.
+        const meta = media && Number(media.id) === mediaId ? media : null;
+        session.activate(mediaId, meta);
+    });
+
     onMount(async () => {
         settings = await loadSettings();
         const miniModeManager = initMiniMode(settings, (mode) => (miniMode = mode));
 
         return () => {
             setMediaTitle(null);
-            session.destroy();
             miniModeManager.destroy();
         };
     });
@@ -117,11 +120,11 @@
     }
 
     $effect(() => {
-        const running = session.running;
+        const active = session.active;
         const sid = session.sessionId;
         minedVersion;
         wordStatusVersion;
-        if (!running || !sid) {
+        if (!active || !sid) {
             sessionWords = [];
             sessionWordsLoaded = false;
             sessionWordsExpanded = false;
@@ -197,7 +200,7 @@
                         onAction={() => (showEditModal = true)}
                     />
                 {/snippet}
-                <MediaStats {mediaId} {media} refreshKey={session.running} {settings}/>
+                <MediaStats {mediaId} {media} refreshKey={session.active} {settings}/>
             </MediaHeader>
         {/if}
 
@@ -213,7 +216,7 @@
             onNameSaved={() => (namesVersion += 1)}
         />
 
-        {#if session.running}
+        {#if session.active}
             <div class="session-words-section">
                 <button
                     type="button"
@@ -365,10 +368,16 @@
     icon={session.running ? ICONS.pause : ICONS.play}
     variant="primary"
     size="small"
-    onAction={() => session.toggle()}
+    onAction={() => session.togglePlayback()}
   />
-  {#if session.running}
-    <span class="session-timer" transition:fly={{ y: -8, duration: 200 }}>
+  {#if session.active}
+    <ActionButton
+      icon={ICONS.check}
+      variant="secondary"
+      size="small"
+      onAction={() => session.stop()}
+    />
+    <span class="session-timer" class:paused={!session.running} transition:fly={{ y: -8, duration: 200 }}>
       {session.formattedTime}
     </span>
   {/if}
@@ -605,6 +614,10 @@
             color: var(--theme-textSecondary, #b3b3b3);
             font-variant-numeric: tabular-nums; /* keeps digit widths consistent so it doesn't jitter as numbers change */
             text-align: center;
+        }
+
+    .session-timer.paused {
+            opacity: 0.55;
         }
 
     .stats-btn-wrap {

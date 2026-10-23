@@ -41,13 +41,11 @@
         settings?.sentence_window_inverted ? themeVars($currentTheme) : ''
     );
 
-    let currentText = $state('');
-    let historyEntries = $state([]);
-    let historyIndex = $state(0);
+    let currentText = $derived(session.currentText);
+    let historyEntries = $derived(session.historyEntries);
+    let historyIndex = $derived(session.historyIndex);
 
-    let displayedText = $derived(
-        historyIndex === 0 ? currentText : (historyEntries[historyIndex - 1] ?? currentText)
-    );
+    let displayedText = $derived(session.displayedText);
     let displayedChars = $derived([...displayedText]);
     let viewingHistory = $derived(historyIndex > 0);
 
@@ -110,19 +108,12 @@
         text = text.replace(/[\r\n]+/g, '');
         if (!isMostlyJapanese(text)) return;
 
-        if (settings?.history_enabled && currentText) {
-            const span = settings.history_span ?? 50;
-            historyEntries = [currentText, ...historyEntries].slice(0, span);
-        }
+        if (!session?.pushText(text, settings)) return;
 
-        currentText = text;
-        historyIndex = 0;
         hoveredSpan = null;
         tooltipSpan = null;
         tooltipVisible = false;
         cycleSkip = 0;
-
-        session?.recordSentence(text);
     }
 
     $effect(() => {
@@ -372,18 +363,13 @@
         e.preventDefault();
 
         if (e.deltaY < 0) {
-            const maxIndex = Math.min(historyEntries.length, settings.history_span ?? 50);
-            const newIndex = Math.min(historyIndex + 1, maxIndex);
-            if (newIndex !== historyIndex) {
-                historyIndex = newIndex;
+            if (session.historyNext(settings.history_span ?? 50)) {
                 hoveredSpan = null;
                 tooltipVisible = false;
                 cycleSkip = 0;
             }
         } else if (e.deltaY > 0) {
-            const newIndex = Math.max(historyIndex - 1, 0);
-            if (newIndex !== historyIndex) {
-                historyIndex = newIndex;
+            if (session.historyPrev(settings.history_span ?? 50)) {
                 hoveredSpan = null;
                 tooltipVisible = false;
                 cycleSkip = 0;
@@ -432,8 +418,8 @@
     }
 
     $effect(() => {
-        if (settings?.history_span != null && historyEntries.length > settings.history_span) {
-            historyEntries = historyEntries.slice(0, settings.history_span);
+        if (settings?.history_span != null) {
+            session.pruneHistory(settings.history_span);
         }
     });
 
