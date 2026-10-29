@@ -96,6 +96,19 @@
         return { variant: 'primary', disabled: false };
     }
 
+    // Mine through the parent, then reload the known-word map so the freshly
+    // mined entry underlines right away in this same tooltip. Without the
+    // reload the map is only fetched on mount, so the underline would not
+    // appear until the tooltip is closed and reopened.
+    /**
+     * @param {any} entry
+     * @param {string} spelling
+     */
+    async function mineAndRefresh(entry, spelling) {
+        await onMine(entry, spelling);
+        await loadKnownWords();
+    }
+
     // Every distinct form a word can be mined as: all listed spellings,
     // then all listed readings (deduped). Falls back to the hovered
     // surface only when the entry lists no forms at all. Collapses to a
@@ -231,7 +244,7 @@
                                             variant={btnState.variant}
                                             disabled={btnState.disabled}
                                             size="mini"
-                                            onAction={() => !btnState.disabled && onMine(entry, forms[0].value)}
+                                            onAction={() => !btnState.disabled && mineAndRefresh(entry, forms[0].value)}
                                         />
                                         {#if forms.length > 1}
                                             <select
@@ -242,7 +255,7 @@
                                                 onchange={(e) => {
                                                     const value = e.currentTarget.value;
                                                     e.currentTarget.selectedIndex = -1;
-                                                    onMine(entry, value);
+                                                    mineAndRefresh(entry, value);
                                                 }}
                                             >
                                             {#each forms as form}
