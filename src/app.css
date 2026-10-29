@@ -773,6 +773,9 @@ html[data-theme-mode="light"] body.mini-mode .sentence-window {
 html[data-theme-mode="light"] .sentence-text.history-text {
     color: #8a5f00;
 }
+html[data-theme-mode="light"] .sentence-window.inverted .sentence-text.history-text {
+    color: #ffe14d;
+}
 
 /* Cover placeholders: dark accent glow becomes a muddy patch on light
    themes; glow toward white instead. */
