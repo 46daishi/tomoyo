@@ -417,6 +417,22 @@ pub(crate) fn lookup_candidate(
             .iter()
             .any(|s| normalize::normalize_text(candidate).contains(s)))
     };
+    // The honorific になる rule is for お/ご + continuative stem + になる,
+    // not ordinary noun + に + なる (歳になる). Other honorific rules such
+    // as なさる do not use these surface endings and remain unaffected.
+    let honorific_ok = |f: &DeconjugatedForm| {
+        let honorific_chain = f.rule_chain.as_deref().map_or(false, |c| {
+            c.split('→').any(|seg| seg == "honorific")
+        });
+        let honorific_ninaru = ["になる", "になっ", "になり", "になら", "になれ", "になろ"]
+            .iter()
+            .any(|surface| candidate.contains(surface));
+        !honorific_chain
+            || !honorific_ninaru
+            || candidate.starts_with('お')
+            || candidate.starts_with('ご')
+            || candidate.starts_with('御')
+    };
 
     // ksb-volitional (お -> おう slur: 行こ for 行こう) only ever leaves a
     // verb stem: after a te/ta-form (買ったお = past + the honorific お of
@@ -583,6 +599,7 @@ pub(crate) fn lookup_candidate(
         // 知らされなかった keeps resolving to 知る.
         let via_deconj = reading_forms.iter().any(|f| {
             try_ok(f)
+                && honorific_ok(f)
                 && ksb_volitional_ok(f)
                 && classical_attr_ok(f)
                 && seeming_ok(f)
@@ -687,6 +704,7 @@ pub(crate) fn lookup_candidate(
                     .iter()
                     .find(|f| {
                         try_ok(f)
+                            && honorific_ok(f)
                             && ksb_volitional_ok(f)
                             && classical_attr_ok(f)
                             && seeming_ok(f)
@@ -1128,7 +1146,7 @@ pub(crate) fn lookup_candidate(
         .iter()
         .any(|t| t.start == position && t.end >= position + span_len);
     for form in deconj_pool {
-        if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) || !ki_noun_ok(form) {
+        if !try_ok(form) || !honorific_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) || !ki_noun_ok(form) {
             continue;
         }
         // Verb-class results need a real verb token backing them (see
@@ -1271,6 +1289,9 @@ pub(crate) fn lookup_candidate(
             if absorbed {
                 let absorption_label = chain_desc.clone();
                 for cont in decon.deconjugate(&form.text) {
+                    if !honorific_ok(&cont) {
+                        continue;
+                    }
                     let cont_na_imperative = cont.rule_chain.as_deref().map_or(false, |c| {
                         c.split('→').any(|seg| seg == "casual polite imperative")
                     });
@@ -1335,6 +1356,9 @@ pub(crate) fn lookup_candidate(
                 if !literal_hit {
                     for key in normalize::normalize_variants(&stripped) {
                         for form in decon.deconjugate(&key) {
+                            if !honorific_ok(&form) {
+                                continue;
+                            }
                             let fkey = normalize::normalize_text(&form.text);
                             if let Some(fentries) = index.by_text.get(&fkey) {
                                 let chain_desc =
@@ -1436,7 +1460,9 @@ pub(crate) fn lookup_candidate(
             let tail_desc = tail_labels.join(" + ");
             // Stem via deconjugation (POS-validated like the main path)...
             for form in decon.deconjugate(stem) {
-                if is_verb_class(&form.tag) && !span_has_verb_token {
+                if !honorific_ok(&form)
+                    || (is_verb_class(&form.tag) && !span_has_verb_token)
+                {
                     continue;
                 }
                 let key = normalize::normalize_text(&form.text);
@@ -1823,7 +1849,7 @@ pub(crate) fn lookup_candidate(
             // forms route through the same てみる-strip rule. The te/ta
             // gates ride along too: classical forms never license modern
             // fabrications either.
-            if !try_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) || !ki_noun_ok(form) {
+            if !try_ok(form) || !honorific_ok(form) || !ksb_volitional_ok(form) || !classical_attr_ok(form) || !seeming_ok(form) || !negpot_ok(form) || !ki_noun_ok(form) {
                 continue;
             }
             let is_na_imperative = form.rule_chain.as_deref().map_or(false, |c| {

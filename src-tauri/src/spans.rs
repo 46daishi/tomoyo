@@ -175,6 +175,87 @@ pub(crate) fn lookup_from_position(
     // extension): the obscure-literal splitter must not re-fragment the
     // very constructions the COMPLETIONS table merges (まずは -> まず).
     let mut completion_ends: HashSet<usize> = HashSet::new();
+    // Let exact grammatical expressions span tokens that normally block
+    // function-word/adverb extension (と|ともに, もしか|すると). A te-form
+    // expression continuing into a verb remains compositional (をして|いる).
+    if let Some(t) = token_at_pos {
+        if position == t.start && matches!(t.pos.as_str(), "助詞" | "副詞") {
+            let mut acc_end = t.end;
+            for tok in tokens.iter().filter(|tok| tok.start >= t.end) {
+                if tok.start != acc_end {
+                    break;
+                }
+                acc_end = tok.end.min(len);
+                if acc_end <= t.end || acc_end > position + MAX_CHARS_COMBINED {
+                    continue;
+                }
+                let compound: String = chars[position..acc_end].iter().collect();
+                let grammatical = normalize::normalize_variants(&compound)
+                    .iter()
+                    .flat_map(|k| index.by_text.get(k).into_iter().flatten())
+                    .any(|e| {
+                        e.pos.iter().any(|p| {
+                            p.split(|c: char| !c.is_alphabetic()).any(|w| {
+                                matches!(
+                                    w,
+                                    "expression"
+                                        | "expressions"
+                                        | "adverb"
+                                        | "conjunction"
+                                        | "particle"
+                                        | "auxiliary"
+                                )
+                            })
+                        })
+                    });
+                let grammatical_tail = tokens
+                    .iter()
+                    .any(|end_tok| end_tok.end == acc_end && end_tok.pos == "助詞");
+                let interrogative_question = t.pos == "副詞"
+                    && compound.ends_with('か')
+                    && tokens
+                        .iter()
+                        .find(|next| next.start == acc_end)
+                        .map_or(false, |next| {
+                            matches!(
+                                next.surface.as_str(),
+                                "な" | "ね" | "よ" | "なー" | "ねー" | "よー" | "?" | "？"
+                                    | "!" | "！"
+                            )
+                        });
+                let continues_te_form = tokens.iter().any(|end_tok| {
+                    end_tok.end == acc_end
+                        && end_tok.pos == "助詞"
+                        && matches!(end_tok.surface.as_str(), "て" | "で")
+                }) && tokens
+                    .iter()
+                    .any(|next| next.start == acc_end && next.pos == "動詞");
+                let nominalizer_before_kamoshirenai = t.surface == "の"
+                    && compound == "のか"
+                    && tokens.iter().any(|m| {
+                        m.start == acc_end
+                            && m.surface == "も"
+                            && tokens.iter().any(|s| {
+                                s.start == m.end
+                                    && s.surface == "しれ"
+                                    && s.base_form == "しれる"
+                                    && tokens.iter().any(|n| {
+                                        n.start == s.end
+                                            && matches!(n.surface.as_str(), "ない" | "ませ")
+                                    })
+                            })
+                    });
+                if grammatical
+                    && grammatical_tail
+                    && !continues_te_form
+                    && !interrogative_question
+                    && !nominalizer_before_kamoshirenai
+                {
+                    ends.push(acc_end);
+                }
+            }
+        }
+    }
     if let Some(t) = token_at_pos {
         for e in (position + 1)..=t.end.min(len) {
             ends.push(e);
@@ -388,9 +469,30 @@ pub(crate) fn lookup_from_position(
                 for e in (t.end + 1)..=next.end.min(len) {
                     ends.push(e);
                 }
-                if let Some(following) = tokens.iter().find(|tok| tok.start >= next.end && tok.start > t.end) {
+                let following = tokens
+                    .iter()
+                    .find(|tok| tok.start >= next.end && tok.start > t.end);
+                if let Some(following) = following {
                     for e in (next.end + 1)..=following.end.min(len) {
                         ends.push(e);
+                    }
+                }
+                // Prefixes attach to the whole predicate, including its
+                // contiguous auxiliary chain (お|見せ|でき|ませ|ん).
+                if matches!(t.pos.as_str(), "接頭辞" | "接頭詞")
+                    && matches!(next.pos.as_str(), "動詞" | "助動詞" | "接尾辞")
+                {
+                    let mut chain_end = next.end;
+                    for tok in tokens.iter().filter(|tok| tok.start >= next.end) {
+                        if tok.start != chain_end
+                            || !matches!(tok.pos.as_str(), "動詞" | "助動詞" | "接尾辞")
+                        {
+                            break;
+                        }
+                        chain_end = tok.end.min(len);
+                        for e in (tok.start + 1)..=chain_end {
+                            ends.push(e);
+                        }
                     }
                 }
             }
@@ -608,6 +710,14 @@ pub(crate) fn lookup_from_position(
                 if cursor_kanji.is_empty() {
                     return false;
                 }
+                if tokens.iter().any(|t| {
+                    t.start >= position
+                        && t.start < end
+                        && t.pos == "助詞"
+                        && !matches!(t.surface.as_str(), "て" | "で")
+                }) {
+                    return false;
+                }
                 let reaches_entry = |e2: usize| {
                     let compound: String = chars[position..e2.min(len)].iter().collect();
                     decon.deconjugate(&compound).iter().any(|f| {
@@ -672,7 +782,7 @@ pub(crate) fn lookup_from_position(
             // exemption yields there. Longest-first falls back when nothing
             // resolves, so ordinary phrases stay split (本を読む/トイレを
             // 使う/費用を出す are not dictionary entries).
-            let pp_compound_end: Option<usize> = match token_at_pos {
+            let pp_compound_end: Option<(usize, usize)> = match token_at_pos {
                 Some(t) if t.pos == "名詞" && position == t.start => {
                     let p = tokens.iter().find(|tok| tok.start == t.end);
                      let v = p
@@ -692,18 +802,54 @@ pub(crate) fn lookup_from_position(
                             let known = normalize::normalize_variants(&compound)
                                 .iter()
                                 .any(|k| index.by_text.contains_key(k));
-                            if known && !continued {
-                                Some(v.end)
-                            } else {
-                                None
+                            let mut expression_end = None;
+                            let mut chain_end = v.end;
+                            for tok in tokens.iter().filter(|tok| tok.start >= v.end) {
+                                if tok.start != chain_end
+                                    || !matches!(
+                                        tok.pos.as_str(),
+                                        "動詞" | "助動詞" | "接尾辞" | "接尾詞"
+                                    )
+                                {
+                                    break;
+                                }
+                                chain_end = tok.end;
+                                let surface: String =
+                                    chars[position..chain_end.min(len)].iter().collect();
+                                let is_expression = decon.deconjugate(&surface).iter().any(|form| {
+                                    normalize::normalize_variants(&form.text)
+                                        .iter()
+                                        .flat_map(|k| index.by_text.get(k).into_iter().flatten())
+                                        .any(|entry| {
+                                            entry.pos.iter().any(|pos| {
+                                                pos.split(|c: char| !c.is_alphabetic())
+                                                    .any(|w| {
+                                                        matches!(
+                                                            w,
+                                                            "expression" | "expressions"
+                                                        )
+                                                    })
+                                            })
+                                        })
+                                });
+                                if is_expression {
+                                    expression_end = Some(chain_end);
+                                }
                             }
+                            expression_end
+                                .map(|end| (v.end, end))
+                                .or_else(|| {
+                                    (known && !continued).then_some((v.end, v.end))
+                                })
                         }
                         _ => None,
                     }
                 }
                 _ => None,
             };
-            let is_pp_compound = |end: usize| pp_compound_end == Some(end);
+            let is_pp_compound = |end: usize| {
+                pp_compound_end.map_or(false, |(start, finish)| end >= start && end <= finish)
+            };
             // A noun span stops once a non-te-form particle (でも/は/と/に...)
             // is followed by a content verb: 風船でも割れる must split as 風船 /
             // でも / 割れる rather than deconjugating the whole string into
@@ -1223,6 +1369,11 @@ pub(crate) fn lookup_from_position(
                                 })
                             })
                     })
+                    && !normalize::normalize_variants(
+                        &chars[position..tok.end.min(len)].iter().collect::<String>(),
+                    )
+                    .iter()
+                    .any(|k| index.by_text.contains_key(k))
                 {
                     break;
                 }
@@ -2162,9 +2313,13 @@ pub(crate) fn lookup_from_position(
                                         .pos
                                         .iter()
                                         .any(|p| p.contains("expression"));
+                                    let winner_exact_spelling = normalize::normalize_variants(&candidate)
+                                        .iter()
+                                        .any(|k| entries[0].spellings.iter().any(|s| s == k));
                                     if !same_entry
                                         && !same_lemma_keep
                                         && !winner_is_expression
+                                        && !winner_exact_spelling
                                         && stem_best.saturating_sub(winner_score)
                                             >= 50
                                     {
@@ -3044,6 +3199,101 @@ pub(crate) fn lookup_from_position(
                                     candidate = stem;
                                     entries = se;
                                     deconj_info = si;
+                                }
+                            }
+                        }
+                    }
+                }
+                // Sentence-final explanatory の and quotative って are not
+                // part of the predicate. Their full forms can deconjugate to
+                // unrelated homophones (信じられないの -> 信ずる,
+                // 通じてるって -> 通ずる), while the predicate alone resolves.
+                if deconj_info.is_some() {
+                    let tail = tokens.iter().find(|t| t.end == eff_end);
+                    let split_len = tail.and_then(|t| {
+                        if t.pos != "助詞" {
+                            return None;
+                        }
+                        let next = tokens.iter().find(|n| n.start == eff_end);
+                        match t.surface.as_str() {
+                            "の" if next.map_or(true, |n| n.pos == "記号") => Some(1),
+                            "って"
+                                if next.map_or(true, |n| {
+                                    n.pos == "記号"
+                                        || (n.pos == "動詞"
+                                            && matches!(n.base_form.as_str(), "いう" | "言う"))
+                                }) =>
+                            {
+                                Some(2)
+                            }
+                            _ => None,
+                        }
+                    });
+                    if let Some(split_len) = split_len {
+                        let stem_end = eff_end - split_len;
+                        let predicate_before_tail = tokens.iter().any(|t| {
+                            t.end == stem_end
+                                && matches!(t.pos.as_str(), "動詞" | "助動詞" | "形容詞")
+                        });
+                        if predicate_before_tail && stem_end > position {
+                            let stem: String = chars[position..stem_end].iter().collect();
+                            if let Some((se, si)) = lookup_candidate(
+                                &stem,
+                                index,
+                                decon,
+                                context_reading,
+                                morph_base,
+                                tokens,
+                                position,
+                            ) {
+                                let different_winner = se.first().map_or(false, |e| {
+                                    entries.first().map_or(true, |current| e.id != current.id)
+                                });
+                                if !se.is_empty() && different_winner {
+                                    eff_end = stem_end;
+                                    candidate = stem;
+                                    entries = se;
+                                    deconj_info = si;
+                                }
+                            }
+                        }
+                    }
+                }
+                // A deconjugated phrase must not swallow a following particle
+                // when the head immediately before it is itself an exact
+                // dictionary spelling (照れくさい|けど). Inflections such as
+                // なった|けど have no exact-spelling head and stay compositional.
+                if deconj_info.is_some() {
+                    if let Some(tail) = tokens.iter().find(|t| {
+                        t.start > position && t.end == eff_end && t.pos == "助詞"
+                    }) {
+                        if !matches!(tail.surface.as_str(), "て" | "で") {
+                            let stem: String = chars[position..tail.start].iter().collect();
+                            if !stem.is_empty() {
+                                if let Some((se, si)) = lookup_candidate(
+                                    &stem,
+                                    index,
+                                    decon,
+                                    context_reading,
+                                    morph_base,
+                                    tokens,
+                                    position,
+                                ) {
+                                    let stem_keys = normalize::normalize_variants(&stem);
+                                    let exact_spelling = se.iter().any(|e| {
+                                        stem_keys.iter().any(|k| {
+                                            e.spellings.iter().any(|s| s == k)
+                                        })
+                                    });
+                                    let different_winner = se.first().map_or(false, |e| {
+                                        entries.first().map_or(true, |current| e.id != current.id)
+                                    });
+                                    if exact_spelling && different_winner {
+                                        eff_end = tail.start;
+                                        candidate = stem;
+                                        entries = se;
+                                        deconj_info = si;
+                                    }
                                 }
                             }
                         }

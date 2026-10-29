@@ -679,3 +679,18 @@ bugs8-20	bugs	これぐらいでへこたれてどうするの?  まだまだ序
 bugs8-21	bugs	これぐらいでへこたれてどうするの?  まだまだ序の口よ?	lookup	ぐらい		top_spelling	位	ぐらい resolves to 位
 bugs8-22	bugs	遅れて息も絶え絶えな亮平が、へばるように小島に上陸した。	lookup	遅れて		surface	遅れて	kanji 息 blocks the teiku reading
 bugs8-23	bugs	遅れて息も絶え絶えな亮平が、へばるように小島に上陸した。	lookup	遅れて		not_surface	遅れて息	no reading-only overreach across the kanji
+bugfix-01	bugs	......心地良い。柔らかい胸に抱かれて、安堵とともに気持ちよさも感じる。	scan			has_span	とともに	lexicalized expression crosses function-word tokens
+bugfix-02	bugs	ゴメンゴメンっ。これ以上は、お見せできませんっ。	scan			has_span	お見せできません	prefix extends through the predicate's auxiliary chain
+bugfix-03	bugs	僕も、何だか照れくさいけど、凄く嬉しかった。	scan		照れくさい	surface	照れくさい	exact adjective head is not swallowed by a clause particle
+bugfix-04	bugs	僕も、何だか照れくさいけど、凄く嬉しかった。	scan			no_span	照れくさいけど	deconjugation must not absorb the following particle
+bugfix-05	bugs	もしかすると、みんなも来るかもしれないし。	scan			has_span	もしかすると	lexicalized adverb crosses content-word tokens
+bugfix-06	bugs	うん......わかった。それじゃ、少しずつ慣れていこうね。	scan			has_span	少しずつ	exact spelling protects the lexicalized adverb
+bugfix-07	bugs	体育の授業の時は、騙し騙しやっていたので、何とかなったけど、いつまでも嘘をついてもいられない。	scan			has_span	いられない	phrase-particle crossings do not swallow the final verb
+bugfix-08	bugs	体育の授業の時は、騙し騙しやっていたので、何とかなったけど、いつまでも嘘をついてもいられない。	scan			no_span	嘘をついてもい	prevent a shared-kanji deconjugation crossing particles
+bugfix-09	bugs	正直情けない......こんな歳になって、泳げないなんて。	scan			has_span	歳	noun stays separate from ordinary に + なる
+bugfix-10	bugs	正直情けない......こんな歳になって、泳げないなんて。	scan			no_span	歳になって	ordinary noun + に + なる is not honorific
+bugfix-10a	bugs	正直情けない......こんな歳になって、泳げないなんて。	lookup	歳		surface	歳	lookup at 歳 must not select the whole ordinary に + なる phrase
+bugfix-11	bugs	私とはるちゃんがって......今でも信じられないの......	scan			has_span	信じられない	sentence-final explanatory の splits from the predicate
+bugfix-12	bugs	私とはるちゃんがって......今でも信じられないの......	scan			no_span	信じられないの	prevent a trailing explanatory particle from fabricating a verb
+bugfix-13	bugs	告白したからといって、僕らに急激な変化みたいなものはないみたいだけど、気持ちが通じてるっていうことは凄く安心できるような気がした。	scan			has_span	通じてる	quotative って splits from the predicate
+bugfix-14	bugs	告白したからといって、僕らに急激な変化みたいなものはないみたいだけど、気持ちが通じてるっていうことは凄く安心できるような気がした。	scan			no_span	通じてるって	quotative particle is not part of the verb
