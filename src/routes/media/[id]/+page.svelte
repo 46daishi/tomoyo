@@ -200,7 +200,7 @@
                         onAction={() => (showEditModal = true)}
                     />
                 {/snippet}
-                <MediaStats {mediaId} {media} refreshKey={session.active} {settings}/>
+                <MediaStats {mediaId} {media} refreshKey={session.statsVersion} {settings}/>
             </MediaHeader>
         {/if}
 

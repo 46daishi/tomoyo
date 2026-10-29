@@ -11,6 +11,7 @@
     let vocab = $state({ gathering: true, percentage: null });
     let vn = $state(/** @type {Record<string, any> | null} */ (null));
     let jiten = $state(/** @type {Record<string, any> | null} */ (null));
+    let statsRequestId = 0;
 
     // Compact mode: once the cards would no longer fit in a single row next
     // to the cover, they collapse to title-only cards that expand on click.
@@ -78,10 +79,17 @@
     }
 
     async function loadStats() {
-        stats = await getMediaStats(mediaId);
-        if (settings?.estimate_coverage) {
-            vocab = await getVocabularyCoverage(mediaId);
-        }
+        // Session start/end can bump the refresh key back-to-back; drop an
+        // older result if a newer load has already started.
+        const my = ++statsRequestId;
+        const nextStats = await getMediaStats(mediaId);
+        if (my !== statsRequestId) return;
+        stats = nextStats;
+
+        if (!settings?.estimate_coverage) return;
+        const nextVocab = await getVocabularyCoverage(mediaId);
+        if (my !== statsRequestId) return;
+        vocab = nextVocab;
     }
 
     // VNDB/Jiten enrichment for the cards below. Best-effort: a failed fetch

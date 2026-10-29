@@ -22,6 +22,9 @@ let mediaColor = $state(null);
 let sessionId = $state(null);
 let running = $state(false);
 let seconds = $state(0);
+// Bumped once session writes have committed, so stats views can reload
+// aggregates without racing the fire-and-forget session SQL below.
+let statsVersion = $state(0);
 
 let currentText = $state('');
 /** @type {string[]} */
@@ -38,6 +41,25 @@ let tickHandle = null;
 let lastTouchAt = 0;
 let starting = false;
 let startToken = 0;
+
+// Session writes are fire-and-forget while reading, but the end-of-session
+// stats query must see all of them. Chain them so `finishSession` can queue
+// its `endSession` behind the final sentence writes and refresh only after
+// everything has committed.
+let writeChain = Promise.resolve();
+
+/**
+ * @param {() => Promise<unknown>} write
+ * @returns {Promise<unknown>} settles when this write has run
+ */
+function queueWrite(write) {
+    const next = writeChain.then(write);
+    writeChain = next.then(
+        () => {},
+        () => {}
+    );
+    return next;
+}
 
 /** @param {number} totalSeconds */
 function formatTime(totalSeconds) {
@@ -99,9 +121,16 @@ function finishSession(/** @type {string | null} */ reason = null) {
     baseSeconds = 0;
     resetReading();
     if (sid !== null) {
-        void endSession(sid, finalSeconds).catch((err) => {
-            console.warn('Failed to end reading session:', err);
-        });
+        // Queue the end behind the session's pending sentence writes, then
+        // refresh stats: querying any earlier misses this session's reading
+        // time (`ended_at` still NULL) and its final sentence's moji/events.
+        void queueWrite(() => endSession(sid, finalSeconds))
+            .then(() => {
+                statsVersion += 1;
+            })
+            .catch((err) => {
+                console.warn('Failed to end reading session:', err);
+            });
     }
     if (reason) notice = reason;
 }
@@ -175,6 +204,8 @@ async function start() {
     baseSeconds = 0;
     seconds = 0;
     beginTicking();
+    // The session row exists now; let media stats pick it up as last active.
+    statsVersion += 1;
 }
 
 function stop() {
@@ -226,15 +257,16 @@ function pushText(text, settings) {
     historyIndex = 0;
 
     const sid = sessionId;
-    void recordSentenceRead(sid, text.length).catch((err) => {
+    const mid = activeId;
+    void queueWrite(() => recordSentenceRead(sid, text.length)).catch((err) => {
         console.warn('Failed to record sentence read:', err);
     });
-    if (activeId != null) {
-        void logSentenceRead({
+    if (mid != null) {
+        void queueWrite(() => logSentenceRead({
             sessionId: sid,
-            mediaId: activeId,
+            mediaId: mid,
             sentenceText: text
-        }).catch((err) => {
+        })).catch((err) => {
             console.warn('Failed to log sentence read:', err);
         });
     }
@@ -285,6 +317,9 @@ export const session = {
     },
     get sessionId() {
         return sessionId;
+    },
+    get statsVersion() {
+        return statsVersion;
     },
     get seconds() {
         return seconds;
