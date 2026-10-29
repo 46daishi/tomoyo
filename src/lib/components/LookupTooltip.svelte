@@ -116,9 +116,24 @@
 
     // Native <select> preselects its first option, which would swallow the
     // first choice's change event. Deselect everything so picking any option
-    // (including the first) fires onchange.
-    function deselect(node) {
+    // (including the first) fires onchange. This has to be re-applied whenever
+    // the option list changes — when the tooltip moves to another word the
+    // same <select> element is reused, and the browser silently selects its
+    // first option again, making that choice look like a no-op.
+    /**
+     * @param {HTMLSelectElement} node
+     * @param {string} signature
+     */
+    function deselect(node, signature) {
         node.selectedIndex = -1;
+        return {
+            /** @param {string} nextSignature */
+            update(nextSignature) {
+                if (nextSignature === signature) return;
+                signature = nextSignature;
+                node.selectedIndex = -1;
+            },
+        };
     }
 </script>
 
@@ -223,7 +238,7 @@
                                                 class="mine-native"
                                                 aria-label="Mine word"
                                                 disabled={btnState.disabled}
-                                                use:deselect
+                                                use:deselect={forms.map((form) => form.value).join('\u0000')}
                                                 onchange={(e) => {
                                                     const value = e.currentTarget.value;
                                                     e.currentTarget.selectedIndex = -1;
